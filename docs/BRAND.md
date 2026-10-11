@@ -52,4 +52,4 @@ Bouncy and punchy, like a dealer who's showing off. Deals snap in fast (250-350 
 
 ## Voice
 
-Plain and a little cocky, like someone who knows the odds. Short sentences. Talk to one creator, say "you". Card and table words are seasoning, not every line: "Deal yourself in", "Play your hand", "Every account on one table".
+Plain and a little cocky, like someone who knows the odds. Short sentences. Talk to one creator, say "you". Card and table words are seasoning, not every line: "Deal yourself in", "Play your hand", "Every account in one deck".
