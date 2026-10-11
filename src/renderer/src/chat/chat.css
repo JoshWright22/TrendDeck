@@ -1728,3 +1728,63 @@
 .cx-messages * {
   user-select: text;
 }
+
+/* narrow chat: pickers shrink before the send button gets pushed out */
+.cx-box-row {
+  min-width: 0;
+}
+
+.cx-box-row .ui-dd {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.cx-box-row .ui-dd-btn {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.cx-box-row .ui-dd-btn > span:first-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cx-box-row .cx-send,
+.cx-box-row .ui-menu,
+.cx-box-row .ui-menu-btn {
+  flex: none;
+}
+
+/* wide tables and code scroll inside the message instead of squeezing or spilling */
+.cx-msg table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.cx-msg th,
+.cx-msg td {
+  min-width: 72px;
+}
+
+.cx-msg pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.cx-msg img,
+.cx-card {
+  max-width: 100%;
+}
+
+/* the side chat is too narrow for every control on one line, so they wrap */
+.cx.compact .cx-box-row {
+  flex-wrap: wrap;
+  row-gap: 6px;
+}
+
+.cx.compact .cx-box-row .cx-send {
+  margin-left: auto;
+}

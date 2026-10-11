@@ -38,8 +38,18 @@ body {
   color: var(--chalk);
   font: 13px/1.45 var(--body);
   overflow: hidden;
-  user-select: none;
   -webkit-font-smoothing: antialiased;
+}
+
+/* any text can be highlighted and copied into the chat, only the controls and chrome can't */
+button,
+.titlebar,
+.sidebar,
+.group-tabs,
+[role='tab'],
+[role='menu'],
+[role='listbox'] {
+  user-select: none;
 }
 
 button,
