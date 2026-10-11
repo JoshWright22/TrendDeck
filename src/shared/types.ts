@@ -1,4 +1,5 @@
 import type { PostingApi } from './posting'
+import type { MediaApi } from './media'
 
 export interface Site {
   id: string
@@ -200,6 +201,7 @@ export interface TrendDeckApi {
   clearAnalytics(brandId: string): Promise<AnalyticsDoc>
   onAnalyticsProgress(fn: (brandId: string, platform: StatPlatform | null) => void): () => void
   posting: PostingApi
+  media: MediaApi
 }
 
 // writer: drafts per idea, one file per brand in writer/

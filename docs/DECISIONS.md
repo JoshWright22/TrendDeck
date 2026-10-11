@@ -70,7 +70,8 @@ Calls made while building, so nobody has to guess later.
 - The ideas board replaced `pages/Ideas.tsx` and the last stub page went away once every page was real, so `Stub.tsx` is gone too.
 - Posting is the sixth page in the sidebar, after Analytics.
 - Each feature kept its own rising line mark component instead of sharing the one in `Icons.tsx`. They draw the same mark, merging them can wait.
-- The feature decisions stay in their own files: DECISIONS-ideas.md, DECISIONS-writer.md and DECISIONS-posting.md.
+- Media came in after posting. It sits between Ideas and Schedule like its branch had it, Posting stays last.
+- The feature decisions stay in their own files: DECISIONS-ideas.md, DECISIONS-writer.md, DECISIONS-posting.md and DECISIONS-media.md.
 
 ## One session per brand
 

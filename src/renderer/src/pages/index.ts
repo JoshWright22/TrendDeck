@@ -9,10 +9,12 @@ const Schedule = lazy(() => import('./schedule/SchedulePage'))
 const Writer = lazy(() => import('./writer/Writer'))
 const Analytics = lazy(() => import('./analytics/Analytics'))
 const Posting = lazy(() => import('../posting/PostingPage'))
+const Media = lazy(() => import('./media/MediaPage'))
 
 export const PAGE_VIEWS: Record<Page, LazyExoticComponent<ComponentType<PageProps>>> = {
   Trends,
   Ideas,
+  Media,
   Schedule,
   Writer,
   Analytics,
