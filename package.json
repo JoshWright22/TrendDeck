@@ -1,7 +1,7 @@
 {
   "name": "trenddeck",
   "productName": "TrendDeck",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Desktop marketing app for creators. One workspace per brand, every site logged in.",
   "license": "MIT",
   "author": "Josh Wright",
@@ -20,6 +20,7 @@
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
     "@fontsource/inter-tight": "^5.3.0",
+    "@ghostery/adblocker": "^2.20.1",
     "@ghostery/adblocker-electron": "^2.20.1",
     "electron-updater": "^6.8.9",
     "react": "^19.3.0",
