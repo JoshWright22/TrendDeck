@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AppData, StatPlatform, TrendDeckApi, TrendFeed } from '@shared/types'
 import { postingApi } from './posting'
+import { inboxApi } from './inbox'
 
 const api: TrendDeckApi = {
   platform: process.platform,
@@ -46,3 +47,4 @@ const api: TrendDeckApi = {
 }
 
 contextBridge.exposeInMainWorld('trenddeck', api)
+contextBridge.exposeInMainWorld('trenddeckInbox', inboxApi)

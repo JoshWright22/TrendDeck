@@ -7,6 +7,7 @@ import { dropTrends, setupTrends } from './trends'
 import { attachBrand, blocksPopup, setupAdblock } from './adblock'
 import { dropAnalytics, setupAnalytics } from './analytics'
 import { dropPostingBrand, setupPosting } from './posting'
+import { dropInboxBrand, setupInbox } from './inbox'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -148,10 +149,12 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   await dropTrends(brandId)
   await dropAnalytics(brandId)
   await dropPostingBrand(brandId)
+  await dropInboxBrand(brandId)
 })
 
 setupTrends()
 setupAnalytics()
+setupInbox()
 
 void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()

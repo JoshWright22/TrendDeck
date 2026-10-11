@@ -12,6 +12,7 @@ import {
   WriterIcon
 } from './Icons'
 import { PostingIcon } from '../posting/bits'
+import { InboxIcon, useInbox } from '../pages/inbox/useInbox'
 
 export type View = { kind: 'page'; page: Page } | { kind: 'site'; id: string }
 
@@ -21,7 +22,8 @@ const NAV_ICONS: Record<Page, () => ReactNode> = {
   Schedule: ScheduleIcon,
   Writer: WriterIcon,
   Analytics: AnalyticsIcon,
-  Posting: PostingIcon
+  Posting: PostingIcon,
+  Inbox: InboxIcon
 }
 
 interface Props {
@@ -40,6 +42,7 @@ interface Props {
 
 export default function Sidebar(props: Props): ReactNode {
   const { brand, view } = props
+  const inbox = useInbox(brand?.id)
   return (
     <aside className="sidebar">
       {brand && (
@@ -88,6 +91,7 @@ export default function Sidebar(props: Props): ReactNode {
           onRemove={props.onRemoveSite}
           onMove={props.onMoveSite}
           onAdd={props.onAddSite}
+          health={inbox?.health}
         />
       )}
 
