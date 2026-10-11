@@ -1,0 +1,19 @@
+appId: com.joshwright.trenddeck
+productName: TrendDeck
+directories:
+  output: release
+  buildResources: resources
+files:
+  - out/**
+  - resources/**
+  - package.json
+win:
+  target: nsis
+  icon: resources/icon.ico
+  artifactName: TrendDeck-Setup.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
+  createDesktopShortcut: true
+  shortcutName: TrendDeck
+publish: null
