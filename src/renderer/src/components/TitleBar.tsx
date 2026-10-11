@@ -159,12 +159,26 @@ function Search({ brands, brand, onPick }: Pick<Props, 'brands' | 'brand' | 'onP
 
 export function WindowButtons(): ReactNode {
   const [max, setMax] = useState(false)
+  const [update, setUpdate] = useState<string | null>(null)
   useEffect(() => {
     void window.trenddeck.windowControl('state').then(setMax)
     return window.trenddeck.onMaximized(setMax)
   }, [])
+  useEffect(() => {
+    void window.trenddeck.updateReady().then(setUpdate)
+    return window.trenddeck.onUpdateReady(setUpdate)
+  }, [])
   return (
     <div className="win-buttons">
+      {update && (
+        <button
+          className="update-btn"
+          title={`Version ${update} is ready. Restarts TrendDeck.`}
+          onClick={() => void window.trenddeck.installUpdate()}
+        >
+          Update
+        </button>
+      )}
       <button className="win-btn" title="Minimize" aria-label="Minimize" onClick={() => void window.trenddeck.windowControl('minimize')}>
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
           <path d="M0 5.5h10" stroke="currentColor" />

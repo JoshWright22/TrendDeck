@@ -28,6 +28,13 @@ const api: TrendDeckApi = {
     setPace: (pace) => ipcRenderer.invoke('reuse:pace-set', pace),
     listShorts: (brandId, channelUrl) => ipcRenderer.invoke('reuse:shorts', brandId, channelUrl)
   },
+  updateReady: () => ipcRenderer.invoke('update:state'),
+  onUpdateReady: (fn) => {
+    const listener = (_event: unknown, version: string): void => fn(version)
+    ipcRenderer.on('update:ready', listener)
+    return () => ipcRenderer.removeListener('update:ready', listener)
+  },
+  installUpdate: () => ipcRenderer.invoke('update:install'),
   loadData: () => ipcRenderer.invoke('data:load'),
   saveData: (data: AppData) => ipcRenderer.invoke('data:save', data),
   clearBrandSession: (brandId: string) => ipcRenderer.invoke('brand:clear-session', brandId),
