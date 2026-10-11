@@ -1,0 +1,171 @@
+.reuse-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  gap: 18px;
+  padding: 18px;
+}
+
+.reuse-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.reuse-side {
+  flex: none;
+  width: 280px;
+  padding: 14px;
+  background: #16161a;
+  border: 1px solid #2a2a33;
+  border-radius: 12px;
+  align-self: flex-start;
+}
+
+.reuse-side h3,
+.reuse-col h3,
+.reuse-review h3 {
+  margin: 0 0 8px;
+  font: 800 15px/1.2 var(--head);
+  letter-spacing: -0.04em;
+}
+
+.reuse-video,
+.reuse-picks,
+.reuse-when {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.reuse-video input {
+  flex: 1;
+  min-width: 0;
+}
+
+.reuse-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.reuse-col,
+.reuse-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #16161a;
+  border: 1px solid #2a2a33;
+  border-radius: 12px;
+  animation: reuse-deal 200ms ease-out both;
+}
+
+@keyframes reuse-deal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reuse-col,
+  .reuse-row {
+    animation: none;
+  }
+}
+
+.reuse-col textarea {
+  resize: vertical;
+}
+
+.reuse-checks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.reuse-checks li::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  background: currentColor;
+}
+
+.reuse-page .ok {
+  color: #00bf9c;
+}
+
+.reuse-page .warn {
+  color: #ffd814;
+}
+
+.reuse-page .bad {
+  color: #fa4e93;
+}
+
+.reuse-review {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reuse-snip {
+  white-space: pre-wrap;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.reuse-msg {
+  margin: 0;
+  color: #00bf9c;
+}
+
+.reuse-shorts {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reuse-shorts li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.reuse-shorts li span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pace-grid {
+  display: grid;
+  grid-template-columns: 1fr 90px 130px;
+  gap: 6px 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.pace-row {
+  display: contents;
+}
+
+.pace-row input {
+  width: 100%;
+}
+

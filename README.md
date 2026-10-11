@@ -28,6 +28,7 @@ Working now:
 - **Writer.** One idea written for YouTube, TikTok, Instagram, X and Reddit, with limits counted and versions saved.
 - **Analytics.** Your followers and views read from your own logged in accounts when you press Refresh.
 - **Media.** Every video, image and file you post, per brand. Drop them in or watch your exports folder, see what's been posted where, and pick which ones an agent may use.
+- **Shorts.** One vertical video out as a YouTube Short, an Instagram Reel and a TikTok, each with its own caption, spaced out so they don't all land at once. Posting pace keeps each site under a daily limit.
 - **Inbox.** Comments from YouTube, Instagram, TikTok, X and Reddit in one list when you press Refresh, with spam filters. A dot next to each site shows if you're still logged in.
 - **Links stay in the app.** A trend, an idea or any link opens in that brand's tab for the site, or in a temporary tab if you don't have one. Never your normal browser.
 - **Ad blocker.** On by default with the same filter lists as uBlock Origin, YouTube ads included. Turn it off per brand or allow a site in Settings.

@@ -21,6 +21,12 @@ const api: TrendDeckApi = {
     return () => ipcRenderer.removeListener('open:url', listener)
   },
   posting: postingApi,
+  reuse: {
+    probe: (brandId, mediaId) => ipcRenderer.invoke('reuse:probe', brandId, mediaId),
+    getPace: () => ipcRenderer.invoke('reuse:pace-get'),
+    setPace: (pace) => ipcRenderer.invoke('reuse:pace-set', pace),
+    listShorts: (brandId, channelUrl) => ipcRenderer.invoke('reuse:shorts', brandId, channelUrl)
+  },
   loadData: () => ipcRenderer.invoke('data:load'),
   saveData: (data: AppData) => ipcRenderer.invoke('data:save', data),
   clearBrandSession: (brandId: string) => ipcRenderer.invoke('brand:clear-session', brandId),

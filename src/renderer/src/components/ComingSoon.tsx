@@ -1,6 +1,17 @@
 import type { ReactNode } from 'react'
 
-export const PAGES = ['Trends', 'Ideas', 'Voice', 'Media', 'Schedule', 'Writer', 'Analytics', 'Posting', 'Inbox'] as const
+export const PAGES = [
+  'Trends',
+  'Ideas',
+  'Voice',
+  'Media',
+  'Schedule',
+  'Writer',
+  'Analytics',
+  'Posting',
+  'Shorts',
+  'Inbox'
+] as const
 export type Page = (typeof PAGES)[number]
 
 const BLURBS: Record<Page, string> = {
@@ -12,6 +23,7 @@ const BLURBS: Record<Page, string> = {
   Writer: 'Draft titles, captions and scripts for each site.',
   Analytics: 'How your posts did across every site, in one place.',
   Posting: 'Post to every site from one place.',
+  Shorts: 'One vertical video out as a Short, a Reel and a TikTok.',
   Inbox: 'Comments from every site in one list.'
 }
 

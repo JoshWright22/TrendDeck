@@ -16,6 +16,7 @@ import { PostingIcon } from '../posting/bits'
 import { MediaIcon } from '../pages/media/MediaIcons'
 import { VoiceIcon } from '../pages/voice/VoiceIcon'
 import { InboxIcon, useInbox } from '../pages/inbox/useInbox'
+import { ShortsIcon } from '../pages/reuse/ShortsIcon'
 
 export type View =
   | { kind: 'page'; page: Page }
@@ -32,6 +33,7 @@ const NAV_ICONS: Record<Page, () => ReactNode> = {
   Writer: WriterIcon,
   Analytics: AnalyticsIcon,
   Posting: PostingIcon,
+  Shorts: ShortsIcon,
   Inbox: InboxIcon
 }
 

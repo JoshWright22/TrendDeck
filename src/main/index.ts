@@ -16,6 +16,7 @@ import { forgetBrandLogins, setupVault } from './vault'
 import { dropChats, setupAgents, stopBrand } from './agents'
 import { dropVoice, setupVoice } from './voice'
 import { dropInboxBrand, setupInbox } from './inbox'
+import { setupReuse } from './reuse'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -187,6 +188,7 @@ void app.whenReady().then(() => {
   setupAdblock()
   setupPosting()
   setupMedia()
+  setupReuse()
   createWindow()
   void setupUpdater()
   app.on('activate', () => {

@@ -12,6 +12,7 @@ const Posting = lazy(() => import('../posting/PostingPage'))
 const Media = lazy(() => import('./media/MediaPage'))
 const Voice = lazy(() => import('./voice/VoicePage'))
 const Inbox = lazy(() => import('./inbox/InboxPage'))
+const Shorts = lazy(() => import('./reuse/ShortsPage'))
 
 export const PAGE_VIEWS: Record<Page, LazyExoticComponent<ComponentType<PageProps>>> = {
   Trends,
@@ -22,5 +23,6 @@ export const PAGE_VIEWS: Record<Page, LazyExoticComponent<ComponentType<PageProp
   Writer,
   Analytics,
   Posting,
+  Shorts,
   Inbox
 }

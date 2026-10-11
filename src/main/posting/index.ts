@@ -30,6 +30,7 @@ import * as store from './store'
 import { recordPost, resolveForUpload } from '../media/upload'
 import { getData } from '../store'
 import { siteForUrl, waitForTab } from '../mcp/tabs'
+import { paceHold } from '../reuse/pace'
 
 const TICK_MS = 20 * 1000
 // due more than this long ago when the app opens, it waits for you instead of firing late
@@ -276,6 +277,12 @@ async function tick(first: boolean): Promise<void> {
       const msg = 'the app was closed when this was due'
       await store.patchPost(p.id, { status: 'missed', note: msg })
       await log(p, store.brandSettings(p.brandId).modes[p.platform], 'missed', msg)
+      continue
+    }
+    // pace limits can push it back a bit
+    const later = paceHold(p, store.allPosts(), now)
+    if (later) {
+      await store.patchPost(p.id, { scheduledAt: later.at, note: later.note })
       continue
     }
     await store.patchPost(p.id, { status: 'queued', note: 'due now' })

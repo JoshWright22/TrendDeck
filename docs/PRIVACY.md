@@ -12,7 +12,7 @@ All of it is in the app's user data folder:
 
 | What | File | Notes |
 |---|---|---|
-| Brands, keywords, subreddits, sites, ideas, chat threads, settings | `trenddeck.json` | plain json, not encrypted |
+| Brands, keywords, subreddits, sites, ideas, settings | `trenddeck.json` | plain json, not encrypted |
 | YouTube Data API key, if you set one | `trenddeck.json` | plain text, same as above |
 | Logins and site data for each brand | `Partitions/brand-<id>/` | cookies, local storage and cache, kept by Chromium the same way a browser keeps them |
 | Trends cache | `trends/<brand id>.json` | the last feed per brand |
@@ -20,8 +20,17 @@ All of it is in the app's user data folder:
 | Agent access | `mcp/state.json` | which sites agents may use, the activity log, drafts and post requests |
 | Agent attach files | `mcp/*.json`, `mcp/bridge.cjs` | config for one chat message, deleted when it's done |
 | Saved logins | `vault/logins.json` | username, password and notes locked with your system keychain, plus the sign-in log |
+| Chats | `chats/<brand id>.json` | every chat with your agents, plain json |
+| Your own agents | `agents.json` | commands and API urls, API keys locked with your system keychain when it's there |
+| Agent limits | `agent-usage.json` | the usage limits an agent last reported |
+| Agent folder | `agent-room/` | an empty folder agents run in so they don't read your files |
+| Brand voice | `voice/<brand id>.json` | your profile and past posts |
+| Inbox | `inbox/<brand id>.json` | comments read from your accounts, read marks and spam filters |
+| Media library | `media/<brand id>.json`, `media/<brand id>/` | file list, thumbnails and copies you asked for |
+| Posting | `posting.json`, `posting-keys.json` | queue, log and settings, API keys locked with your system keychain when it's there |
+| Posting pace | `reuse-pace.json` | daily limits and gaps per site |
 
-Deleting a brand deletes its logins, its saved logins, its trends cache and its agent access data. Deleting the folder deletes everything.
+Deleting a brand deletes its logins, its saved logins, its trends cache, its agent access data, its chats, its voice, its inbox, its media library and its posts. Deleting the folder deletes everything.
 
 ## What goes out, and when
 
@@ -31,8 +40,10 @@ Nothing goes out unless it's one of these.
 - **Trends.** When the Trends page loads, or every 10 minutes while the app is open if the open brand's feed is over 3 hours old, the app asks Reddit, YouTube, Google Trends and TikTok for your keywords and subreddits. It uses the brand's own session, so if you're logged in those sites see the searches on your account. With a YouTube key set, the key goes to Google with the YouTube requests. TikTok's general list is fetched even with no keywords. There's no switch to turn trends off yet.
 - **Update check.** A few seconds after the app starts and every 6 hours, it asks GitHub for the latest version file. That's the whole request, nothing about you or your brands goes with it. If there's a new version it downloads from GitHub and installs when you quit. Turn off Settings > Update automatically and it never checks. Running from source never checks.
 - **Ad block lists.** About once a day the app downloads the public ad and tracker lists. The request has no data about you or your brands.
-- **Links.** Clicking a trend or idea link opens it in your normal browser.
+- **Links.** Clicking a trend, idea or chat link opens it in a tab inside the app on that brand's session.
 - **Spellcheck on Linux.** Chromium downloads its spellcheck dictionary from Google the first time you type in a text box. On Windows and macOS it uses the system spellchecker and nothing is downloaded.
+- **Brand voice import, inbox and analytics refresh.** Only when you press Import or Refresh. The app opens your own pages on those sites in a hidden window on the brand's session and reads them.
+- **Shorts import.** Only when you press it. The app loads your channel's Shorts page on the brand's session.
 - **Chat.** When you send a chat message, the agent you picked gets your message and works through its own provider, the same way it does in a terminal. What it can see through TrendDeck is below.
 
 The app never loads remote images or fonts for its own screens, has no crash reporter.
