@@ -1698,3 +1698,10 @@
 .cx.compact .cx-q-option {
   padding: 8px 10px;
 }
+
+/* home: the conversation sits in the middle of the window, not of what's left beside the sidebar */
+@media (min-width: 1180px) {
+  .main.home .cx-main {
+    padding-right: 224px;
+  }
+}

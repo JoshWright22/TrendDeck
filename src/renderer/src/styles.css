@@ -87,7 +87,7 @@ select:focus-visible,
   height: 100%;
   /* the indigo spotlight on the felt */
   background:
-    radial-gradient(ellipse 60% 50% at 18% 0%, rgba(59, 70, 164, 0.22), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(59, 70, 164, 0.22), transparent 70%),
     var(--felt);
 }
 
@@ -1887,4 +1887,73 @@ select:focus-visible,
 .about-line strong {
   font: 800 16px var(--head);
   letter-spacing: -0.04em;
+}
+
+/* a sidebar group's pages, as tabs over the page */
+
+.group-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.group-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex: none;
+  height: 44px;
+  border-bottom: 1px solid var(--line);
+}
+
+.group-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: var(--smoke);
+  font-weight: 500;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.group-tab:hover {
+  color: var(--chalk);
+}
+
+.group-tab.active {
+  background: var(--raised);
+  color: var(--chalk);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.group-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* the tab already names the page */
+.group-body .page-head > h2:first-child {
+  display: none;
+}
+
+/* the chat's list of chats, in the sidebar */
+
+.side-threads {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 96px;
+  padding: 0 0 12px;
+}
+
+.side-threads ~ .side-section {
+  flex: none;
+  max-height: 34%;
 }

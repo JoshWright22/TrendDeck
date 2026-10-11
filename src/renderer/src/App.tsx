@@ -8,6 +8,7 @@ import SiteView from './components/SiteView'
 import TitleBar, { type SearchPick } from './components/TitleBar'
 import { ChatToggle } from './components/PageHeader'
 import { PAGE_VIEWS } from './pages'
+import GroupTabs from './components/GroupTabs'
 import ShareTab from './components/mcp/ShareTab'
 import { useAgentEvents } from './components/mcp/useAgentEvents'
 import CodePrompt from './components/vault/CodePrompt'
@@ -333,19 +334,28 @@ export default function App(): ReactNode {
             </Suspense>
           )}
           {brand && PageView && view.kind === 'page' && (
-            <Suspense fallback={<div className="page" />}>
-              <PageView
-                key={`${brand.id}:${view.page}`}
+            <div className="group-view">
+              <GroupTabs
                 page={view.page}
-                brand={brand}
-                editBrand={(fn) => editBrand(brand.id, fn)}
-                onEditBrand={() => setModal({ kind: 'brand', id: brand.id })}
-                chatOpen={data.chatOpen}
-                onToggleChat={toggleChat}
-                trendQuery={trendQuery}
-                onTrendQuery={setTrendQuery}
+                onPage={(page) => setView({ kind: 'page', page })}
+                count={{ Ideas: brand.ideas.length }}
               />
-            </Suspense>
+              <div className="group-body">
+                <Suspense fallback={<div className="page" />}>
+                  <PageView
+                    key={`${brand.id}:${view.page}`}
+                    page={view.page}
+                    brand={brand}
+                    editBrand={(fn) => editBrand(brand.id, fn)}
+                    onEditBrand={() => setModal({ kind: 'brand', id: brand.id })}
+                    chatOpen={data.chatOpen}
+                    onToggleChat={toggleChat}
+                    trendQuery={trendQuery}
+                    onTrendQuery={setTrendQuery}
+                  />
+                </Suspense>
+              </div>
+            </div>
           )}
         </main>
 

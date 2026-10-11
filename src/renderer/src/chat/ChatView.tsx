@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { Brand, TrendItem, TrendSource } from '@shared/types'
 import type {
@@ -142,6 +143,8 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
   const [config, setConfig] = useState<AgentConfig>({ defaultAgentId: null, custom: [] })
   const [threads, setThreads] = useState<ThreadSummary[]>([])
   const [openId, setOpenId] = useState<string | null>(null)
+  const [sideSlot, setSideSlot] = useState<HTMLElement | null>(null)
+  useEffect(() => setSideSlot(compact ? null : document.getElementById('side-threads')), [compact])
   const [thread, setThread] = useState<Thread | null>(null)
   const [draft, setDraft] = useState('')
   const [files, setFiles] = useState<Attachment[]>([])
@@ -756,16 +759,19 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
 
   return (
     <section className={`cx${compact ? ' compact' : ''}`} aria-label="Chat">
-      {!compact && (
-        <aside className="cx-side">
-          <button className="cx-new" onClick={() => setOpenId(null)} title="New chat (Ctrl+Shift+N)">
-            <PlusIcon />
-            New chat
-          </button>
-          {threadList}
-          <p className="cx-keys muted small">{SHORTCUTS}</p>
-        </aside>
-      )}
+      {/* the full chat keeps its list of chats in the sidebar */}
+      {!compact &&
+        sideSlot &&
+        createPortal(
+          <>
+            <button className="cx-new" onClick={() => setOpenId(null)} title={`New chat. ${SHORTCUTS}`}>
+              <PlusIcon />
+              New chat
+            </button>
+            {threadList}
+          </>,
+          sideSlot
+        )}
 
       <div className={`cx-main${home ? ' home' : ''}`}>
         <header className="cx-head">

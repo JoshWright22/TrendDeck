@@ -1,23 +1,12 @@
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import type { Brand, Site } from '@shared/types'
 import SiteTabs from './SiteTabs'
 import PhoneTab from '../emulator/PhoneTab'
-import { PAGES, type Page } from './ComingSoon'
-import {
-  AnalyticsIcon,
-  ChatIcon,
-  EditIcon,
-  IdeasIcon,
-  ScheduleIcon,
-  SettingsIcon,
-  TrendsIcon,
-  WriterIcon
-} from './Icons'
+import type { Page } from './ComingSoon'
+import { GROUPS, groupOf, type Group } from './groups'
+import { ChatIcon, EditIcon, IdeasIcon, SettingsIcon, TrendsIcon, WriterIcon } from './Icons'
 import { PostingIcon } from '../posting/bits'
-import { MediaIcon } from '../pages/media/MediaIcons'
-import { VoiceIcon } from '../pages/voice/VoiceIcon'
-import { InboxIcon, useInbox } from '../pages/inbox/useInbox'
-import { ShortsIcon } from '../pages/reuse/ShortsIcon'
+import { useInbox } from '../pages/inbox/useInbox'
 
 export type View =
   | { kind: 'page'; page: Page }
@@ -26,17 +15,11 @@ export type View =
   | { kind: 'chat' }
   | { kind: 'phone' }
 
-const NAV_ICONS: Record<Page, () => ReactNode> = {
-  Trends: TrendsIcon,
-  Ideas: IdeasIcon,
-  Voice: VoiceIcon,
-  Media: MediaIcon,
-  Schedule: ScheduleIcon,
-  Writer: WriterIcon,
-  Analytics: AnalyticsIcon,
-  Posting: PostingIcon,
-  Shorts: ShortsIcon,
-  Inbox: InboxIcon
+const GROUP_ICONS: Record<Group['name'], () => ReactNode> = {
+  Discover: TrendsIcon,
+  Plan: IdeasIcon,
+  Create: WriterIcon,
+  Publish: PostingIcon
 }
 
 interface Props {
@@ -56,6 +39,10 @@ interface Props {
 export default function Sidebar(props: Props): ReactNode {
   const { brand, view } = props
   const inbox = useInbox(brand?.id)
+  // a group opens on the tab you last had open in it
+  const last = useRef<Partial<Record<Group['name'], Page>>>({})
+  const group = view.kind === 'page' ? groupOf(view.page) : null
+  if (group && view.kind === 'page') last.current[group.name] = view.page
   return (
     <aside className="sidebar">
       {brand && (
@@ -81,25 +68,25 @@ export default function Sidebar(props: Props): ReactNode {
           <ChatIcon />
           <span className="side-name">Chat</span>
         </button>
-        {PAGES.map((p) => {
-          const Icon = NAV_ICONS[p]
-          const active = view.kind === 'page' && view.page === p
+        {GROUPS.map((g) => {
+          const Icon = GROUP_ICONS[g.name]
+          const active = group?.name === g.name
           return (
             <button
-              key={p}
+              key={g.name}
               className={`side-item${active ? ' active' : ''}`}
               aria-current={active ? 'page' : undefined}
-              onClick={() => props.onView({ kind: 'page', page: p })}
+              onClick={() => props.onView({ kind: 'page', page: last.current[g.name] ?? g.pages[0] })}
             >
               <Icon />
-              <span className="side-name">{p}</span>
-              {p === 'Ideas' && brand && brand.ideas.length > 0 && (
-                <span className="count">{brand.ideas.length}</span>
-              )}
+              <span className="side-name">{g.name}</span>
             </button>
           )
         })}
       </nav>
+
+      {/* the chat puts its list of chats here while it's open */}
+      {view.kind === 'chat' && <div id="side-threads" className="side-threads" />}
 
       {brand && (
         <SiteTabs
