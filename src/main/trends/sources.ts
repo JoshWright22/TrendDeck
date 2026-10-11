@@ -263,8 +263,9 @@ async function trendsJson<T>(ctx: Ctx, url: string): Promise<T> {
   return JSON.parse(stripGuard(await getText(ctx.ses, url))) as T
 }
 
-async function risingQueries(ctx: Ctx, keyword: string): Promise<RankedKeyword[]> {
-  const req = { comparisonItem: [{ keyword, geo: '', time: 'now 7-d' }], category: 0, property: '' }
+async function relatedQueries(ctx: Ctx, keyword: string, time: string): Promise<RankedKeyword[][]> {
+  // google finds nothing for "Game Development" but plenty for "game development"
+  const req = { comparisonItem: [{ keyword: keyword.toLowerCase(), geo: '', time }], category: 0, property: '' }
   const explore = await trendsJson<{ widgets?: Widget[] }>(
     ctx,
     `https://trends.google.com/trends/api/explore?hl=en-US&tz=0&req=${encodeURIComponent(JSON.stringify(req))}`
@@ -276,7 +277,18 @@ async function risingQueries(ctx: Ctx, keyword: string): Promise<RankedKeyword[]
     `https://trends.google.com/trends/api/widgetdata/relatedsearches?hl=en-US&tz=0&req=${encodeURIComponent(JSON.stringify(widget.request))}&token=${encodeURIComponent(widget.token)}`
   )
   // list 0 is top, list 1 is rising
-  return related.default?.rankedList?.[1]?.rankedKeyword ?? []
+  return (related.default?.rankedList ?? []).map((l) => l.rankedKeyword ?? [])
+}
+
+// broad keywords often have nothing rising this week, so widen to three months, then
+// fall back to what people search most with it
+async function risingQueries(ctx: Ctx, keyword: string): Promise<RankedKeyword[]> {
+  const week = await relatedQueries(ctx, keyword, 'now 7-d')
+  if (week[1]?.length) return week[1]
+  await sleep(800)
+  const month = await relatedQueries(ctx, keyword, 'today 3-m')
+  if (month[1]?.length) return month[1]
+  return (month[0]?.length ? month[0] : (week[0] ?? [])).map((r) => ({ ...r, formattedValue: 'Top' }))
 }
 
 export async function google(ctx: Ctx): Promise<RawItem[]> {
@@ -313,7 +325,10 @@ export async function google(ctx: Ctx): Promise<RawItem[]> {
         source: 'google',
         title: r.query,
         url: `https://trends.google.com/trends/explore?date=now%207-d&q=${encodeURIComponent(r.query)}`,
-        detail: `${r.formattedValue === 'Breakout' ? 'Breakout' : r.formattedValue} searches, from "${k}"`,
+        detail:
+          r.formattedValue === 'Top'
+            ? `Top search with "${k}"`
+            : `${r.formattedValue} searches, from "${k}"`,
         publishedAt: null,
         velocity: r.value,
         value: r.value,

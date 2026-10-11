@@ -296,6 +296,8 @@ export function setupAdblock(): void {
     }
   )
   ipcMain.handle('@ghostery/adblocker/is-mutation-observer-enabled', () => {
-    return engine?.config.enableMutationObserver ?? false
+    // watching every dom change costs youtube about two seconds per load and stalls it while
+    // it runs, the first pass of hiding rules plus the network and script rules cover the ads
+    return false
   })
 }
