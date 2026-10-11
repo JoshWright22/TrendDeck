@@ -4,6 +4,7 @@ import { postingApi } from './posting'
 import { mediaApi } from './media'
 import type { McpApi } from '@shared/mcp'
 import type { VaultApi } from '@shared/vault'
+import { chatApi } from './chat'
 
 const api: TrendDeckApi = {
   platform: process.platform,
@@ -84,3 +85,5 @@ const vault: VaultApi = {
 }
 
 contextBridge.exposeInMainWorld('trenddeckVault', vault)
+
+contextBridge.exposeInMainWorld('trenddeckChat', chatApi)

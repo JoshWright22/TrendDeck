@@ -4,6 +4,7 @@ import SiteTabs from './SiteTabs'
 import { PAGES, type Page } from './ComingSoon'
 import {
   AnalyticsIcon,
+  ChatIcon,
   EditIcon,
   IdeasIcon,
   ScheduleIcon,
@@ -14,7 +15,11 @@ import {
 import { PostingIcon } from '../posting/bits'
 import { MediaIcon } from '../pages/media/MediaIcons'
 
-export type View = { kind: 'page'; page: Page } | { kind: 'site'; id: string } | { kind: 'settings' }
+export type View =
+  | { kind: 'page'; page: Page }
+  | { kind: 'site'; id: string }
+  | { kind: 'settings' }
+  | { kind: 'chat' }
 
 const NAV_ICONS: Record<Page, () => ReactNode> = {
   Trends: TrendsIcon,
@@ -59,6 +64,14 @@ export default function Sidebar(props: Props): ReactNode {
       )}
 
       <nav className="side-section" aria-label="Pages">
+        <button
+          className={`side-item${view.kind === 'chat' ? ' active' : ''}`}
+          aria-current={view.kind === 'chat' ? 'page' : undefined}
+          onClick={() => props.onView({ kind: 'chat' })}
+        >
+          <ChatIcon />
+          <span className="side-name">Chat</span>
+        </button>
         {PAGES.map((p) => {
           const Icon = NAV_ICONS[p]
           const active = view.kind === 'page' && view.page === p

@@ -12,10 +12,11 @@ import { Chips, cleanKeyword, cleanSub, type ChipList } from './BrandModal'
 import { ChatToggle } from './PageHeader'
 import { CloseIcon, PlusIcon } from './Icons'
 import AgentAccess from './mcp/AgentAccess'
+import AgentsSection from '../chat/AgentsSection'
 import SavedLogins from './vault/SavedLogins'
 
 const REPO_URL = 'https://github.com/JoshWright22/TrendDeck'
-const SECTIONS = ['Brand', 'Sites', 'Ad blocker', 'Tabs', 'Trends', 'Agent access', 'Saved logins', 'About'] as const
+const SECTIONS = ['Brand', 'Sites', 'Ad blocker', 'Tabs', 'Trends', 'Agents', 'Agent access', 'Saved logins', 'About'] as const
 
 interface Props {
   data: AppData
@@ -316,6 +317,7 @@ export default function Settings(props: Props): ReactNode {
         </p>
       </>
     ),
+    Agents: <AgentsSection />,
     'Agent access': <AgentAccess brandId={brand.id} />,
     'Saved logins': <SavedLogins brandId={brand.id} />,
     About: (

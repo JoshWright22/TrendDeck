@@ -16,6 +16,7 @@ I wanted one app that's fast on a cheap laptop, keeps everything on your machine
 
 Working now:
 
+- **Chat.** The home screen. Ask your agent (any of the ones above, or your own) for ideas, outlines, titles and posts, with your brand and trends as context. Agents only ever run when you send a message.
 - **Brands.** Your brands sit as small cards in the title bar. Each one has its own logins, niche keywords and recommendations, and switching is one click or Ctrl+1 to 9.
 - **Every account at once.** Each brand gets its own browser session, so two brands can be logged into two different accounts on the same site and they never mix.
 - **Site tabs.** Reddit, X, Instagram, TikTok, YouTube, YouTube Studio, vidIQ and 1of10 to start. Add any site with a name and a URL, drag to reorder.
@@ -31,7 +32,7 @@ Working now:
 - **Search.** One box in the title bar for trends, sites, brands and ideas. Paste a link to open it. Ctrl+K gets you there.
 - **Quick on a cheap laptop.** The ad blocker loads after the window is up, sites you leave go quiet until you come back, and nothing heavy loads before you need it.
 - **First run setup.** Name your brand and niche, pick your sites, done. Or skip it.
-- **Settings.** One screen for the brand, its sites, the ad blocker, tabs and updates.
+- **Settings.** One screen for the brand, its sites, the ad blocker, tabs, agents and updates.
 - **Local first.** Everything is saved on your computer. No account, no server.
 - **Posting.** Write a post once and TrendDeck fills it in on YouTube, TikTok, Instagram, X or Reddit in your logged in session, then stops at Post so you can check it. It can press Post itself, run scheduled posts while the app is open, or go through the official APIs instead.
 
@@ -39,7 +40,6 @@ Brand colors, type and logo rules are in [docs/BRAND.md](docs/BRAND.md).
 
 Coming next:
 
-- **Chat**: ask your AI agent (any of the ones above, or your own) for ideas, outlines, titles and posts, with your brand and trends as context. Agents only ever run when you send a message.
 - **Phone emulator** for app-only features
 
 ## Installation

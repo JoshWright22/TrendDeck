@@ -5,7 +5,7 @@ Calls made while building, so nobody has to guess later.
 ## Layout
 
 - Brand switcher is a row of small brand cards in the title bar, not a dropdown. Every brand stays one click away and the shortcut number shows on hover.
-- The app always opens on Trends. What each brand has open isn't saved, only kept while the app runs.
+- The app always opens on the chat. What each brand has open isn't saved, only kept while the app runs.
 - Sites you visit stay loaded after you leave them, hidden with CSS so switching back is instant. Each brand keeps its 6 most recently used ones, the oldest gets closed when you open a 7th. The number is in Settings > Tabs, 1 to 20. A closed one reopens on the last page you were on, it just reloads.
 - Other brands keep their tabs too, so switching brands and back is instant as well. That's more memory with a lot of brands, the cap is per brand to keep it simple.
 - Hidden, not `display: none`. A webview that loses its size has to lay the page out again when it comes back, which is the delay this is meant to remove. Webviews never move in the page either, moving one reloads it.
@@ -13,7 +13,7 @@ Calls made while building, so nobody has to guess later.
 - After 4 seconds without input the brand's first 3 sites load in the background, one at a time 8 seconds apart, so the usual ones are ready before you click. Only into free slots, it never closes a tab you used to make room. Each site is only warmed once per run.
 - Switching back to a site went from about 580 ms before anything showed and 8 s until the page finished loading, to about 25 ms with nothing to load. Four sites open went from 1.4 GB to 1.9 GB of memory, that's the trade.
 - Ctrl+1..9 (Cmd on macOS) picks the brand in rail order. When a site has focus the main process catches the keys first, otherwise the site would eat them.
-- Chat sits on the right, toggled from the top right of every page. Threads are saved per brand. No agent is wired up yet, so sending just saves your message to the thread.
+- Chat is the home screen and the first item in the sidebar. On every other page it can sit on the right too, toggled from the top right. See DECISIONS-chat.md.
 - Pages and the chat pane are lazy loaded, each one is its own chunk.
 - Fonts (Inter, Inter Tight) come from @fontsource and get bundled, latin subset only to keep the build small.
 
@@ -102,10 +102,12 @@ Calls made while building, so nobody has to guess later.
 - Each feature kept its own rising line mark component instead of sharing the one in `Icons.tsx`. They draw the same mark, merging them can wait.
 - Media came in after posting. It sits between Ideas and Schedule like its branch had it, Posting stays last.
 - MCP and saved logins came last. Agent access and Saved logins sit at the bottom of Settings under the ad blocker. The branch's update switch is kept since main's updater already reads `settings.autoUpdate`. The share button sits next to the chat toggle in a site's toolbar.
-- The feature decisions stay in their own files: DECISIONS-ideas.md, DECISIONS-writer.md, DECISIONS-posting.md, DECISIONS-media.md and DECISIONS-mcp.md.
+- The feature decisions stay in their own files: DECISIONS-ideas.md, DECISIONS-writer.md, DECISIONS-posting.md, DECISIONS-media.md, DECISIONS-mcp.md and DECISIONS-chat.md.
 - The newer shell from main came in after that: live tabs, first run setup and the Settings screen. The settings modal is gone. Agent access and Saved logins are sections on the Settings screen between Trends and About, they get the section title from the screen so their own headings went. The branch's own "Update automatically" switch is dropped, About already has one for the same setting.
 - With live tabs more than one site webview is mounted, so the agent tools can't take the first one anymore. The open tab is the one that told main it's on screen. A tab that's still mounting doesn't count until its page is up, and `waitForTab` already waits for that. With a page like Trends on screen there's no open tab, same as before.
 - An agent or the post check opening a site that's already loaded in the background sends that tab to the link, like any other link does. Before, it only set the start url, which a loaded tab never reads again.
+- Chat came next. Its view replaced the old chat pane, so `ChatPane.tsx` is gone. A site card in the chat sends a tab that's already loaded to the card's link too. Searching trends from the title bar opens Trends, not home, since home is the chat now.
+- Agents got a section on the Settings screen next to Agent access. It lists the agents found and opens the same editor as the composer's agent picker.
 
 ## One session per brand
 

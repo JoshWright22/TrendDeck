@@ -13,6 +13,7 @@ import { dropMedia, setupMedia } from './media'
 import { setupMcp } from './mcp'
 import { forgetBrand } from './mcp/state'
 import { forgetBrandLogins, setupVault } from './vault'
+import { dropChats, setupAgents, stopBrand } from './agents'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -163,12 +164,15 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   await dropMedia(brandId)
   await forgetBrand(brandId)
   await forgetBrandLogins(brandId)
+  stopBrand(brandId)
+  await dropChats(brandId)
 })
 
 setupTrends()
 setupAnalytics()
 setupMcp()
 setupVault()
+setupAgents()
 setupHiddenSites(syncMute)
 
 void app.whenReady().then(() => {

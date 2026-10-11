@@ -12,7 +12,7 @@ import ShareTab from './components/mcp/ShareTab'
 import { useAgentEvents } from './components/mcp/useAgentEvents'
 import CodePrompt from './components/vault/CodePrompt'
 
-const ChatPane = lazy(() => import('./components/ChatPane'))
+const ChatView = lazy(() => import('./chat/ChatView'))
 const Settings = lazy(() => import('./components/Settings'))
 // modals only load the first time one opens
 const BrandModal = lazy(() => import('./components/BrandModal'))
@@ -24,14 +24,15 @@ type ModalState =
   | { kind: 'site' }
   | null
 
-const HOME: View = { kind: 'page', page: 'Trends' }
+const HOME: View = { kind: 'chat' }
+const TRENDS: View = { kind: 'page', page: 'Trends' }
 
 const newId = (): string => crypto.randomUUID()
 
 export default function App(): ReactNode {
   const { data, update } = useAppData()
   const [modal, setModal] = useState<ModalState>(null)
-  // what each brand has open, not saved so the app always starts on trends
+  // what each brand has open, not saved so the app always starts on the chat
   const [views, setViews] = useState<Record<string, View>>({})
   // last page each site was on, so going back to a site picks up where you left it
   const lastUrl = useRef<Record<string, string>>({})
@@ -52,7 +53,7 @@ export default function App(): ReactNode {
     picked.kind === 'site'
       ? (brand?.sites.find((s) => s.id === picked.id) ?? brandTemps.find((s) => s.id === picked.id))
       : undefined
-  // a removed site falls back to trends
+  // a removed site falls back to the chat
   const view: View = picked.kind === 'site' && !site ? HOME : picked
   const { tabs, isLive } = useLiveTabs(
     data?.brands ?? [],
@@ -211,6 +212,17 @@ export default function App(): ReactNode {
     })
   }
 
+  // from a card in the chat, url is already checked to be on the same site
+  const openSite = (siteId: string, url?: string): void => {
+    if (!brand) return
+    const key = `${brand.id}:${siteId}`
+    if (url) {
+      lastUrl.current[key] = url
+      if (isLive(brand.id, siteId)) setNav({ key, url, n: Date.now() })
+    }
+    setView({ kind: 'site', id: siteId })
+  }
+
   const onSearch = (pick: SearchPick): void => {
     if (pick.kind === 'brand') {
       update((d) => ({ ...d, activeBrandId: pick.id }))
@@ -218,7 +230,7 @@ export default function App(): ReactNode {
       openUrl(pick.url)
     } else if (pick.kind === 'trends') {
       setTrendQuery(pick.query)
-      setView(HOME)
+      setView(TRENDS)
     } else {
       setView(pick.view)
     }
@@ -299,6 +311,16 @@ export default function App(): ReactNode {
               />
             </Suspense>
           )}
+          {brand && view.kind === 'chat' && (
+            <Suspense fallback={<div className="page" />}>
+              <ChatView
+                key={brand.id}
+                brand={brand}
+                editBrand={(fn) => editBrand(brand.id, fn)}
+                onOpenSite={openSite}
+              />
+            </Suspense>
+          )}
           {brand && PageView && view.kind === 'page' && (
             <Suspense fallback={<div className="page" />}>
               <PageView
@@ -316,13 +338,14 @@ export default function App(): ReactNode {
           )}
         </main>
 
-        {data.chatOpen && brand && (
+        {data.chatOpen && brand && view.kind !== 'chat' && (
           <Suspense fallback={<aside className="chat" />}>
-            <ChatPane
+            <ChatView
               key={brand.id}
-              brandName={brand.name}
-              threads={brand.threads}
-              onChange={(fn) => editBrand(brand.id, (b) => ({ ...b, threads: fn(b.threads) }))}
+              compact
+              brand={brand}
+              editBrand={(fn) => editBrand(brand.id, fn)}
+              onOpenSite={openSite}
               onClose={toggleChat}
             />
           </Suspense>
