@@ -2,9 +2,10 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { loadData } from './store'
 
 const SIX_HOURS = 6 * 60 * 60 * 1000
-// an update that finishes downloading this soon after launch installs right away. a full download
-// takes about a minute, and a new release often lands between two launches
-const INSTALL_ON_LAUNCH_MS = 120_000
+// only an update that was already downloaded last time installs on launch, that's ready in a few
+// seconds, before you've touched anything. a fresh download never closes the app while you work:
+// it waits for the Update button or installs when you quit
+const INSTALL_ON_LAUNCH_MS = 8_000
 
 // version of an update that is downloaded and waiting, shown as a button in the title bar
 let ready: string | null = null
