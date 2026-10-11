@@ -48,7 +48,10 @@ const api: TrendDeckApi = {
     return () => ipcRenderer.removeListener('analytics:progress', listener)
   },
   media: mediaApi,
-  setSiteHidden: (webContentsId: number, hidden: boolean) => ipcRenderer.send('site:hidden', webContentsId, hidden)
+  setSiteHidden: (webContentsId: number, hidden: boolean) => ipcRenderer.send('site:hidden', webContentsId, hidden),
+  voiceLoad: (brandId) => ipcRenderer.invoke('voice:load', brandId),
+  voiceSave: (brandId, data) => ipcRenderer.invoke('voice:save', brandId, data),
+  voiceImport: (brandId, platforms) => ipcRenderer.invoke('voice:import', brandId, platforms)
 }
 
 contextBridge.exposeInMainWorld('trenddeck', api)

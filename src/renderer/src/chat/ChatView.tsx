@@ -23,6 +23,7 @@ import { RisingMark } from './Marks'
 import { Dropdown, Menu } from './ui'
 import { fileSize, onAttach, toAttachment } from './attachments'
 import { chat, newId, when } from './api'
+import { onDraft } from '../pages/voice/chatDraft'
 import './chat.css'
 
 interface Props {
@@ -194,6 +195,9 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
   useEffect(() => {
     void loadAgents()
   }, [loadAgents])
+
+  // a message drafted somewhere else, like "learn my voice", lands in the box unsent
+  useEffect(() => onDraft(setDraft), [])
 
   useEffect(() => {
     const remembered = lastOpen.get(brandId)

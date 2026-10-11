@@ -1,5 +1,6 @@
 import type { PostingApi } from './posting'
 import type { MediaApi } from './media'
+import type { VoiceApi } from './voice'
 
 export interface Site {
   id: string
@@ -185,7 +186,7 @@ export function isHttpUrl(value: string): boolean {
 
 export type WindowAction = 'minimize' | 'maximize' | 'close' | 'state'
 
-export interface TrendDeckApi {
+export interface TrendDeckApi extends VoiceApi {
   platform: string
   // resolves to whether the window is maximized after the action
   windowControl(action: WindowAction): Promise<boolean>

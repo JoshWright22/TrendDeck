@@ -102,12 +102,13 @@ Calls made while building, so nobody has to guess later.
 - Each feature kept its own rising line mark component instead of sharing the one in `Icons.tsx`. They draw the same mark, merging them can wait.
 - Media came in after posting. It sits between Ideas and Schedule like its branch had it, Posting stays last.
 - MCP and saved logins came last. Agent access and Saved logins sit at the bottom of Settings under the ad blocker. The branch's update switch is kept since main's updater already reads `settings.autoUpdate`. The share button sits next to the chat toggle in a site's toolbar.
-- The feature decisions stay in their own files: DECISIONS-ideas.md, DECISIONS-writer.md, DECISIONS-posting.md, DECISIONS-media.md, DECISIONS-mcp.md and DECISIONS-chat.md.
+- The feature decisions stay in their own files: DECISIONS-ideas.md, DECISIONS-writer.md, DECISIONS-posting.md, DECISIONS-media.md, DECISIONS-mcp.md, DECISIONS-chat.md and DECISIONS-voice.md.
 - The newer shell from main came in after that: live tabs, first run setup and the Settings screen. The settings modal is gone. Agent access and Saved logins are sections on the Settings screen between Trends and About, they get the section title from the screen so their own headings went. The branch's own "Update automatically" switch is dropped, About already has one for the same setting.
 - With live tabs more than one site webview is mounted, so the agent tools can't take the first one anymore. The open tab is the one that told main it's on screen. A tab that's still mounting doesn't count until its page is up, and `waitForTab` already waits for that. With a page like Trends on screen there's no open tab, same as before.
 - An agent or the post check opening a site that's already loaded in the background sends that tab to the link, like any other link does. Before, it only set the start url, which a loaded tab never reads again.
 - Chat came next. Its view replaced the old chat pane, so `ChatPane.tsx` is gone. A site card in the chat sends a tab that's already loaded to the card's link too. Searching trends from the title bar opens Trends, not home, since home is the chat now.
 - Agents got a section on the Settings screen next to Agent access. It lists the agents found and opens the same editor as the composer's agent picker.
+- Brand voice came after chat. It sits right under Ideas in the sidebar, before Media. Its "Learn my voice" draft goes into the chat composer through the same `onDraft` hook, now in `ChatView.tsx` since the old pane is gone.
 
 ## One session per brand
 

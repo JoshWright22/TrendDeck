@@ -14,6 +14,7 @@ import {
 } from './Icons'
 import { PostingIcon } from '../posting/bits'
 import { MediaIcon } from '../pages/media/MediaIcons'
+import { VoiceIcon } from '../pages/voice/VoiceIcon'
 
 export type View =
   | { kind: 'page'; page: Page }
@@ -24,6 +25,7 @@ export type View =
 const NAV_ICONS: Record<Page, () => ReactNode> = {
   Trends: TrendsIcon,
   Ideas: IdeasIcon,
+  Voice: VoiceIcon,
   Media: MediaIcon,
   Schedule: ScheduleIcon,
   Writer: WriterIcon,

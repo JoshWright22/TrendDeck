@@ -23,6 +23,7 @@ Working now:
 - **Instant switching.** Sites you've opened stay loaded in the background, so going back to one doesn't reload it. Your first few sites load while the app sits idle. How many stay open per brand is up to you in Settings.
 - **Trends.** One ranked feed of what's rising in your niche across Reddit, YouTube, Google Trends and TikTok, with today's top three up front.
 - **Ideas board.** Save a trend as an idea in one click, or write your own down, then move it from idea to posted.
+- **Brand voice.** Tell the chat who the brand is and feed it your past posts, pasted, from a file or read from your own logged in accounts when you press import. It counts your habits locally and shows you exactly what the agent will get.
 - **Schedule.** A month, week and list view of what goes out where and when.
 - **Writer.** One idea written for YouTube, TikTok, Instagram, X and Reddit, with limits counted and versions saved.
 - **Analytics.** Your followers and views read from your own logged in accounts when you press Refresh.
@@ -96,7 +97,7 @@ Brands and sites are in `trenddeck.json` in the app's user data folder:
 - macOS: `~/Library/Application Support/TrendDeck`
 - Linux: `~/.config/TrendDeck`
 
-Logins live in the same folder under `Partitions`, one folder per brand. Deleting a brand wipes its logins too. Cached trends are in `trends`, the ad blocker's lists are in `adblock`, and each brand's media library is in `media`.
+Logins live in the same folder under `Partitions`, one folder per brand. Deleting a brand wipes its logins too. Brand voice profiles and past posts are in `voice`, one file per brand. Cached trends are in `trends`, the ad blocker's lists are in `adblock`, and each brand's media library is in `media`.
 
 Everything the app stores and every time it goes online is in [docs/PRIVACY.md](docs/PRIVACY.md).
 
