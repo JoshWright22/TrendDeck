@@ -12,13 +12,15 @@ interface Props {
   // a link for this tab while it's already open
   navigate?: { url: string; n: number } | null
   right?: ReactNode
+  // kept alive in the background, see useLiveTabs
+  hidden?: boolean
 }
 
 // react drops unknown boolean attributes, so this one goes in as a string
 const popups = { allowpopups: 'true' } as object
 
 export default function SiteView(props: Props): ReactNode {
-  const { site, partition, startUrl, onUrl, right, navigate } = props
+  const { site, partition, startUrl, onUrl, right, navigate, hidden = false } = props
   const ref = useRef<HTMLWebViewElement>(null)
   const ready = useRef(false)
   // only read once, changing src later would reload the page
@@ -30,6 +32,13 @@ export default function SiteView(props: Props): ReactNode {
   const [canBack, setCanBack] = useState(false)
   const [canForward, setCanForward] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const hiddenRef = useRef(hidden)
+  hiddenRef.current = hidden
+  // tells main so a hidden tab gets muted and its videos paused
+  const report = (): void => {
+    const view = ref.current as unknown as WebviewTag | null
+    if (view && ready.current) window.trenddeck.setSiteHidden(view.getWebContentsId(), hiddenRef.current)
+  }
 
   useEffect(() => {
     const view = ref.current as unknown as WebviewTag | null
@@ -44,8 +53,10 @@ export default function SiteView(props: Props): ReactNode {
       setCanForward(view.canGoForward())
     }
     const onReady = (): void => {
+      const first = !ready.current
       ready.current = true
       sync()
+      if (first) report()
     }
     const onStart = (): void => {
       setLoading(true)
@@ -84,6 +95,8 @@ export default function SiteView(props: Props): ReactNode {
     if (view && ready.current) fn(view)
   }
 
+  useEffect(report, [hidden])
+
   const navN = navigate?.n
   useEffect(() => {
     if (navigate) run((v) => void v.loadURL(navigate.url).catch(() => {}))
@@ -91,7 +104,7 @@ export default function SiteView(props: Props): ReactNode {
   }, [navN])
 
   return (
-    <div className="site-view">
+    <div className={`site-view${hidden ? ' hidden' : ''}`} aria-hidden={hidden || undefined}>
       <div className="toolbar page-head">
         <button
           className="icon-btn"

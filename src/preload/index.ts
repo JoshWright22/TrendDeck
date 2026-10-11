@@ -46,7 +46,8 @@ const api: TrendDeckApi = {
     ipcRenderer.on('analytics:progress', listener)
     return () => ipcRenderer.removeListener('analytics:progress', listener)
   },
-  media: mediaApi
+  media: mediaApi,
+  setSiteHidden: (webContentsId: number, hidden: boolean) => ipcRenderer.send('site:hidden', webContentsId, hidden)
 }
 
 contextBridge.exposeInMainWorld('trenddeck', api)

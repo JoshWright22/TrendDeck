@@ -80,14 +80,21 @@ export interface Brand {
 export interface Settings {
   // optional, youtube search pages are used when it's empty
   youtubeApiKey: string
-  // checks github for new versions, on unless set to false
-  autoUpdate?: boolean
+  // site tabs each brand keeps open in the background
+  tabCap: number
+  // checks github releases for a new version, packaged builds only
+  autoUpdate: boolean
 }
+
+export const TAB_CAP_DEFAULT = 6
+export const TAB_CAP_MAX = 20
 
 export interface AppData {
   version: 1
   activeBrandId: string | null
   chatOpen: boolean
+  // false until the first run setup is done or skipped
+  onboarded: boolean
   settings: Settings
   brands: Brand[]
 }
@@ -203,6 +210,8 @@ export interface TrendDeckApi {
   clearAnalytics(brandId: string): Promise<AnalyticsDoc>
   onAnalyticsProgress(fn: (brandId: string, platform: StatPlatform | null) => void): () => void
   posting: PostingApi
+  // a kept alive site tab went out of view or came back
+  setSiteHidden(webContentsId: number, hidden: boolean): void
   media: MediaApi
 }
 

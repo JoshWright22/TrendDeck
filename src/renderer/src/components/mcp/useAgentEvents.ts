@@ -1,24 +1,19 @@
-import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
+import { useEffect, useRef } from 'react'
 import type { Update } from '../../useAppData'
-import type { View } from '../Sidebar'
+
+// shows a brand's site at a url, App sends a tab that's already loaded to the url
+export type OpenSite = (brandId: string, siteId: string, url: string) => void
 
 // main checks access first, these only move the ui and keep the saved data in one place
-export function useAgentEvents(
-  update: Update,
-  setViews: Dispatch<SetStateAction<Record<string, View>>>,
-  lastUrl: MutableRefObject<Record<string, string>>
-): void {
+export function useAgentEvents(update: Update, openSite: OpenSite): void {
+  const openRef = useRef(openSite)
+  openRef.current = openSite
   useEffect(() => {
     const api = window.trenddeckMcp
-    const offOpen = api.onOpenSite(({ brandId, siteId, url }) => {
-      // the site view reads its start url once when it mounts, so set it before switching
-      lastUrl.current[`${brandId}:${siteId}`] = url
-      setViews((all) => ({ ...all, [brandId]: { kind: 'site', id: siteId } }))
-    })
+    const offOpen = api.onOpenSite(({ brandId, siteId, url }) => openRef.current(brandId, siteId, url))
     // post audit: switch to the brand and its tab for the site, posting fills it in from main
     const offPost = window.trenddeck.posting.onOpenSite(({ brandId, siteId, url }) => {
-      lastUrl.current[`${brandId}:${siteId}`] = url
-      setViews((all) => ({ ...all, [brandId]: { kind: 'site', id: siteId } }))
+      openRef.current(brandId, siteId, url)
       update((d) => (d.activeBrandId === brandId ? d : { ...d, activeBrandId: brandId }))
     })
     const offIdea = api.onIdea(({ brandId, title, url }) => {
@@ -42,5 +37,5 @@ export function useAgentEvents(
       offPost()
       offIdea()
     }
-  }, [update, setViews, lastUrl])
+  }, [update])
 }

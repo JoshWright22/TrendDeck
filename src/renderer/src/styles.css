@@ -573,6 +573,16 @@ select:focus-visible,
   flex-direction: column;
 }
 
+.site-stack {
+  display: contents;
+}
+
+/* kept alive out of view. not display none, a webview that loses its size relays out on the way back */
+.site-view.hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .toolbar.page-head {
   gap: 2px;
   padding-left: 10px;
@@ -1548,31 +1558,9 @@ select {
   margin: 8px 0 10px;
 }
 
-.modal label.toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-  color: var(--chalk);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.modal .toggle-row input {
-  display: inline;
-  width: auto;
-  margin: 0;
-  accent-color: var(--teal);
-}
-
 .allow-add {
   display: flex;
   gap: 6px;
-}
-
-.modal .allow-add input {
-  flex: 1;
-  margin: 0;
 }
 
 .suggest {
@@ -1585,4 +1573,305 @@ select {
 .suggest .filter-chip {
   padding: 3px 9px;
   font-size: 11px;
+}
+
+/* first run setup */
+
+.onboard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background:
+    radial-gradient(ellipse 50% 45% at 50% 0%, rgba(59, 70, 164, 0.26), transparent 70%),
+    var(--felt);
+}
+
+.onboard .skip {
+  -webkit-app-region: no-drag;
+  margin-right: 6px;
+  font-size: 12px;
+}
+
+.onboard-body {
+  display: flex;
+  flex-direction: column;
+  width: 520px;
+  max-width: calc(100vw - 48px);
+  margin: auto;
+  padding-bottom: 42px;
+}
+
+.onboard-step {
+  min-height: 300px;
+  animation: rise 0.2s var(--ease);
+}
+
+.onboard h1 {
+  margin: 0 0 8px;
+  font: 900 38px/1.05 var(--head);
+  letter-spacing: -0.04em;
+}
+
+.onboard-lead {
+  margin: 0 0 22px;
+  color: var(--smoke);
+  font-size: 14px;
+}
+
+.onboard label {
+  display: block;
+  margin-bottom: 14px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.onboard input {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--chalk);
+  font-size: 14px;
+  user-select: text;
+}
+
+.onboard input:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
+.pick-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.pick-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  aspect-ratio: 5 / 7;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--smoke);
+  transition:
+    transform 0.12s var(--ease),
+    border-color 0.12s var(--ease);
+}
+
+.pick-card:hover {
+  transform: translateY(-2px);
+}
+
+.pick-card .suit {
+  opacity: 0;
+}
+
+.pick-card.on {
+  border-color: var(--teal);
+  background: var(--raised);
+  color: var(--chalk);
+}
+
+.pick-card.on .suit {
+  opacity: 0.8;
+}
+
+.pick-letter {
+  font: 800 26px/1 var(--head);
+  letter-spacing: -0.04em;
+}
+
+.pick-card.on .pick-letter {
+  color: var(--teal);
+}
+
+.pick-name {
+  font-weight: 600;
+}
+
+.pick-host {
+  max-width: 90%;
+  overflow: hidden;
+  color: var(--smoke);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.onboard-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 26px;
+}
+
+.dots {
+  display: flex;
+  gap: 6px;
+}
+
+.dots span {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line);
+  transition: width 0.2s var(--ease);
+}
+
+.dots span.done {
+  background: var(--smoke);
+}
+
+.dots span.on {
+  width: 22px;
+  background: var(--teal);
+}
+
+/* settings screen */
+
+.settings-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: none;
+  width: 150px;
+  padding: 18px 0 18px 12px;
+}
+
+.settings-scroll {
+  scroll-behavior: smooth;
+}
+
+.settings-section {
+  max-width: 560px;
+  padding-bottom: 26px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 22px;
+}
+
+.settings-section:last-child {
+  border-bottom: 0;
+  /* tall enough that the last section can scroll to the top */
+  min-height: calc(100vh - 160px);
+}
+
+.settings .modal-section {
+  margin-top: 0;
+}
+
+.settings label {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.settings input:not([type='checkbox']) {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--felt);
+  color: var(--chalk);
+  font-size: 13px;
+  user-select: text;
+}
+
+.settings input:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
+.settings input.short {
+  width: 100px;
+}
+
+.settings label.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--chalk);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.settings .toggle-row input {
+  margin: 0;
+  accent-color: var(--teal);
+}
+
+.settings .allow-add input {
+  flex: 1;
+  margin: 0;
+}
+
+.settings-sites {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-sites li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--raised);
+}
+
+.settings-sites input:not([type='checkbox']) {
+  width: 180px;
+  margin: 0;
+  padding: 5px 8px;
+}
+
+.settings-host {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--smoke);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-sites .row-close {
+  opacity: 1;
+}
+
+.row-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.about-line {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.about-line strong {
+  font: 800 16px var(--head);
+  letter-spacing: -0.04em;
 }

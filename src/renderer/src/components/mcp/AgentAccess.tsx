@@ -58,8 +58,7 @@ export default function AgentAccess({ brandId }: { brandId: string | null }): Re
   const log = state.log.filter((l) => l.brandId === brand.id).slice(-30).reverse()
 
   return (
-    <section className="agent-access">
-      <h3>Agent access</h3>
+    <div className="agent-access">
       <p className="form-hint">
         Agents can't touch any site until you allow it here. They only run when you send a chat
         message, and never see cookies or passwords.
@@ -159,6 +158,6 @@ export default function AgentAccess({ brandId }: { brandId: string | null }): Re
           ))}
         </ul>
       )}
-    </section>
+    </div>
   )
 }

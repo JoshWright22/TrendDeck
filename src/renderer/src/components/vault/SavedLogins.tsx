@@ -72,8 +72,7 @@ export default function SavedLogins({ brandId }: { brandId: string | null }): Re
   }
 
   return (
-    <section className="saved-logins">
-      <h3>Saved logins</h3>
+    <div className="saved-logins">
       <p className="form-hint">
         Agents can ask TrendDeck to sign you in. The app fills the form itself, agents never see
         your password or codes. Passwords are locked with your system keychain and can't be shown
@@ -204,6 +203,6 @@ export default function SavedLogins({ brandId }: { brandId: string | null }): Re
           </ul>
         </>
       )}
-    </section>
+    </div>
   )
 }

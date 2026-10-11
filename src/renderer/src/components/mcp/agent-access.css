@@ -1,17 +1,5 @@
 /* agent access section in settings and the share tab button, colors from docs/BRAND.md */
 
-.agent-access {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-}
-
-.agent-access h3 {
-  margin: 0 0 10px;
-  font: 800 15px/1.1 var(--head);
-  letter-spacing: -0.04em;
-}
-
 .agent-access h4 {
   margin: 14px 0 6px;
   color: var(--smoke);
@@ -32,7 +20,7 @@
   gap: 4px 12px;
 }
 
-.modal label.aa-site {
+:is(.modal, .settings) label.aa-site {
   display: flex;
   align-items: center;
   margin: 0;
@@ -50,7 +38,7 @@
   white-space: nowrap;
 }
 
-.modal input.aa-switch {
+:is(.modal, .settings) input.aa-switch {
   position: relative;
   flex: none;
   width: 28px;
@@ -77,7 +65,7 @@
   transition: transform 0.15s ease-out;
 }
 
-.modal input.aa-switch:checked {
+:is(.modal, .settings) input.aa-switch:checked {
   background: var(--teal);
 }
 

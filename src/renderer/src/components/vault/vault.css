@@ -1,17 +1,5 @@
 /* saved logins in settings and the two-factor code dialog, colors from docs/BRAND.md */
 
-.saved-logins {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
-}
-
-.saved-logins h3 {
-  margin: 0 0 10px;
-  font: 800 15px/1.1 var(--head);
-  letter-spacing: -0.04em;
-}
-
 .saved-logins h4 {
   margin: 14px 0 6px;
   color: var(--smoke);

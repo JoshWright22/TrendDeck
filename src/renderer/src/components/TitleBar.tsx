@@ -50,6 +50,7 @@ function results(query: string, brands: Brand[], brand: Brand | null): Result[] 
   for (const p of PAGES) {
     if (has(p)) out.push({ key: `page:${p}`, label: p, hint: 'Page', pick: { kind: 'view', view: { kind: 'page', page: p } } })
   }
+  if (has('Settings')) out.push({ key: 'settings', label: 'Settings', hint: 'Page', pick: { kind: 'view', view: { kind: 'settings' } } })
   for (const s of brand?.sites ?? []) {
     if (has(s.name) || has(s.url)) {
       out.push({ key: `site:${s.id}`, label: s.name, hint: 'Site', pick: { kind: 'view', view: { kind: 'site', id: s.id } } })
@@ -156,7 +157,7 @@ function Search({ brands, brand, onPick }: Pick<Props, 'brands' | 'brand' | 'onP
   )
 }
 
-function WindowButtons(): ReactNode {
+export function WindowButtons(): ReactNode {
   const [max, setMax] = useState(false)
   useEffect(() => {
     void window.trenddeck.windowControl('state').then(setMax)

@@ -34,7 +34,7 @@ Calls made while building the local MCP server, so nobody has to guess later.
 
 ## Tabs
 
-- The open tab is the one webview the app has mounted. Its brand comes from its session, its site from its url.
+- The open tab is the site webview that's on screen. Sites you left stay mounted but hidden, those don't count. Its brand comes from its session, its site from its url.
 - `read_page` returns headings, the visible text (up to 15000 characters) and numbered refs for things you can click or type into. Its scripts run in an isolated world so the page can't see them.
 - Field values only show for plain text boxes. Passwords, hidden fields, card fields and one-time codes never show, and `type` refuses them.
 - Clicks and typing go through real input events, so sites treat them like a person.

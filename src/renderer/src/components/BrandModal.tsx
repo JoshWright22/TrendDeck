@@ -11,7 +11,7 @@ interface Props {
   onClose: () => void
 }
 
-interface ChipList {
+export interface ChipList {
   values: string[]
   draft: string
 }
@@ -25,9 +25,9 @@ function merge(list: ChipList, clean: (s: string) => string): string[] {
   return all
 }
 
-const cleanKeyword = (s: string): string => s.trim()
+export const cleanKeyword = (s: string): string => s.trim()
 // people paste "r/buildapc" or the whole url
-const cleanSub = (s: string): string =>
+export const cleanSub = (s: string): string =>
   s
     .trim()
     .replace(/^(https?:\/\/)?(www\.|old\.)?reddit\.com\//i, '')
@@ -36,7 +36,7 @@ const cleanSub = (s: string): string =>
     .replace(/[^A-Za-z0-9_]/g, '')
     .slice(0, 21)
 
-function Chips(props: {
+export function Chips(props: {
   label: string
   placeholder: string
   list: ChipList

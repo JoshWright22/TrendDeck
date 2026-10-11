@@ -1,5 +1,6 @@
 import { BrowserWindow, session, webContents, type WebContents } from 'electron'
 import { partitionFor, type Brand, type Site } from '@shared/types'
+import { isSiteShown } from '../hidden-sites'
 
 // two-factor and one-time code boxes, agents can't read or type into these
 const CODE_FIELD = `/otp|one.?time|2fa|two.?factor|verification.?code|security.?code|auth.?code|mfa|totp|passcode/i.test([el.name, el.id, el.getAttribute('placeholder'), el.getAttribute('aria-label')].join(' '))`
@@ -48,9 +49,9 @@ export function brandTabs(brandId: string): WebContents[] {
     )
 }
 
-// only one site is ever mounted, so the first one is the open tab
+// sites you left stay mounted and hidden, so the open tab is the one on screen
 export function openTab(brandId: string): WebContents | null {
-  return brandTabs(brandId)[0] ?? null
+  return brandTabs(brandId).find((wc) => isSiteShown(wc.id)) ?? null
 }
 
 export async function waitForTab(brandId: string, siteHost: string, ms = 10000): Promise<WebContents | null> {
