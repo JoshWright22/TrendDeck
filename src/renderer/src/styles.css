@@ -209,6 +209,27 @@ select:focus-visible,
   align-self: stretch;
 }
 
+/* shows when a new version is downloaded, one click restarts into it */
+.update-btn {
+  align-self: center;
+  margin-right: 8px;
+  padding: 5px 12px;
+  border-radius: 99px;
+  background: var(--teal);
+  color: var(--felt);
+  font: 600 12px/1 var(--body);
+  -webkit-app-region: no-drag;
+  transition: transform 0.12s;
+}
+
+.update-btn:hover {
+  transform: scale(1.05);
+}
+
+.update-btn:active {
+  transform: scale(0.96);
+}
+
 .win-btn {
   display: grid;
   place-items: center;

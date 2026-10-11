@@ -156,6 +156,11 @@ export interface TrendDeckApi {
   onMaximized(fn: (maximized: boolean) => void): () => void
   // a link was clicked somewhere, open it in a site tab
   onOpenUrl(fn: (url: string) => void): () => void
+  // version of a downloaded update that is waiting, or null
+  updateReady(): Promise<string | null>
+  onUpdateReady(fn: (version: string) => void): () => void
+  // closes the app, installs the update and opens it again
+  installUpdate(): Promise<void>
   loadData(): Promise<AppData>
   saveData(data: AppData): Promise<void>
   clearBrandSession(brandId: string): Promise<void>
