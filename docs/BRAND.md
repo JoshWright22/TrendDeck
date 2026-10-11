@@ -4,7 +4,7 @@ The idea: your brands are a hand of cards, and TrendDeck deals you the trends wo
 
 ## Logo
 
-`resources/logo.svg`: a hand of three playing cards fanned from the bottom (indigo, pink, teal on top), white edges, large black YouTube and Instagram logos centered on the back cards and mostly hidden by the top card, a spark suit mark in two corners of every card, and a black TD on the teal card where the D's curve rises into a yellow spark.
+`resources/logo.svg`: a hand of three playing cards fanned from the bottom (indigo, pink, teal on top), white edges, large black YouTube and Instagram logos centered on the back cards and mostly hidden by the top card, a small rising-line mark in two corners of every card, and a black TD on the teal card where the D's curve rises into a yellow spark.
 
 - Use it on off-black. On a light background, keep the white card edges and add the soft shadow.
 - Minimum size 16 px (`resources/icon.ico` has the small sizes).
@@ -27,7 +27,7 @@ The idea: your brands are a hand of cards, and TrendDeck deals you the trends wo
 | Pink | `#FA4E93` | hot items, alerts, the glow on the spark |
 | Indigo | `#3B46A4` | soft glows and spotlights, secondary |
 
-The surface is always Felt with an indigo spotlight glow. Accents stay small: one bright card or spark per view does more than a rainbow.
+The surface is always Felt with an indigo spotlight glow. Accents stay small: one bright card or accent per view does more than a rainbow.
 
 ## Type
 
@@ -38,17 +38,19 @@ The surface is always Felt with an indigo spotlight glow. Accents stay small: on
 
 ## Motifs
 
-- **Cards.** Anything that is a thing you can pick (a brand, a trend, an idea, a draft) is a card: 5:7, rounded 12 px corners, white edge on art, a spark suit mark in the corners.
-- **Spark suit.** The four-point spark from the logo stands in for hearts and spades. Teal for rising, pink for hot, yellow for a win.
-- **Dealing.** Things arrive the way cards are dealt: slide in from the deck, small rotation, settle. Flip to reveal detail.
+- **Cards.** Anything that is a thing you can pick (a brand, a trend, an idea, a draft) is a card: 5:7, rounded 12 px corners, white edge on art, the rising-line mark in the corners.
+- **Marks.** Two marks, never a four-point sparkle. On cards: the rising line, a tiny trend line ending in a dot, in the corners where a suit would go. On backgrounds: the rounded diamond, for floating accents and texture. Teal for rising, pink for hot, yellow for a win.
+- **Dealing.** Things arrive the way cards are dealt from the top of the deck: a short slide in, no spin.
 - **Chips and stakes.** Growth scores and counts can sit in round chips. Use sparingly.
-- **No dithering.** No dot-grid or dither textures. For texture use a faint tiled spark-suit pattern (about 5% opacity) that fades out.
+- **No dithering.** No dot-grid or dither textures. For texture use a faint tiled rounded-diamond pattern (about 5% opacity) that fades out.
 - **Dotted lines.** Trend charts join points with thin dotted lines, the hottest point glows.
 - **Pill buttons.** Small white or teal pills with dark text.
 
 ## Motion
 
-Bouncy and punchy, like a dealer who's showing off. Deals snap in fast (250-350 ms) and land with a real overshoot and a little settle wobble. Flips (400 ms) pop with a quick scale-up at the halfway point. Buttons and chips squash on press and spring back. Wins hit hard: a spark burst, a short shake, a pop of yellow. Springs over linear eases everywhere (stiff, low damping). Nothing loops forever except a slow glow. Respect reduced motion, and keep slow devices fast (fewer particles, no blur on big areas).
+Quiet by default, loud on a win. Everyday motion is a short fade and slide with a plain ease-out: cards rise 8 px in about 200 ms with a small stagger and panels slide in 12 px. Hovers lift a pixel or two and presses shrink a little. No overshoot, no rotation.
+
+The bounce is saved for small wins, like saving an idea or a post going out: a quick pop that overshoots and settles, with a yellow spark burst. Nothing loops forever except a slow glow. Respect reduced motion, and keep slow devices fast (fewer particles, no blur on big areas).
 
 ## Voice
 
