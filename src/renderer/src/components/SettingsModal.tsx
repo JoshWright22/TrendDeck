@@ -1,14 +1,16 @@
 import { useState, type ReactNode } from 'react'
 import type { Settings } from '@shared/types'
 import Modal from './Modal'
+import AgentAccess from './mcp/AgentAccess'
 
 interface Props {
+  brandId?: string | null
   settings: Settings
   onSave: (settings: Settings) => void
   onClose: () => void
 }
 
-export default function SettingsModal({ settings, onSave, onClose }: Props): ReactNode {
+export default function SettingsModal({ brandId, settings, onSave, onClose }: Props): ReactNode {
   const [key, setKey] = useState(settings.youtubeApiKey)
   return (
     <Modal title="Settings" onClose={onClose}>
@@ -43,6 +45,7 @@ export default function SettingsModal({ settings, onSave, onClose }: Props): Rea
           </button>
         </div>
       </form>
+      <AgentAccess brandId={brandId ?? null} />
     </Modal>
   )
 }

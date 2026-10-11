@@ -4,6 +4,8 @@ import { ID_PATTERN, isHttpUrl, partitionFor, type AppData } from '@shared/types
 import { loadData, saveData } from './store'
 import { dropTrends, setupTrends } from './trends'
 import { attachBrand, blocksPopup, setupAdblock } from './adblock'
+import { setupMcp } from './mcp'
+import { forgetBrand } from './mcp/state'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -110,9 +112,11 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   await ses.clearStorageData()
   await ses.clearCache()
   await dropTrends(brandId)
+  await forgetBrand(brandId)
 })
 
 setupTrends()
+setupMcp()
 
 void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()

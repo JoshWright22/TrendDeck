@@ -8,6 +8,8 @@ import SettingsModal from './components/SettingsModal'
 import SiteView from './components/SiteView'
 import { ChatToggle } from './components/PageHeader'
 import { PAGE_VIEWS } from './pages'
+import ShareTab from './components/mcp/ShareTab'
+import { useAgentEvents } from './components/mcp/useAgentEvents'
 
 const ChatPane = lazy(() => import('./components/ChatPane'))
 
@@ -44,6 +46,9 @@ export default function App(): ReactNode {
   const site = picked.kind === 'site' ? brand?.sites.find((s) => s.id === picked.id) : undefined
   // a removed site falls back to trends
   const view: View = picked.kind === 'site' && !site ? HOME : picked
+
+  // agents asking to open a site or save an idea
+  useAgentEvents(update, setViews, lastUrl)
 
   const brandIds = data?.brands.map((b) => b.id).join(',') ?? ''
   useEffect(() => {
@@ -176,7 +181,12 @@ export default function App(): ReactNode {
             partition={partitionFor(brand.id)}
             startUrl={lastUrl.current[siteKey] ?? site.url}
             onUrl={(url) => (lastUrl.current[siteKey] = url)}
-            right={<ChatToggle chatOpen={data.chatOpen} onToggleChat={toggleChat} />}
+            right={
+              <>
+                <ShareTab brandId={brand.id} siteId={site.id} siteName={site.name} />
+                <ChatToggle chatOpen={data.chatOpen} onToggleChat={toggleChat} />
+              </>
+            }
           />
         )}
         {brand && PageView && view.kind === 'page' && (
@@ -218,6 +228,7 @@ export default function App(): ReactNode {
       {modal?.kind === 'site' && <SiteModal onSave={addSite} onClose={() => setModal(null)} />}
       {modal?.kind === 'settings' && (
         <SettingsModal
+          brandId={data.activeBrandId}
           settings={data.settings}
           onSave={(settings) => {
             update((d) => ({ ...d, settings }))
