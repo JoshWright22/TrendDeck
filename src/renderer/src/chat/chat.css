@@ -925,12 +925,14 @@
 }
 
 .cx-agent .ui-dd-btn,
-.cx-model .ui-dd-btn {
+.cx-model .ui-dd-btn,
+.cx-effort .ui-dd-btn {
   height: 28px;
   background: var(--raised);
 }
 
-.cx-model .ui-dd-btn {
+.cx-model .ui-dd-btn,
+.cx-effort .ui-dd-btn {
   max-width: 160px;
   color: var(--smoke);
 }

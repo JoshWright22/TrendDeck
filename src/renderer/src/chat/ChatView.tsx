@@ -138,6 +138,14 @@ const ReplyText = memo(function ReplyText({
   return <Markdown text={m.text} embed={make.current(m)} />
 })
 
+const EFFORT_LABELS: Record<string, string> = {
+  low: 'Low effort',
+  medium: 'Medium effort',
+  high: 'High effort',
+  xhigh: 'Extra high effort',
+  max: 'Max effort'
+}
+
 export default function ChatView({ brand, editBrand, onOpenSite, compact, onClose, headerRight }: Props): ReactNode {
   const [agents, setAgents] = useState<AgentInfo[] | null>(null)
   const [config, setConfig] = useState<AgentConfig>({ defaultAgentId: null, custom: [] })
@@ -151,6 +159,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
   const [picked, setPicked] = useState<string | null>(null)
   // model picked before the chat exists, per agent
   const [newModels, setNewModels] = useState<Record<string, string>>({})
+  const [newEfforts, setNewEfforts] = useState<Record<string, string>>({})
   const [modelLists, setModelLists] = useState<Record<string, ModelOption[]>>({})
   const [error, setError] = useState('')
   const [manage, setManage] = useState(false)
@@ -349,7 +358,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
 
   const model = agentId ? ((thread ? thread.models?.[agentId] : newModels[agentId]) ?? '') : ''
   const modelOptions = useMemo(() => {
-    const list = (agentId && modelLists[agentId]) || agent?.models || [{ id: '', label: 'Default model' }]
+    const list = (agentId && modelLists[agentId]) || agent?.models || [{ id: '', label: 'Model' }]
     return list.some((m) => m.id === model) ? list : [...list, { id: model, label: model }]
   }, [agentId, agent, modelLists, model])
 
@@ -370,7 +379,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
     try {
       const res = await chat().send(brandId, openId, body, agentId, {
         attachments: sending,
-        ...(thread ? {} : { model: newModels[agentId] ?? '' })
+        ...(thread ? {} : { model: newModels[agentId] ?? '', effort: newEfforts[agentId] ?? '' })
       })
       if (res.threadId !== openId) setOpenId(res.threadId)
       else void loadThread(res.threadId)
@@ -411,6 +420,17 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
   const pickAgent = (id: string): void => {
     setPicked(id)
     void chat().setDefaultAgent(id).then(setConfig)
+  }
+
+  const effort = agentId ? ((thread ? thread.efforts?.[agentId] : newEfforts[agentId]) ?? '') : ''
+  const pickEffort = (level: string): void => {
+    if (!agentId) return
+    if (thread) {
+      setThread({ ...thread, efforts: { ...thread.efforts, [agentId]: level } })
+      void chat().setEffort(brandId, thread.id, agentId, level)
+    } else {
+      setNewEfforts((m) => ({ ...m, [agentId]: level }))
+    }
   }
 
   const pickModel = (id: string): void => {
@@ -963,6 +983,20 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
                   options={modelOptions.map((o) => ({ value: o.id, label: o.label }))}
                   onChange={pickModel}
                   onOpen={loadModels}
+                />
+              )}
+              {agent?.efforts && (
+                <Dropdown
+                  className="cx-effort"
+                  label="Effort"
+                  title="How hard the agent thinks, more is slower and uses more of your limits"
+                  up
+                  value={effort}
+                  options={[
+                    { value: '', label: 'Effort' },
+                    ...agent.efforts.map((l) => ({ value: l, label: EFFORT_LABELS[l] ?? l }))
+                  ]}
+                  onChange={pickEffort}
                 />
               )}
               <button

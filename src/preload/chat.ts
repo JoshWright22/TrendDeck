@@ -21,6 +21,7 @@ export const chatApi: ChatApi = {
   archiveThread: (brandId, threadId, archived) => ipcRenderer.invoke('chat:archive', brandId, threadId, archived),
   searchThreads: (brandId, query) => ipcRenderer.invoke('chat:search', brandId, query),
   setModel: (brandId, threadId, agentId, model) => ipcRenderer.invoke('chat:model', brandId, threadId, agentId, model),
+  setEffort: (brandId, threadId, agentId, effort) => ipcRenderer.invoke('chat:effort', brandId, threadId, agentId, effort),
   listModels: (agentId) => ipcRenderer.invoke('chat:models', agentId),
   decide: (brandId, threadId, messageId, card, decision) =>
     ipcRenderer.invoke('chat:decide', brandId, threadId, messageId, card, decision),

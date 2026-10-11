@@ -105,6 +105,7 @@ function cleanThread(raw: unknown): Thread | null {
     updatedAt: Number(t.updatedAt) || 0,
     agentId: typeof t.agentId === 'string' ? t.agentId.slice(0, 80) : null,
     models: cleanMap(t.models, isStr),
+    efforts: cleanMap(t.efforts, isStr),
     sessions: cleanMap(t.sessions, isStr),
     voiceSent: cleanMap(t.voiceSent, isStr),
     archived: t.archived === true,

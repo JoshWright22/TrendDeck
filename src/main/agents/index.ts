@@ -30,7 +30,7 @@ export { dropChats }
 const MAX_MESSAGE = 8000
 // streaming replies get saved this often, the rest is saved when they finish
 const SAVE_EVERY_MS = 3000
-const DEFAULT_MODEL: ModelOption[] = [{ id: '', label: 'Default model' }]
+const DEFAULT_MODEL: ModelOption[] = [{ id: '', label: 'Model' }]
 
 let detected: AgentInfo[] | null = null
 
@@ -50,7 +50,8 @@ async function detect(): Promise<AgentInfo[]> {
         detail: path ?? '',
         setup: c.setup,
         url: c.url,
-        models: c.modelFlag ? (c.models ?? DEFAULT_MODEL) : DEFAULT_MODEL
+        models: c.modelFlag ? (c.models ?? DEFAULT_MODEL) : DEFAULT_MODEL,
+        efforts: c.efforts
       }
     })
   )
@@ -187,6 +188,7 @@ async function runReply(
     const past = history(thread, 2, historyRoom(context.length + message.length))
     const sentVoice = voiceHash(voice.text)
     const model = thread.models?.[agentId] || undefined
+    const effort = thread.efforts?.[agentId] || undefined
 
     const cli = CLIS.find((c) => c.id === agentId)
     if (cli) {
@@ -202,12 +204,12 @@ async function runReply(
       thread.voiceSent = { ...thread.voiceSent, [agentId]: sentVoice }
       const { attach } = await openTurn()
       try {
-        await runCli(cli, prompt, { model, session }, hooks, attach)
+        await runCli(cli, prompt, { model, effort, session }, hooks, attach)
       } catch (err) {
         // the agent lost the session (cleared, other machine), start over with the full prompt
         if (!session || ctl.signal.aborted || reply.text) throw err
         if (thread.sessions) delete thread.sessions[agentId]
-        await runCli(cli, flatPrompt(context, past, message), { model }, hooks, attach)
+        await runCli(cli, flatPrompt(context, past, message), { model, effort }, hooks, attach)
       }
     } else {
       const custom = await getCustom(agentId)
@@ -326,6 +328,7 @@ export function setupAgents(): void {
         await addThread(brandId, thread)
       }
       if (typeof o.model === 'string') thread.models = { ...thread.models, [agentId]: o.model.slice(0, 120) }
+      if (typeof o.effort === 'string') thread.efforts = { ...thread.efforts, [agentId]: o.effort.slice(0, 20) }
       const reply = newReply(agentId, thread.models?.[agentId] || undefined)
       const files = cleanAttachments(o.attachments)
       const userMsg: ThreadMessage = { id: randomUUID(), role: 'user', text: body, at: now }
@@ -417,6 +420,14 @@ export function setupAgents(): void {
     if (!thread) return
     thread.models = { ...thread.models, [agentId.slice(0, 80)]: model.slice(0, 120) }
     thread.agentId = agentId.slice(0, 80)
+    await persist(brandId)
+  })
+
+  ipcMain.handle('chat:effort', async (_e, brandId: unknown, threadId: unknown, agentId: unknown, effort: unknown) => {
+    if (!validId(brandId) || !validId(threadId) || typeof agentId !== 'string' || typeof effort !== 'string') return
+    const thread = await findThread(brandId, threadId)
+    if (!thread) return
+    thread.efforts = { ...thread.efforts, [agentId.slice(0, 80)]: effort.slice(0, 20) }
     await persist(brandId)
   })
 

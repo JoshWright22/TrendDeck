@@ -16,6 +16,9 @@ export interface CliSpec {
   // flag that picks the model, no flag means only the agent's default
   modelFlag?: string
   models?: ModelOption[]
+  // effort levels and the args that set one
+  efforts?: string[]
+  effortArgs?: (level: string) => string[]
   // args that resume a saved session, put before the rest
   resume?: (session: string) => string[]
   setup: string
@@ -44,7 +47,7 @@ export const CLIS: CliSpec[] = [
     output: 'claude-json',
     modelFlag: '--model',
     models: [
-      { id: '', label: 'Default model' },
+      { id: '', label: 'Model' },
       { id: 'opus', label: 'Opus (latest)' },
       { id: 'sonnet', label: 'Sonnet (latest)' },
       { id: 'haiku', label: 'Haiku (latest)' },
@@ -53,6 +56,8 @@ export const CLIS: CliSpec[] = [
       { id: 'claude-haiku-5-5', label: 'Haiku 5.5' },
       { id: 'claude-fable-5-1', label: 'Fable 5.1' }
     ],
+    efforts: ['low', 'medium', 'high', 'xhigh', 'max'],
+    effortArgs: (level) => ['--effort', level],
     resume: (session) => ['--resume', session],
     setup: 'claude auth login',
     url: 'https://claude.com/product/claude-code'
@@ -66,10 +71,12 @@ export const CLIS: CliSpec[] = [
     output: 'codex-json',
     modelFlag: '-m',
     models: [
-      { id: '', label: 'Default model' },
+      { id: '', label: 'Model' },
       { id: 'gpt-5-codex', label: 'GPT-5 Codex' },
       { id: 'gpt-5', label: 'GPT-5' }
     ],
+    efforts: ['low', 'medium', 'high'],
+    effortArgs: (level) => ['-c', `model_reasoning_effort=${level}`],
     setup: 'codex login',
     url: 'https://developers.openai.com/codex/cli'
   },
@@ -82,7 +89,7 @@ export const CLIS: CliSpec[] = [
     output: 'cursor-json',
     modelFlag: '--model',
     models: [
-      { id: '', label: 'Default model' },
+      { id: '', label: 'Model' },
       { id: 'auto', label: 'Auto' },
       { id: 'sonnet-4.5', label: 'Sonnet 4.5' },
       { id: 'gpt-5', label: 'GPT-5' }

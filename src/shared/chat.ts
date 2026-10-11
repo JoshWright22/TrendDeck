@@ -16,6 +16,8 @@ export interface AgentInfo {
   url?: string
   // models it can run, the first one is its own default
   models?: ModelOption[]
+  // how hard it thinks, empty means the agent's own default
+  efforts?: string[]
 }
 
 export interface ModelOption {
@@ -104,6 +106,8 @@ export interface Thread {
   agentId: string | null
   // model per agent id, empty or missing means the agent's default
   models?: Record<string, string>
+  // effort per agent id, empty or missing means the agent's default
+  efforts?: Record<string, string>
   // agent session to resume, per agent id
   sessions?: Record<string, string>
   // hash of the brand voice pack each agent's session last got, it's sent again when it changes
@@ -152,6 +156,7 @@ export type ChatEvent =
 
 export interface SendOptions {
   model?: string
+  effort?: string
   attachments?: Attachment[]
 }
 
@@ -180,6 +185,7 @@ export interface ChatApi {
   // thread ids whose title or messages match
   searchThreads(brandId: string, query: string): Promise<string[]>
   setModel(brandId: string, threadId: string, agentId: string, model: string): Promise<void>
+  setEffort(brandId: string, threadId: string, agentId: string, effort: string): Promise<void>
   // api agents ask their /models endpoint, clis come from a known list
   listModels(agentId: string): Promise<ModelOption[]>
   decide(brandId: string, threadId: string, messageId: string, card: string, decision: Decision): Promise<void>

@@ -12,6 +12,7 @@ export interface RunHooks extends Sink {
 
 export interface CliOptions {
   model?: string
+  effort?: string
   session?: string
 }
 
@@ -91,6 +92,7 @@ async function planCli(spec: CliSpec, prompt: string, opts: CliOptions, turn: Tu
   const extra: string[] = [...merged.extra]
   if (opts.session && spec.resume) extra.push(...spec.resume(opts.session))
   if (opts.model && spec.modelFlag) extra.push(spec.modelFlag, opts.model)
+  if (opts.effort && spec.effortArgs && spec.efforts?.includes(opts.effort)) extra.push(...spec.effortArgs(opts.effort))
   const base = merged.base.map((a) => (a === '{prompt}' ? prompt : a))
   // codex reads `-` as the prompt marker, so the extra flags go before the last arg there
   const args = spec.id === 'codex' ? [...base.slice(0, -1), ...extra, ...base.slice(-1)] : [...extra, ...base]
