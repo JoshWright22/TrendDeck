@@ -2,17 +2,15 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { WebviewTag } from 'electron'
 import type { Site } from '@shared/types'
 import { BackIcon, CloseIcon, ForwardIcon, HomeIcon, ReloadIcon } from './Icons'
-import Shield from './Shield'
 
 interface Props {
   site: Site
-  brandId: string
-  brandAdblock: boolean
-  onToggleAdblock: () => void
   partition: string
   // where to open, e.g. the page you were on last time
   startUrl: string
   onUrl: (url: string) => void
+  // a link for this tab while it's already open
+  navigate?: { url: string; n: number } | null
   right?: ReactNode
 }
 
@@ -20,7 +18,7 @@ interface Props {
 const popups = { allowpopups: 'true' } as object
 
 export default function SiteView(props: Props): ReactNode {
-  const { site, brandId, brandAdblock, onToggleAdblock, partition, startUrl, onUrl, right } = props
+  const { site, partition, startUrl, onUrl, right, navigate } = props
   const ref = useRef<HTMLWebViewElement>(null)
   const ready = useRef(false)
   // only read once, changing src later would reload the page
@@ -32,19 +30,11 @@ export default function SiteView(props: Props): ReactNode {
   const [canBack, setCanBack] = useState(false)
   const [canForward, setCanForward] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [blocked, setBlocked] = useState(0)
-  const wcId = useRef<number | null>(null)
 
   useEffect(() => {
     const view = ref.current as unknown as WebviewTag | null
     if (!view) return
 
-    // as soon as it has a webContents, tell main which brand and site it is so the blocker knows
-    const onAttach = (): void => {
-      const id = view.getWebContentsId()
-      wcId.current = id
-      void window.trenddeck.adblockAttach(id, brandId, site.id)
-    }
     const sync = (): void => {
       if (!ready.current) return
       const now = view.getURL()
@@ -55,8 +45,6 @@ export default function SiteView(props: Props): ReactNode {
     }
     const onReady = (): void => {
       ready.current = true
-      // in case did-attach fired before we were listening
-      if (wcId.current === null) onAttach()
       sync()
     }
     const onStart = (): void => {
@@ -73,11 +61,6 @@ export default function SiteView(props: Props): ReactNode {
       setError(e.errorDescription || 'load failed')
     }
 
-    const offCount = window.trenddeck.onAdblockCount((c) => {
-      if (c.webContentsId === wcId.current) setBlocked(c.count)
-    })
-
-    view.addEventListener('did-attach', onAttach)
     view.addEventListener('dom-ready', onReady)
     view.addEventListener('did-start-loading', onStart)
     view.addEventListener('did-stop-loading', onStop)
@@ -86,8 +69,6 @@ export default function SiteView(props: Props): ReactNode {
     view.addEventListener('did-fail-load', onFail)
     return () => {
       ready.current = false
-      offCount()
-      view.removeEventListener('did-attach', onAttach)
       view.removeEventListener('dom-ready', onReady)
       view.removeEventListener('did-start-loading', onStart)
       view.removeEventListener('did-stop-loading', onStop)
@@ -95,13 +76,19 @@ export default function SiteView(props: Props): ReactNode {
       view.removeEventListener('did-navigate-in-page', sync)
       view.removeEventListener('did-fail-load', onFail)
     }
-    // keyed per brand and site in App, so brandId and site.id never change for one view
+    // keyed per brand and site in App, so one view never changes site
   }, [])
 
   const run = (fn: (view: WebviewTag) => void): void => {
     const view = ref.current as unknown as WebviewTag | null
     if (view && ready.current) fn(view)
   }
+
+  const navN = navigate?.n
+  useEffect(() => {
+    if (navigate) run((v) => void v.loadURL(navigate.url).catch(() => {}))
+    // only when a new link comes in
+  }, [navN])
 
   return (
     <div className="site-view">
@@ -154,18 +141,6 @@ export default function SiteView(props: Props): ReactNode {
         <div className={`url${error ? ' failed' : ''}`} title={url}>
           {error ? `Couldn't load this page (${error})` : url}
         </div>
-        <Shield
-          on={site.adblock}
-          locked={!brandAdblock}
-          count={blocked}
-          label={site.name}
-          onToggle={() => {
-            onToggleAdblock()
-            // reload so the page comes back with or without its ads,
-            // after a beat so the new setting has been saved to main
-            setTimeout(() => run((v) => v.reload()), 300)
-          }}
-        />
         {right}
       </div>
       <webview ref={ref} className="webview" src={src} partition={partition} {...popups} />

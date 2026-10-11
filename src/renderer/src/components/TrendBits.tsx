@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { SOURCE_NAMES, type TrendItem } from '@shared/types'
-import { ExternalIcon, SaveIcon, Spark } from './Icons'
+import { Diamond, ExternalIcon, RisingMark, SaveIcon } from './Icons'
 
 export function age(at: number | null): string {
   if (at === null) return 'this week'
@@ -64,20 +64,40 @@ function Corners({ hot }: { hot: boolean }): ReactNode {
   const cls = `suit${hot ? ' hot' : ''}`
   return (
     <>
-      <Spark className={`${cls} tl`} />
-      <Spark className={`${cls} br`} />
+      <RisingMark className={`${cls} tl`} />
+      <RisingMark className={`${cls} br`} />
     </>
   )
 }
 
+// the one bouncy bit on the page: a pop and a burst of diamonds when you save
+export function WinBurst(): ReactNode {
+  return (
+    <span className="burst" aria-hidden="true">
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <Diamond key={i} className={`burst-bit b${i}`} />
+      ))}
+    </span>
+  )
+}
+
 function Actions({ item, saved, onSave }: Omit<CardProps, 'index'>): ReactNode {
+  const [won, setWon] = useState(false)
   return (
     <div className="card-actions">
-      <button className={`pill${saved ? ' done' : ''}`} onClick={onSave} disabled={saved}>
+      <button
+        className={`pill${saved ? ' done' : ''}${won ? ' win-pop' : ''}`}
+        onClick={() => {
+          onSave()
+          setWon(true)
+        }}
+        disabled={saved}
+      >
         <SaveIcon />
         {saved ? 'Saved' : 'Save as idea'}
+        {won && <WinBurst />}
       </button>
-      <a className="icon-btn small" href={item.url} target="_blank" rel="noreferrer" title="Open">
+      <a className="icon-btn small" href={item.url} target="_blank" rel="noreferrer" title="Open in a tab">
         <ExternalIcon />
       </a>
     </div>
@@ -88,8 +108,8 @@ export function TrendCard({ item, saved, onSave, index }: CardProps): ReactNode 
   return (
     <article
       className={`trend-card src-${item.source}`}
-      // stagger the deal, but not forever down a long list
-      style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }}
+      // small stagger, capped so a long list doesn't crawl in
+      style={{ animationDelay: `${Math.min(index, 10) * 20}ms` }}
     >
       <Corners hot={isHot(item.score)} />
       <header>
@@ -110,7 +130,7 @@ export function TrendCard({ item, saved, onSave, index }: CardProps): ReactNode 
 
 export function HeroCard({ item, saved, onSave, index }: CardProps): ReactNode {
   return (
-    <article className={`hero-card rank-${index + 1}`} style={{ animationDelay: `${index * 90}ms` }}>
+    <article className={`hero-card rank-${index + 1}`} style={{ animationDelay: `${index * 40}ms` }}>
       <Corners hot={isHot(item.score)} />
       <div className="hero-top">
         <span className="rank">#{index + 1}</span>

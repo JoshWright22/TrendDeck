@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, session, webContents, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { ID_PATTERN, isHttpUrl, partitionFor, type AppData } from '@shared/types'
 import { loadData, saveData } from './store'
@@ -6,6 +6,20 @@ import { dropTrends, setupTrends } from './trends'
 import { attachBrand, blocksPopup, setupAdblock } from './adblock'
 
 const PARTITION_PREFIX = 'persist:brand-'
+
+// test runs pass --mute-audio or set TRENDDECK_MUTE=1 so nothing ever makes a sound
+const MUTE_ALL = process.argv.includes('--mute-audio') || process.env.TRENDDECK_MUTE === '1'
+if (MUTE_ALL) app.commandLine.appendSwitch('mute-audio')
+
+// sites only play sound while you can see them
+function syncMute(win: BrowserWindow): void {
+  const hidden = !win.isVisible() || win.isMinimized()
+  for (const wc of webContents.getAllWebContents()) {
+    if (wc.getType() === 'webview' && wc.hostWebContents?.id === win.webContents.id) {
+      wc.setAudioMuted(MUTE_ALL || hidden)
+    }
+  }
+}
 
 // some sites refuse to log in when the user agent says Electron
 function plainUserAgent(): string {
@@ -15,6 +29,11 @@ function plainUserAgent(): string {
 }
 
 const isMac = process.platform === 'darwin'
+
+// never the system browser, the renderer picks a site tab or makes a temporary one
+function openInApp(host: WebContents | null | undefined, url: string): void {
+  if (host && !host.isDestroyed() && isHttpUrl(url)) host.send('open:url', url)
+}
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -44,13 +63,21 @@ function createWindow(): void {
   const sendMax = (): void => win.webContents.send('window:maximized', win.isMaximized())
   win.on('maximize', sendMax)
   win.on('unmaximize', sendMax)
+  win.on('minimize', () => syncMute(win))
+  win.on('restore', () => syncMute(win))
+  win.on('hide', () => syncMute(win))
+  win.on('show', () => syncMute(win))
+  win.webContents.on('did-attach-webview', () => syncMute(win))
 
-  // the app window only ever shows the app itself
+  // the app window only ever shows the app itself, links go to a site tab instead
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (isHttpUrl(url)) void shell.openExternal(url)
+    openInApp(win.webContents, url)
     return { action: 'deny' }
   })
-  win.webContents.on('will-navigate', (event) => event.preventDefault())
+  win.webContents.on('will-navigate', (event) => {
+    event.preventDefault()
+    openInApp(win.webContents, event.url)
+  })
 
   // site tabs get no preload and no node, and must live in a brand partition
   win.webContents.on('will-attach-webview', (event, webPreferences, params) => {
@@ -74,6 +101,7 @@ function createWindow(): void {
 }
 
 app.on('web-contents-created', (_event, contents) => {
+  if (MUTE_ALL) contents.setAudioMuted(true)
   if (contents.getType() !== 'webview') return
   // a focused site eats key presses, so catch the brand shortcuts before it does
   contents.on('before-input-event', (event, input) => {
@@ -82,9 +110,14 @@ app.on('web-contents-created', (_event, contents) => {
     event.preventDefault()
     contents.hostWebContents?.send('shortcut:brand', Number(input.key) - 1)
   })
-  // login flows open popups, those stay in the same brand session
-  contents.setWindowOpenHandler(({ url }) => {
+  contents.setWindowOpenHandler(({ url, disposition }) => {
     if (!isHttpUrl(url) || blocksPopup(contents, url)) return { action: 'deny' }
+    // a plain link that wants a new tab gets one inside the app
+    if (disposition === 'foreground-tab' || disposition === 'background-tab') {
+      openInApp(contents.hostWebContents, url)
+      return { action: 'deny' }
+    }
+    // sized popups are login flows, they need window.opener and stay in the same brand session
     return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true } }
   })
 })

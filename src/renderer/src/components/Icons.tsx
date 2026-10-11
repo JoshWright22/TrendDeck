@@ -50,6 +50,13 @@ export const HomeIcon = (): ReactNode => (
   </Icon>
 )
 
+export const PinIcon = (): ReactNode => (
+  <Icon>
+    <path d="M9 4h6l-1 6 4 4H6l4-4-1-6z" />
+    <path d="M12 14v6" />
+  </Icon>
+)
+
 export const PlusIcon = (): ReactNode => (
   <Icon>
     <path d="M12 5v14M5 12h14" />
@@ -127,13 +134,25 @@ export const TrashIcon = (): ReactNode => (
   </Icon>
 )
 
-// the spark suit from the logo, filled
-export const Spark = ({ className }: { className?: string }): ReactNode => (
-  <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+// the rising line from the logo's card corners, a tiny trend line ending in a dot
+export const RisingMark = ({ className }: { className?: string }): ReactNode => (
+  <svg className={className} viewBox="-9 -6 18 13" aria-hidden="true">
     <path
-      fill="currentColor"
-      d="M12 1c.9 6.2 3.8 9.1 11 11-7.2 1.9-10.1 4.8-11 11-.9-6.2-3.8-9.1-11-11 7.2-1.9 10.1-4.8 11-11z"
+      d="M-7 5 L-2 0 L1 3 L6 -3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     />
+    <circle cx="6" cy="-3" r="1.9" fill="currentColor" />
+  </svg>
+)
+
+// the rounded diamond for floating accents
+export const Diamond = ({ className }: { className?: string }): ReactNode => (
+  <svg className={className} viewBox="-6 -6 12 12" aria-hidden="true">
+    <rect x="-3.5" y="-3.5" width="7" height="7" rx="1.8" transform="rotate(45)" fill="currentColor" />
   </svg>
 )
 
@@ -161,12 +180,5 @@ export const ExternalIcon = (): ReactNode => (
 export const SaveIcon = (): ReactNode => (
   <Icon>
     <path d="M6 3h12v18l-6-4-6 4V3z" />
-  </Icon>
-)
-
-export const ShieldIcon = ({ off }: { off?: boolean }): ReactNode => (
-  <Icon>
-    <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
-    {off ? <path d="M4 4l16 16" /> : <path d="M9 12l2 2 4-4" />}
   </Icon>
 )

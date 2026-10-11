@@ -1,9 +1,13 @@
 import { useState, type ReactNode } from 'react'
 import type { Site } from '@shared/types'
-import { CloseIcon, PlusIcon, ShieldIcon } from './Icons'
+import { CloseIcon, PinIcon, PlusIcon } from './Icons'
 
 interface Props {
   sites: Site[]
+  // opened from links, not saved
+  temps: Site[]
+  onCloseTemp: (id: string) => void
+  onKeepTemp: (id: string) => void
   activeId: string | null
   onSelect: (id: string) => void
   onRemove: (id: string) => void
@@ -73,11 +77,6 @@ export default function SiteTabs(props: Props): ReactNode {
           >
             <span className="site-dot">{s.name.slice(0, 1).toUpperCase()}</span>
             <span className="side-name">{s.name}</span>
-            {!s.adblock && (
-              <span className="row-flag" title="Ad blocker off for this site">
-                <ShieldIcon off />
-              </span>
-            )}
             <button
               className="row-close"
               title={`Remove ${s.name}`}
@@ -91,7 +90,48 @@ export default function SiteTabs(props: Props): ReactNode {
             </button>
           </div>
         ))}
-        {sites.length === 0 && <p className="side-empty">No sites yet</p>}
+        {sites.length === 0 && props.temps.length === 0 && <p className="side-empty">No sites yet</p>}
+        {props.temps.map((s) => (
+          <div
+            key={s.id}
+            role="listitem"
+            className={`side-item site-row temp${s.id === activeId ? ' active' : ''}`}
+            title={`${s.name}, open until you close the app`}
+            tabIndex={0}
+            onClick={() => onSelect(s.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onSelect(s.id)
+              }
+            }}
+          >
+            <span className="site-dot">{s.name.slice(0, 1).toUpperCase()}</span>
+            <span className="side-name">{s.name}</span>
+            <button
+              className="row-close"
+              title="Keep as a site"
+              aria-label={`Keep ${s.name} as a site`}
+              onClick={(e) => {
+                e.stopPropagation()
+                props.onKeepTemp(s.id)
+              }}
+            >
+              <PinIcon />
+            </button>
+            <button
+              className="row-close"
+              title="Close tab"
+              aria-label={`Close ${s.name}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                props.onCloseTemp(s.id)
+              }}
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        ))}
       </div>
     </section>
   )

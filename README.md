@@ -16,22 +16,26 @@ I wanted one app that's fast on a cheap laptop, keeps everything on your machine
 
 Working now:
 
-- **Brands.** A rail of brands on the left. Each one has its own logins, niche keywords and recommendations, and switching is one click.
+- **Brands.** Your brands sit as small cards in the title bar. Each one has its own logins, niche keywords and recommendations, and switching is one click or Ctrl+1 to 9.
 - **Every account at once.** Each brand gets its own browser session, so two brands can be logged into two different accounts on the same site and they never mix.
 - **Site tabs.** Reddit, X, Instagram, TikTok, YouTube, YouTube Studio, vidIQ and 1of10 to start. Add any site with a name and a URL, drag to reorder.
+- **Trends.** One ranked feed of what's rising in your niche across Reddit, YouTube, Google Trends and TikTok, with today's top three up front.
+- **Ideas.** Save a trend as an idea in one click, or write your own down.
+- **Links stay in the app.** A trend, an idea or any link opens in that brand's tab for the site, or in a temporary tab if you don't have one. Never your normal browser.
+- **Ad blocker.** On by default with the same filter lists as uBlock Origin, YouTube ads included. Turn it off per brand or allow a site in Settings.
+- **Search.** One box in the title bar for trends, sites, brands and ideas. Paste a link to open it. Ctrl+K gets you there.
 - **Local first.** Everything is saved on your computer. No account, no server.
 
 Brand colors, type and logo rules are in [docs/BRAND.md](docs/BRAND.md).
 
 Coming next:
 
-- **Trends**: one ranked feed of what's rising in your niche across Reddit, YouTube, Google Trends and TikTok
-- **Chat**: ask your AI agent (any of the ones above, or your own) for ideas, outlines, titles and posts, with your brand and trends as context
-- **Ideas and Schedule**: a board from idea to posted, and a calendar of what goes out where
+- **Chat**: ask your AI agent (any of the ones above, or your own) for ideas, outlines, titles and posts, with your brand and trends as context. Agents only ever run when you send a message.
+- **Ideas board and Schedule**: a board from idea to posted, and a calendar of what goes out where
 - **Writer**: drafts for every platform from one idea
 - **Analytics**: how your posts did, pulled from your own logged-in accounts
 - **Posting**: TrendDeck posts for you through your logged-in tabs, or through official APIs if you'd rather
-- **Ad blocker** built in, and a **phone emulator** for app-only features
+- **Phone emulator** for app-only features
 
 ## Installation
 
@@ -69,9 +73,11 @@ npm run build      # type check and build into out/
 npm start          # run the build
 ```
 
+To test without sound, add `--mute-audio` when you launch Electron or set `TRENDDECK_MUTE=1`. Every page, site and popup starts muted.
+
 ```
-src/main       electron main process, window setup and the json store
-src/preload    the small api the ui is allowed to call
+src/main       electron main process: window, json store, trends and the ad blocker
+src/preload    the small api the ui is allowed to call, and the ad blocker's page preload
 src/renderer   the react ui
 src/shared     types used by both sides
 resources      logo and app icons
@@ -85,7 +91,7 @@ Brands and sites are in `trenddeck.json` in the app's user data folder:
 - macOS: `~/Library/Application Support/TrendDeck`
 - Linux: `~/.config/TrendDeck`
 
-Logins live in the same folder under `Partitions`, one folder per brand. Deleting a brand wipes its logins too.
+Logins live in the same folder under `Partitions`, one folder per brand. Deleting a brand wipes its logins too. Cached trends are in `trends`, and the ad blocker's lists are in `adblock`.
 
 ## License
 

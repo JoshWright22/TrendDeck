@@ -1,7 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AdblockCount, AppData, TrendDeckApi, TrendFeed } from '@shared/types'
+import type { AppData, TrendDeckApi, TrendFeed } from '@shared/types'
 
 const api: TrendDeckApi = {
+  platform: process.platform,
+  windowControl: (action) => ipcRenderer.invoke('window:control', action),
+  onMaximized: (fn) => {
+    const listener = (_event: unknown, maximized: boolean): void => fn(maximized)
+    ipcRenderer.on('window:maximized', listener)
+    return () => ipcRenderer.removeListener('window:maximized', listener)
+  },
+  onOpenUrl: (fn) => {
+    const listener = (_event: unknown, url: string): void => fn(url)
+    ipcRenderer.on('open:url', listener)
+    return () => ipcRenderer.removeListener('open:url', listener)
+  },
   loadData: () => ipcRenderer.invoke('data:load'),
   saveData: (data: AppData) => ipcRenderer.invoke('data:save', data),
   clearBrandSession: (brandId: string) => ipcRenderer.invoke('brand:clear-session', brandId),
@@ -16,13 +28,6 @@ const api: TrendDeckApi = {
     const listener = (_event: unknown, feed: TrendFeed): void => fn(feed)
     ipcRenderer.on('trends:update', listener)
     return () => ipcRenderer.removeListener('trends:update', listener)
-  },
-  adblockAttach: (webContentsId: number, brandId: string, siteId: string) =>
-    ipcRenderer.invoke('adblock:attach', webContentsId, brandId, siteId),
-  onAdblockCount: (fn) => {
-    const listener = (_event: unknown, count: AdblockCount): void => fn(count)
-    ipcRenderer.on('adblock:count', listener)
-    return () => ipcRenderer.removeListener('adblock:count', listener)
   }
 }
 

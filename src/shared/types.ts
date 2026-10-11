@@ -2,8 +2,6 @@ export interface Site {
   id: string
   name: string
   url: string
-  // ad blocker for just this site, the brand switch wins when it's off
-  adblock: boolean
 }
 
 export interface ChatMessage {
@@ -34,7 +32,10 @@ export interface Brand {
   keywords: string[]
   // without the r/
   subreddits: string[]
+  // ad blocker for every site of this brand
   adblock: boolean
+  // domains the blocker leaves alone, subdomains included
+  adblockAllow: string[]
   sites: Site[]
   threads: ChatThread[]
   ideas: Idea[]
@@ -89,7 +90,7 @@ export interface TrendFeed {
   refreshing: boolean
 }
 
-export const DEFAULT_SITES: ReadonlyArray<Omit<Site, 'id' | 'adblock'>> = [
+export const DEFAULT_SITES: ReadonlyArray<Omit<Site, 'id'>> = [
   { name: 'Reddit', url: 'https://www.reddit.com' },
   { name: 'X', url: 'https://x.com' },
   { name: 'Instagram', url: 'https://www.instagram.com' },
@@ -100,20 +101,32 @@ export const DEFAULT_SITES: ReadonlyArray<Omit<Site, 'id' | 'adblock'>> = [
   { name: '1of10', url: 'https://1of10.com' }
 ]
 
-export interface AdblockCount {
-  webContentsId: number
-  // blocked on the page that's open now, resets when it navigates
-  count: number
-  brandId: string
-  // blocked for the brand since the app started
-  brandTotal: number
-}
-
 // brand ids end up in a session partition name, so keep them boring
 export const ID_PATTERN = /^[a-zA-Z0-9-]{1,64}$/
 
 export function partitionFor(brandId: string): string {
   return `persist:brand-${brandId}`
+}
+
+// hostname without the www, '' when it isn't a url
+export function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, '')
+  } catch {
+    return ''
+  }
+}
+
+// last two labels, good enough to match youtube.com links to a youtube tab
+export function baseDomain(host: string): string {
+  return host.split('.').slice(-2).join('.')
+}
+
+// "https://www.Example.com/x" or "example.com" both end up as example.com
+export function cleanDomain(raw: string): string {
+  const text = raw.trim().toLowerCase()
+  const host = hostOf(/^https?:\/\//.test(text) ? text : `https://${text}`)
+  return /^[a-z0-9.-]+\.[a-z0-9-]+$/.test(host) ? host : ''
 }
 
 export function isHttpUrl(value: string): boolean {
@@ -132,6 +145,8 @@ export interface TrendDeckApi {
   // resolves to whether the window is maximized after the action
   windowControl(action: WindowAction): Promise<boolean>
   onMaximized(fn: (maximized: boolean) => void): () => void
+  // a link was clicked somewhere, open it in a site tab
+  onOpenUrl(fn: (url: string) => void): () => void
   loadData(): Promise<AppData>
   saveData(data: AppData): Promise<void>
   clearBrandSession(brandId: string): Promise<void>
@@ -141,7 +156,4 @@ export interface TrendDeckApi {
   getTrends(brandId: string): Promise<TrendFeed | null>
   refreshTrends(brandId: string): Promise<void>
   onTrends(fn: (feed: TrendFeed) => void): () => void
-  // tells the main process which brand and site a webview is showing
-  adblockAttach(webContentsId: number, brandId: string, siteId: string): Promise<void>
-  onAdblockCount(fn: (count: AdblockCount) => void): () => void
 }

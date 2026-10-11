@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react'
-import type { Brand } from '@shared/types'
-import BrandRail from './BrandRail'
+import type { Brand, Site } from '@shared/types'
 import SiteTabs from './SiteTabs'
-import Shield from './Shield'
 import { PAGES, type Page } from './ComingSoon'
 import {
   AnalyticsIcon,
@@ -25,42 +23,26 @@ const NAV_ICONS: Record<Page, () => ReactNode> = {
 }
 
 interface Props {
-  brands: Brand[]
   brand: Brand | null
   view: View
   onView: (view: View) => void
-  onSelectBrand: (id: string) => void
   onEditBrand: (id: string) => void
-  onAddBrand: () => void
   onAddSite: () => void
+  temps: Site[]
   onRemoveSite: (id: string) => void
+  onCloseTemp: (id: string) => void
+  onKeepTemp: (id: string) => void
   onMoveSite: (fromId: string, toId: string) => void
   onSettings: () => void
-  blocked: number
-  onToggleAdblock: () => void
 }
 
 export default function Sidebar(props: Props): ReactNode {
-  const { brands, brand, view } = props
+  const { brand, view } = props
   return (
     <aside className="sidebar">
-      <BrandRail
-        brands={brands}
-        activeId={brand?.id ?? null}
-        onSelect={props.onSelectBrand}
-        onEdit={props.onEditBrand}
-        onAdd={props.onAddBrand}
-      />
-
       {brand && (
         <div className="brand-head">
           <h1 title={brand.name}>{brand.name}</h1>
-          <Shield
-            on={brand.adblock}
-            count={props.blocked}
-            label={`every ${brand.name} site`}
-            onToggle={props.onToggleAdblock}
-          />
           <button
             className="icon-btn small"
             title="Edit brand and keywords"
@@ -96,6 +78,9 @@ export default function Sidebar(props: Props): ReactNode {
       {brand && (
         <SiteTabs
           sites={brand.sites}
+          temps={props.temps}
+          onCloseTemp={props.onCloseTemp}
+          onKeepTemp={props.onKeepTemp}
           activeId={view.kind === 'site' ? view.id : null}
           onSelect={(id) => props.onView({ kind: 'site', id })}
           onRemove={props.onRemoveSite}

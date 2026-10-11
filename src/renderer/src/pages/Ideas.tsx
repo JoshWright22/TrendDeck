@@ -51,7 +51,13 @@ export default function Ideas({ brand, editBrand, chatOpen, onToggleChat }: Page
             {brand.ideas.map((idea) => (
               <li key={idea.id} className="idea">
                 <div className="idea-main">
-                  <span className="idea-title">{idea.title}</span>
+                  {idea.url ? (
+                    <a className="idea-title link" href={idea.url} target="_blank" rel="noreferrer">
+                      {idea.title}
+                    </a>
+                  ) : (
+                    <span className="idea-title">{idea.title}</span>
+                  )}
                   <span className="muted small">
                     {idea.source === 'manual' ? 'Your idea' : SOURCE_NAMES[idea.source]}, saved{' '}
                     {age(idea.savedAt)} ago
@@ -63,7 +69,7 @@ export default function Ideas({ brand, editBrand, chatOpen, onToggleChat }: Page
                     href={idea.url}
                     target="_blank"
                     rel="noreferrer"
-                    title="Open"
+                    title="Open in a tab"
                   >
                     <ExternalIcon />
                   </a>

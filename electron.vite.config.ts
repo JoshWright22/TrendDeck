@@ -27,8 +27,31 @@ function buildCsp(): Plugin {
 }
 
 export default defineConfig({
-  main: { resolve: { alias: shared } },
-  preload: { resolve: { alias: shared } },
+  main: {
+    resolve: { alias: shared },
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/main/index.ts'),
+          // the ad blocker parses its lists off the main thread
+          'adblock-worker': resolve('src/main/adblock-worker.ts')
+        }
+      }
+    }
+  },
+  preload: {
+    resolve: { alias: shared },
+    build: {
+      // site preloads run sandboxed, so the blocker's preload gets bundled in
+      externalizeDeps: { exclude: ['@ghostery/adblocker-electron-preload'] },
+      rollupOptions: {
+        input: {
+          index: resolve('src/preload/index.ts'),
+          adblock: resolve('src/preload/adblock.ts')
+        }
+      }
+    }
+  },
   renderer: {
     resolve: { alias: shared },
     plugins: [react(), buildCsp()]

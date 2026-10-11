@@ -4,7 +4,7 @@ Calls made while building, so nobody has to guess later.
 
 ## Layout
 
-- Brand switcher is a compact rail of brand cards at the top of the sidebar, not a dropdown. Every brand stays one click away and the shortcut number shows on hover.
+- Brand switcher is a row of small brand cards in the title bar, not a dropdown. Every brand stays one click away and the shortcut number shows on hover.
 - The app always opens on Trends. What each brand has open isn't saved, only kept while the app runs.
 - Only the open site has a webview. Leaving a site unmounts it, and coming back reopens the last page you were on (in memory only). Logins live in the brand's session so nothing is lost, the page just reloads.
 - Ctrl+1..9 (Cmd on macOS) picks the brand in rail order. When a site has focus the main process catches the keys first, otherwise the site would eat them.
@@ -24,5 +24,40 @@ Calls made while building, so nobody has to guess later.
 - Trend lines: TikTok sends its own 7 day curve. The rest start at zero when posted and gain a point every refresh, so they fill in over time.
 - Only the first 5 keywords and 8 subreddits are used per refresh to stay under rate limits.
 - Cache is one json per brand in `trends/` in the user data folder. Auto refresh checks the open brand every 10 minutes and refreshes when the cache is over 3 hours old.
-- Links open in your normal browser. Thumbnails aren't loaded, the app never pulls remote images.
+- Thumbnails aren't loaded, the app never pulls remote images.
 - Ideas is a plain list per brand for now. Saving the same link twice does nothing.
+
+## Window
+
+- No native frame on Windows and Linux. The title bar is ours: logo, brand cards, search, then minimize, maximize and close. The bar is a drag region so Windows still treats it as the caption, double click maximizes and dragging to an edge snaps. The snap layouts popup on hover over maximize is native only, so it's not there.
+- macOS keeps its own traffic lights in a hidden title bar, people expect them there.
+- Search in the bar is the one search box. It lists matching pages, sites, brands and ideas, and the first row searches trends. Picking that opens Trends filtered, with a chip to clear it. Pasting a link opens it in a tab. Ctrl+K focuses it.
+
+## Motion
+
+- Everyday motion is a short fade and slide with no overshoot. The bounce and the diamond burst only play on a small win: saving an idea now, a post going out once posting exists. `.win-pop` in styles.css is the one place it lives.
+
+## Links
+
+- Every link opens inside TrendDeck, never the system browser. Trends, ideas, pasted links and links a site wants in a new tab all go through the same path.
+- A link goes to the brand's site tab with the same host, or the same domain if there's no exact match (youtube.com links go to YouTube, not YouTube Studio). If nothing matches it opens a temporary tab at the bottom of the Sites list.
+- Temporary tabs aren't saved and go away when the app closes. The pin button keeps one as a normal site.
+- Popups that ask for a size, like Google or Apple login, still open as a small window in the same brand session. They need the page that opened them to finish the login.
+
+## Ad blocker
+
+- On for every brand by default. There's no button or count in the main UI, it just works. Settings has the switch per brand and an allowlist of domains per brand, subdomains included. The old per site switch moved into the allowlist.
+- Lists are the ones uBlock Origin turns on by default: its filters, quick fixes, unbreak, privacy and badware lists, plus EasyList and EasyPrivacy. They come from uBO's own CDN with two mirrors each, so one being down doesn't matter. Scriptlets (json-prune, set-constant and the rest) come from the resources file the blocker library builds from uBO's.
+- Lists refresh when the app starts and every 4 hours. Each list is cached on disk, so a failed download keeps the last good copy. Parsing takes a few seconds so it runs in a worker thread, and the built engine is cached so the next start is instant.
+- Scriptlets run from a preload at document start. The library's own way injects them after the page has started, which is too late for YouTube: the player has already read its ad slots by then. Each scriptlet runs in its own function because they all declare the same helpers.
+- Login pages and YouTube Studio are never touched.
+- Checked on a monetized music video: with the blocker on it plays from 0:00 with no pre-roll, with youtube.com on the allowlist a 15 second ad plays first.
+
+## Sound
+
+- Sites only play sound while you can see them. Minimize or hide the window and every site goes quiet, it comes back on restore. Only the open site has a webview anyway.
+- `--mute-audio` or `TRENDDECK_MUTE=1` mutes everything, the app window, sites and popups. Test runs always use one of them.
+
+## Agents
+
+- An agent only runs when you send a chat message. Nothing else calls one: not trends, not the ad blocker, not analytics, not a timer. Anything that wants an agent's help has to go through a message you send.

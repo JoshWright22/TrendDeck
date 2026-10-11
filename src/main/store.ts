@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import {
+  cleanDomain,
   DEFAULT_SITES,
+  hostOf,
   ID_PATTERN,
   isHttpUrl,
   type AppData,
@@ -28,7 +30,8 @@ function defaultData(): AppData {
     keywords: [],
     subreddits: [],
     adblock: true,
-    sites: DEFAULT_SITES.map((s) => ({ ...s, id: randomUUID(), adblock: true })),
+    adblockAllow: [],
+    sites: DEFAULT_SITES.map((s) => ({ ...s, id: randomUUID() })),
     threads: [],
     ideas: []
   }
@@ -45,7 +48,7 @@ function cleanSite(raw: unknown): Site | null {
   const s = raw as Partial<Site> | null
   if (!s || typeof s.id !== 'string' || !ID_PATTERN.test(s.id)) return null
   if (typeof s.name !== 'string' || typeof s.url !== 'string' || !isHttpUrl(s.url)) return null
-  return { id: s.id, name: s.name.slice(0, 60), url: s.url, adblock: s.adblock !== false }
+  return { id: s.id, name: s.name.slice(0, 60), url: s.url }
 }
 
 function cleanMessage(raw: unknown): ChatMessage | null {
@@ -93,6 +96,13 @@ function cleanBrand(raw: unknown): Brand | null {
   const sites = Array.isArray(b.sites)
     ? b.sites.map(cleanSite).filter((s): s is Site => s !== null)
     : []
+  // sites used to have their own ad blocker switch, an off one moves to the allowlist
+  const oldOff = Array.isArray(b.sites)
+    ? (b.sites as Partial<{ url: string; adblock: boolean }>[])
+        .filter((s) => s && s.adblock === false && typeof s.url === 'string')
+        .map((s) => hostOf(s.url as string))
+    : []
+  const adblockAllow = [...new Set([...strings(b.adblockAllow, 253).map(cleanDomain), ...oldOff])].filter(Boolean)
   const threads = Array.isArray(b.threads)
     ? b.threads.map(cleanThread).filter((t): t is ChatThread => t !== null)
     : []
@@ -105,6 +115,7 @@ function cleanBrand(raw: unknown): Brand | null {
     keywords,
     subreddits,
     adblock: b.adblock !== false,
+    adblockAllow,
     sites,
     threads,
     ideas

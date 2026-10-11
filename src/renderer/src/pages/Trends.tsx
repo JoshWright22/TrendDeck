@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { SOURCE_NAMES, TREND_SOURCES, type TrendFeed, type TrendItem, type TrendSource } from '@shared/types'
 import PageHeader from '../components/PageHeader'
 import { age, HeroCard, TrendCard } from '../components/TrendBits'
-import { ReloadIcon, SearchIcon } from '../components/Icons'
+import { CloseIcon, ReloadIcon, SearchIcon } from '../components/Icons'
 import type { PageProps } from './types'
 
 type Sort = 'score' | 'newest' | 'source'
@@ -10,11 +10,10 @@ type Sort = 'score' | 'newest' | 'source'
 const newId = (): string => crypto.randomUUID()
 
 export default function Trends(props: PageProps): ReactNode {
-  const { brand, editBrand, chatOpen, onToggleChat, onEditBrand } = props
+  const { brand, editBrand, chatOpen, onToggleChat, onEditBrand, trendQuery: query, onTrendQuery } = props
   const [feed, setFeed] = useState<TrendFeed | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [sources, setSources] = useState<ReadonlySet<TrendSource>>(new Set(TREND_SOURCES))
-  const [query, setQuery] = useState('')
   const [sort, setSort] = useState<Sort>('score')
 
   useEffect(() => {
@@ -140,15 +139,15 @@ export default function Trends(props: PageProps): ReactNode {
             ))}
           </div>
           <span className="spacer" />
-          <label className="search">
-            <SearchIcon />
-            <input
-              value={query}
-              placeholder="Search trends"
-              aria-label="Search trends"
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
+          {q && (
+            <span className="filter-chip on query-chip">
+              <SearchIcon />
+              {query.trim()}
+              <button title="Clear search" aria-label="Clear search" onClick={() => onTrendQuery('')}>
+                <CloseIcon />
+              </button>
+            </span>
+          )}
           <select value={sort} aria-label="Sort" onChange={(e) => setSort(e.target.value as Sort)}>
             <option value="score">Top score</option>
             <option value="newest">Newest</option>
@@ -184,8 +183,10 @@ export default function Trends(props: PageProps): ReactNode {
               </div>
             ) : items.length === 0 ? (
               <p>Nothing yet. Hit refresh to deal the first hand.</p>
-            ) : (
+            ) : filtering || sort !== 'score' ? (
               <p>No trends match that.</p>
+            ) : (
+              <p>That's the whole hand for now.</p>
             )}
           </div>
         )}

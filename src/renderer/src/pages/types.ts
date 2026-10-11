@@ -8,4 +8,7 @@ export interface PageProps {
   onEditBrand: () => void
   chatOpen: boolean
   onToggleChat: () => void
+  // from the title bar search
+  trendQuery: string
+  onTrendQuery: (q: string) => void
 }

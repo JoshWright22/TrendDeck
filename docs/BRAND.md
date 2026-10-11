@@ -50,7 +50,7 @@ The surface is always Felt with an indigo spotlight glow. Accents stay small: on
 
 Quiet by default, loud on a win. Everyday motion is a short fade and slide with a plain ease-out: cards rise 8 px in about 200 ms with a small stagger and panels slide in 12 px. Hovers lift a pixel or two and presses shrink a little. No overshoot, no rotation.
 
-The bounce is saved for small wins, like saving an idea or a post going out: a quick pop that overshoots and settles, with a yellow spark burst. Nothing loops forever except a slow glow. Respect reduced motion, and keep slow devices fast (fewer particles, no blur on big areas).
+The bounce is saved for small wins, like saving an idea or a post going out: a quick pop that overshoots and settles, with a burst of small yellow diamonds. Nothing loops forever except a slow glow. Respect reduced motion, and keep slow devices fast (fewer particles, no blur on big areas).
 
 ## Voice
 
