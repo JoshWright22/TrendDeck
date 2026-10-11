@@ -86,7 +86,7 @@ Calls made while building the chat, so nobody has to guess later.
 
 ## Thread tools
 
-- Stop (button or Esc), Retry on the last reply, Edit on any of your messages. Editing drops everything after that message and runs again.
+- Stop (button or Esc, see Esc below), Retry on the last reply, Edit on any of your messages. Editing drops everything after that message and runs again.
 - Typing while the agent works queues the message, it shows above the composer and goes out when the reply finishes. A stopped or failed reply holds the queue so you can look first. The queue lives in the window, not on disk.
 - Rename (F2), archive and delete (with a confirm) from the menu on each chat. Archived chats sit behind an "Archived" button at the bottom of the list. Sending in an archived chat brings it back.
 - Search looks in titles and message text.
@@ -99,3 +99,29 @@ Calls made while building the chat, so nobody has to guess later.
 - Two new cards: `post` and `login`. They show Approve and Decline and nothing happens until you pick. The pick is saved on the reply and is final.
 - Approving a post copies it and opens the site tab so you can paste it. Approving a login opens the tab. The app still never posts by itself.
 - The agent sees the pick in the history next time ("The user approved a request card").
+
+## Question cards
+
+- The agent can ask with `{"type":"question","question":"...","multi":false,"options":[{"label":"...","description":"..."}]}`. Options get cut to 4, plain strings work too. The card always adds Other with a text box, so an agent's own "Other" option gets dropped.
+- Single choice: a click is the answer. Multi choice and Other need Next or Send.
+- Several question blocks in one reply show as one card with steps and dots, the answers go out together when the last one is done. They render under the reply text, not where the blocks were.
+- The answer goes out as a normal message from you, `Q: question` and `A: pick` lines, so every agent reads it the same way and it shows up in history like anything else. The card reads that message back to show what was picked. Nothing new gets saved on the reply.
+- Only the newest reply's questions can be answered, and only once it's done and nothing is running. If you type something else instead, the card shows no answer.
+- Sending the answer is a message you sent, so the agent only runs because you clicked.
+
+## Esc
+
+- Esc closes whatever is open first: a modal, a dropdown or menu, the usage popover, the chat list in the side pane, a delete confirm, a search. Only when nothing is open does it stop a reply. It checks what's open at the start of the key press, since a modal closes itself on the same key and would already be gone.
+
+## Home view
+
+- Before the first message the chat shows the brand's name, a short line and four prompt cards (video ideas from today's trends, outline an idea, titles and thumbnail text, posts for every platform). The composer sits right under them with the agent and model pickers, so you can pick both before sending.
+- The cards send their prompt straight away. The title shows the full prompt on hover.
+- The outline prompt tells the agent it can ask which idea, which shows off question cards.
+
+## Long chats and narrow windows
+
+- Old replies only redraw when that message changes, not on every streamed word of the new one.
+- Messages and chats off screen use `content-visibility: auto`, so the browser skips them until they scroll in. Tried with 80 messages and it scrolls fine, so no list virtualizing library for now.
+- The chat sizes itself off its own width (container queries), not the window, since the side pane and sidebar change how much room it gets. Under 860 px the chat list gets narrower and drops times, under 620 px the shortcut hints go.
+- The search box's native clear button is hidden, Esc clears it instead.

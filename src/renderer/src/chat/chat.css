@@ -696,25 +696,118 @@
 }
 
 .cx-starters {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  max-width: 720px;
+  margin: 22px auto 0;
+  padding: 3px;
+}
+
+.cx.compact .cx-starters {
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin-top: 18px;
 }
 
 .cx-starter {
-  padding: 8px 14px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--smoke);
-  transition: transform 0.12s ease-out;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 112px;
+  padding: 14px 14px 12px;
+  border-radius: 12px;
+  background: var(--raised);
+  box-shadow: 0 0 0 1px var(--line);
+  color: var(--chalk);
+  text-align: left;
+  animation: cx-deal 0.22s ease-out both;
+  transition:
+    transform 0.14s ease-out,
+    box-shadow 0.14s ease-out;
+}
+
+.cx-starter:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.cx-starter:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.cx-starter:nth-child(4) {
+  animation-delay: 120ms;
 }
 
 .cx-starter:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: var(--teal);
-  color: var(--chalk);
+  transform: translateY(-2px);
+  box-shadow: 0 0 0 2px var(--teal);
+}
+
+.cx-starter:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.cx-starter:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.cx-starter-mark {
+  width: 16px;
+  height: 14px;
+  color: var(--teal);
+}
+
+.cx-starter-title {
+  margin-top: auto;
+  font: 800 14.5px/1.2 var(--head);
+  letter-spacing: -0.02em;
+}
+
+.cx-starter-hint {
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.cx-home-mark {
+  width: 34px;
+  height: 30px;
+  margin-bottom: 10px;
+  color: var(--teal);
+}
+
+.cx-home-brand {
+  color: var(--smoke);
+  font: 700 12px/1 var(--body);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* before the first message the composer sits right under the welcome, pickers and all */
+.cx-main.home .cx-messages {
+  flex: 0 1 auto;
+  margin-top: auto;
+}
+
+.cx-main.home .cx-column {
+  min-height: 0;
+}
+
+.cx-main.home .cx-empty {
+  margin: 0;
+  padding-bottom: 6px;
+}
+
+.cx-main.home .cx-composer {
+  margin-bottom: auto;
+  padding-bottom: 32px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cx-starter {
+    animation: none;
+  }
 }
 
 .cx-setup-list {
@@ -1361,4 +1454,231 @@
 
 .cx-decided.declined {
   color: var(--smoke);
+}
+
+/* question cards, the agent asks and waits */
+
+.cx-hand:empty {
+  display: none;
+}
+
+.cx-card.cx-question,
+.cx.compact .cx-card.cx-question {
+  aspect-ratio: auto;
+  width: min(100%, 420px);
+  user-select: auto;
+}
+
+.cx-card.cx-question:hover {
+  transform: none;
+}
+
+.cx-question .cx-card-title {
+  margin: 2px 0 0;
+}
+
+.cx-q-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cx-q-option {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  column-gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--chalk);
+  text-align: left;
+  transition:
+    transform 0.12s ease-out,
+    border-color 0.12s ease-out;
+}
+
+.cx-q-option:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--smoke);
+}
+
+.cx-q-option:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.cx-q-option.on {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+}
+
+.cx-q-option:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.cx-q-tick {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--smoke);
+  border-radius: 50%;
+}
+
+.cx-q-tick.box {
+  border-radius: 4px;
+}
+
+.cx-q-option.on .cx-q-tick {
+  border-color: var(--teal);
+  background: var(--teal);
+  box-shadow: inset 0 0 0 2.5px var(--panel);
+}
+
+.cx-q-label {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.cx-q-desc {
+  grid-column: 2;
+  color: var(--smoke);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.cx-q-other {
+  padding: 8px 12px;
+  border: 1px solid var(--teal);
+  border-radius: 10px;
+  background: var(--felt);
+  color: var(--chalk);
+  font: inherit;
+}
+
+.cx-q-other:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--teal-soft);
+}
+
+.cx-q-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.cx-q-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  background: rgba(154, 154, 166, 0.35);
+  transition: background 0.15s ease-out;
+}
+
+.cx-q-dot.done {
+  background: var(--smoke);
+}
+
+.cx-q-dot.on {
+  background: var(--teal);
+}
+
+.cx-q-dot:disabled {
+  cursor: default;
+}
+
+.cx-q-summary {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.cx-q-summary dt {
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.cx-q-summary dd {
+  margin: 2px 0 0;
+  color: var(--chalk);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* long chats: old messages off screen skip layout and paint until they scroll in */
+
+.cx-column > .cx-msg.agent:not(.streaming):not(:nth-last-child(-n + 4)),
+.cx-column > .cx-msg-user-wrap:not(:nth-last-child(-n + 4)),
+.cx-thread:not(.active) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 120px;
+}
+
+.cx-thread:not(.active) {
+  contain-intrinsic-size: auto 34px;
+}
+
+/* the native clear button on search isn't themed, esc clears instead */
+.cx-search::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+/* narrow windows */
+
+.cx {
+  container-type: inline-size;
+}
+
+.cx-thread-title {
+  line-height: 1.3;
+}
+
+@container (max-width: 860px) {
+  .cx-side {
+    width: 196px;
+  }
+
+  .cx-thread-when {
+    display: none;
+  }
+
+  .cx-column {
+    padding: 18px 16px 10px;
+  }
+
+  .cx-composer {
+    padding: 0 16px 12px;
+  }
+
+  .cx-msg.user {
+    max-width: 92%;
+  }
+}
+
+@container (max-width: 620px) {
+  .cx-side {
+    width: 160px;
+    padding: 8px 6px;
+  }
+
+  .cx-keys {
+    display: none;
+  }
+
+  .cx-hello {
+    font-size: 21px;
+  }
+
+  .cx-starters {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.cx.compact .cx-msg.user {
+  max-width: 92%;
+}
+
+.cx.compact .cx-q-option {
+  padding: 8px 10px;
 }

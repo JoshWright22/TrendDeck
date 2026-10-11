@@ -55,6 +55,14 @@ When you want to post something for the user or need them to log in somewhere, a
 {"type":"login","site":"<site tab name>","reason":"<why you need it>"}
 \`\`\`
 
+When you need the user to choose before you go on, ask with a question card and stop there, their answer comes back as the next message. 2 to 4 options, each with a short description. Set "multi" to true if they can pick more than one. The app adds an "Other" option where they can write their own, so don't add one. Put several question blocks in one reply to ask a few things in a row:
+
+\`\`\`${EMBED_LANG}
+{"type":"question","question":"<short question>","multi":false,"options":[{"label":"<short option>","description":"<one line on what it means>"},{"label":"<short option>","description":"<one line>"}]}
+\`\`\`
+
+Only ask when it really changes the answer, otherwise just pick something sensible and say so. Answers come back as lines starting with "Q:" and "A:".
+
 Use a trend card when you talk about a specific trend, an idea card for each post idea, a draft card for anything ready to post and a site card to point at where to post it. Keep normal text short around the cards.`
 
 export async function brandContext(brand: Brand): Promise<string> {

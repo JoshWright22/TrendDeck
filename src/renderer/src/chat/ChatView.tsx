@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { Brand, TrendItem, TrendSource } from '@shared/types'
 import type {
   AgentConfig,
@@ -17,6 +17,7 @@ import { EmbedCard, type EmbedActions } from './Embeds'
 import AgentSettings from './AgentSettings'
 import SetupSteps from './SetupSteps'
 import WorkLog from './WorkLog'
+import QuestionDeck, { questionsIn, readAnswers } from './Questions'
 import UsagePopover from './UsagePopover'
 import { RisingMark } from './Marks'
 import { Dropdown, Menu } from './ui'
@@ -49,10 +50,31 @@ const lastOpen = new Map<string, string | null>()
 const queues = new Map<string, Queued[]>()
 
 const STARTERS = [
-  'Give me 5 post ideas from my top trends',
-  'Which trend should I jump on today, and why?',
-  'Write an X post and a Reddit post about my best trend'
+  {
+    title: "Video ideas from today's trends",
+    hint: 'Five ideas with a hook each',
+    prompt: "Give me 5 video ideas from today's top trends, with a hook and why it should work for each."
+  },
+  {
+    title: 'Outline an idea',
+    hint: 'Hook, beats and a call to action',
+    prompt:
+      "Outline one of my saved ideas into a short video: hook, beats and a call to action. Ask me which idea if it's not obvious."
+  },
+  {
+    title: 'Titles and thumbnail text',
+    hint: 'Ten pairs for your best trend',
+    prompt: 'Write 10 titles with matching thumbnail text for my best trend right now. Keep the thumbnail text under 5 words.'
+  },
+  {
+    title: 'Posts for every platform',
+    hint: 'One trend, a draft per site',
+    prompt: 'Turn my best trend into a post for each platform I use, as draft cards, each written the way that platform likes it.'
+  }
 ]
+
+// anything esc should close before it stops a reply
+const OVERLAYS = '.modal-backdrop, .ui-pop, [aria-modal="true"]'
 
 const SHORTCUTS = 'Ctrl+Shift+N new chat, Ctrl+L type, Esc stop, Alt+Up/Down switch chats'
 
@@ -96,6 +118,22 @@ function applyEvent(t: Thread, ev: Exclude<ChatEvent, { type: 'threads' | 'done'
     })
   }
 }
+
+type EmbedFn = (raw: string, closed: boolean, key: string) => ReactNode
+
+// a reply's text only redraws when that message or what its cards show changes, so a long
+// chat doesn't redo every old reply on each streamed word
+const ReplyText = memo(function ReplyText({
+  m,
+  make
+}: {
+  m: ThreadMessage
+  // deps is only here so memo sees when cards need a redraw
+  deps: object
+  make: RefObject<(m: ThreadMessage) => EmbedFn>
+}): ReactNode {
+  return <Markdown text={m.text} embed={make.current(m)} />
+})
 
 export default function ChatView({ brand, editBrand, onOpenSite, compact, onClose, headerRight }: Props): ReactNode {
   const [agents, setAgents] = useState<AgentInfo[] | null>(null)
@@ -400,6 +438,17 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
   )
   const archivedCount = threads.filter((t) => t.archived).length
 
+  // esc closes whatever is open first. checked in the capture phase because a modal
+  // closes itself on the same key and is already gone by the time onKey runs
+  const overlayOnEsc = useRef(false)
+  useEffect(() => {
+    const onDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') overlayOnEsc.current = document.querySelector(OVERLAYS) !== null
+    }
+    window.addEventListener('keydown', onDown, true)
+    return () => window.removeEventListener('keydown', onDown, true)
+  }, [])
+
   // keyboard: new chat, focus the composer, stop, step through chats
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -411,8 +460,11 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
       } else if (mod && !e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault()
         input.current?.focus()
-      } else if (e.key === 'Escape' && busy && !e.defaultPrevented && document.querySelector('.ui-pop') === null) {
-        stop()
+      } else if (e.key === 'Escape') {
+        if (e.defaultPrevented || overlayOnEsc.current || manage) return
+        if (showThreads) setShowThreads(false)
+        else if (confirmDelete) setConfirmDelete(null)
+        else if (busy) stop()
       } else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         const list = visible
         if (!list.length) return
@@ -439,7 +491,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
           : { ...b, ideas: [{ id: newId(), title, url, source, savedAt: Date.now() }, ...b.ideas] }
       )
   }
-  const embedFor = (m: ThreadMessage) => {
+  const embedFor = (m: ThreadMessage): EmbedFn => {
     const actions: EmbedActions = {
       ...baseActions,
       decision: (card) => m.decisions?.[card],
@@ -468,7 +520,13 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
     return embed
   }
 
+  const makeEmbed = useRef(embedFor)
+  makeEmbed.current = embedFor
+  const embedDeps = useMemo(() => ({}), [trends, savedTitles, brand, onOpenSite, editBrand, thread?.id, busy])
+
   const noAgents = agents !== null && usable.length === 0
+  // nothing sent yet: the welcome cards with the composer right under them
+  const home = !noAgents && !thread?.messages.length
   const lastAgentId = [...(thread?.messages ?? [])].reverse().find((m) => m.role === 'agent')?.id
 
   const threadList = (
@@ -480,7 +538,12 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
         aria-label="Search chats"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape' && query) {
+            e.preventDefault()
+            setQuery('')
+          }
+        }}
       />
       <div className="cx-threads" role="list" aria-label="Chats">
         {visible.length === 0 && (
@@ -562,7 +625,26 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
     </div>
   )
 
-  const agentMessage = (m: ThreadMessage): ReactNode => (
+  const questionsFor = (m: ThreadMessage, i: number): ReactNode => {
+    const qs = questionsIn(m.text)
+    if (!qs.length || !thread) return null
+    const after = thread.messages[i + 1]
+    const answered = after?.role === 'user' ? readAnswers(qs, after.text) : null
+    // only the newest reply can be answered, and only once it's done
+    const open = !after && m.status !== 'streaming' && !busy && !!agentId
+    return (
+      <div className="cx-hand cx-q-hand">
+        <QuestionDeck
+          key={`${m.id}-${qs.length}`}
+          questions={qs}
+          answered={answered ?? (after ? qs.map(() => '') : null)}
+          onAnswer={open ? (text) => void send(text) : null}
+        />
+      </div>
+    )
+  }
+
+  const agentMessage = (m: ThreadMessage, i: number): ReactNode => (
     <div key={m.id} className={`cx-msg agent${m.status === 'streaming' ? ' streaming' : ''}`}>
       <div className="cx-who">
         <RisingMark className="cx-who-mark" />
@@ -572,7 +654,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
       </div>
       <WorkLog m={m} />
       {m.text ? (
-        <Markdown text={m.text} embed={embedFor(m)} />
+        <ReplyText m={m} deps={embedDeps} make={makeEmbed} />
       ) : m.status === 'streaming' && !m.steps?.length && !m.thinking && !m.thinkingTokens ? (
         <div className="cx-thinking" aria-label="Thinking">
           <span />
@@ -580,6 +662,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
           <span />
         </div>
       ) : null}
+      {questionsFor(m, i)}
       {m.status === 'error' && <p className="cx-error">{m.error || 'Something went wrong'}</p>}
       {m.id === lastAgentId && m.status !== 'streaming' && (
         <div className="cx-msg-tools">
@@ -662,7 +745,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
         </aside>
       )}
 
-      <div className="cx-main">
+      <div className={`cx-main${home ? ' home' : ''}`}>
         <header className="cx-head">
           {compact ? (
             <button
@@ -696,20 +779,30 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
         <div className="cx-messages">
           <div className="cx-column">
             {thread && thread.messages.length > 0 ? (
-              thread.messages.map((m) => (m.role === 'user' ? userMessage(m) : agentMessage(m)))
+              thread.messages.map((m, i) => (m.role === 'user' ? userMessage(m) : agentMessage(m, i)))
             ) : noAgents ? (
               <SetupSteps agents={agents ?? []} scanning={scanning} onRescan={() => void loadAgents(true)} onAdd={() => setManage(true)} />
             ) : (
               <div className="cx-empty">
-                <p className="cx-hello">What are we posting for {brand.name}?</p>
+                <RisingMark className="cx-home-mark" />
+                <p className="cx-home-brand">{brand.name}</p>
+                <p className="cx-hello">Deal yourself in. What are we making today?</p>
                 <p className="muted">
                   Your agent gets this brand's keywords, top trends and saved ideas. Never your logins or what's in your
                   tabs.
                 </p>
                 <div className="cx-starters">
                   {STARTERS.map((s) => (
-                    <button key={s} className="cx-starter" disabled={!agentId} onClick={() => void send(s)}>
-                      {s}
+                    <button
+                      key={s.title}
+                      className="cx-starter"
+                      disabled={!agentId}
+                      title={s.prompt}
+                      onClick={() => void send(s.prompt)}
+                    >
+                      <RisingMark className="cx-starter-mark" />
+                      <span className="cx-starter-title">{s.title}</span>
+                      <span className="cx-starter-hint">{s.hint}</span>
                     </button>
                   ))}
                 </div>

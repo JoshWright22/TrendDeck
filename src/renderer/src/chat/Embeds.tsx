@@ -15,6 +15,7 @@ export type Embed =
   | { type: 'site'; site: string; url?: string }
   | { type: 'post'; site: string; title?: string; body: string }
   | { type: 'login'; site: string; reason?: string }
+  | { type: 'question'; question: string; options: { label: string; description: string }[]; multi: boolean }
 
 const str = (v: unknown, max = 4000): string => (typeof v === 'string' ? v.slice(0, max) : '')
 
@@ -77,6 +78,21 @@ export function parseEmbed(raw: string): Embed | null {
         : null
     case 'login':
       return str(j.site) ? { type: 'login', site: str(j.site, 100), reason: str(j.reason, 500) } : null
+    case 'question': {
+      // 2 to 4 options, plain strings work too. Other is added by the card
+      const options = (Array.isArray(j.options) ? j.options : [])
+        .map((o) =>
+          typeof o === 'string'
+            ? { label: o.slice(0, 80), description: '' }
+            : o && typeof o === 'object'
+              ? { label: str((o as Record<string, unknown>).label, 80), description: str((o as Record<string, unknown>).description, 200) }
+              : { label: '', description: '' }
+        )
+        .filter((o, i, all) => o.label.trim() && o.label.toLowerCase() !== 'other' && all.findIndex((x) => x.label === o.label) === i)
+        .slice(0, 4)
+      const question = str(j.question, 300) || str(j.text, 300)
+      return question && options.length >= 1 ? { type: 'question', question, options, multi: j.multi === true || j.multiple === true } : null
+    }
     default:
       return null
   }
@@ -384,5 +400,8 @@ export function EmbedCard({
     case 'post':
     case 'login':
       return <RequestEmbed e={e} a={actions} card={card} />
+    case 'question':
+      // drawn under the reply as one deck, see Questions.tsx
+      return null
   }
 }
