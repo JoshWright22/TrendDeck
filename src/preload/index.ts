@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AppData, TrendDeckApi, TrendFeed } from '@shared/types'
+import type { AppData, StatPlatform, TrendDeckApi, TrendFeed } from '@shared/types'
 
 const api: TrendDeckApi = {
   platform: process.platform,
@@ -28,6 +28,18 @@ const api: TrendDeckApi = {
     const listener = (_event: unknown, feed: TrendFeed): void => fn(feed)
     ipcRenderer.on('trends:update', listener)
     return () => ipcRenderer.removeListener('trends:update', listener)
+  },
+  loadDrafts: (brandId) => ipcRenderer.invoke('writer:load', brandId),
+  saveDrafts: (brandId, doc) => ipcRenderer.invoke('writer:save', brandId, doc),
+  loadAnalytics: (brandId) => ipcRenderer.invoke('analytics:load', brandId),
+  saveAnalyticsConfig: (brandId, config) => ipcRenderer.invoke('analytics:config', brandId, config),
+  refreshAnalytics: (brandId, platforms) => ipcRenderer.invoke('analytics:refresh', brandId, platforms),
+  clearAnalytics: (brandId) => ipcRenderer.invoke('analytics:clear', brandId),
+  onAnalyticsProgress: (fn) => {
+    const listener = (_event: unknown, brandId: string, platform: StatPlatform | null): void =>
+      fn(brandId, platform)
+    ipcRenderer.on('analytics:progress', listener)
+    return () => ipcRenderer.removeListener('analytics:progress', listener)
   }
 }
 
