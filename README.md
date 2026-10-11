@@ -4,7 +4,7 @@
 
 TrendDeck is a marketing desktop for creators. Every brand you run gets its own workspace: every account logged in at once, what's trending in your niche, and a chat pane that turns trends into posts.
 
-Works with the AI subscriptions you already have: Claude Code, Codex, Cursor, Grok Build, OpenCode and Google Antigravity. If one is set up on your computer, TrendDeck can use it.
+Works with the AI subscriptions you already have: Claude Code, Codex, Cursor, Grok Build, OpenCode, Google Antigravity, Qwen Code and Kimi. If one is set up on your computer, TrendDeck can use it. Anything else plugs in too: any command line agent, or any OpenAI-compatible API (DeepSeek, GLM, OpenRouter, a local Ollama model).
 
 ## "So what's the catch?"
 
@@ -26,7 +26,7 @@ Brand colors, type and logo rules are in [docs/BRAND.md](docs/BRAND.md).
 Coming next:
 
 - **Trends**: one ranked feed of what's rising in your niche across Reddit, YouTube, Google Trends and TikTok
-- **Chat**: ask your AI agent (any of the six above) for ideas, outlines, titles and posts, with your brand and trends as context
+- **Chat**: ask your AI agent (any of the ones above, or your own) for ideas, outlines, titles and posts, with your brand and trends as context
 - **Ideas and Schedule**: a board from idea to posted, and a calendar of what goes out where
 - **Writer**: drafts for every platform from one idea
 - **Analytics**: how your posts did, pulled from your own logged-in accounts
@@ -44,6 +44,9 @@ Coming next:
 > - Grok Build: install [Grok Build CLI](https://x.ai/cli) and run `grok login`
 > - OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
 > - Antigravity: install the [Antigravity CLI](https://antigravity.google) and sign in with Google
+> - Qwen Code: install [Qwen Code](https://github.com/QwenLM/qwen-code) and run `qwen` to sign in
+> - Kimi: install [Kimi CLI](https://github.com/MoonshotAI/kimi-cli) and run `kimi` to sign in
+> - Anything else: add it in Settings > Agents, either a command to run or an OpenAI-compatible API URL and key
 >
 > Everything else works without one.
 
