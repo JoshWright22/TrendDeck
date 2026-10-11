@@ -42,6 +42,7 @@ The surface is always Felt with an indigo spotlight glow. Accents stay small: on
 - **Spark suit.** The four-point spark from the logo stands in for hearts and spades. Teal for rising, pink for hot, yellow for a win.
 - **Dealing.** Things arrive the way cards are dealt: slide in from the deck, small rotation, settle. Flip to reveal detail.
 - **Chips and stakes.** Growth scores and counts can sit in round chips. Use sparingly.
+- **No dithering.** No dot-grid or dither textures. For texture use a faint tiled spark-suit pattern (about 5% opacity) that fades out.
 - **Dotted lines.** Trend charts join points with thin dotted lines, the hottest point glows.
 - **Pill buttons.** Small white or teal pills with dark text.
 
