@@ -6,6 +6,7 @@ import { dropTrends, setupTrends } from './trends'
 import { attachBrand, blocksPopup, setupAdblock } from './adblock'
 import { setupMcp } from './mcp'
 import { forgetBrand } from './mcp/state'
+import { forgetBrandLogins, setupVault } from './vault'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -113,10 +114,12 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   await ses.clearCache()
   await dropTrends(brandId)
   await forgetBrand(brandId)
+  await forgetBrandLogins(brandId)
 })
 
 setupTrends()
 setupMcp()
+setupVault()
 
 void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()

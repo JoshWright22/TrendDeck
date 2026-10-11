@@ -7,6 +7,7 @@ import { isHttpUrl, SOURCE_NAMES, TREND_SOURCES, type Brand, type Site, type Tre
 import { getData } from '../store'
 import { addLog, changeState, isGranted, loadState, logEntry } from './state'
 import type { Turn } from './turns'
+import { authGuard, loginTool } from '../vault'
 import {
   click,
   focusRef,
@@ -79,6 +80,9 @@ async function allowedTab(turn: Turn): Promise<{ wc: WebContents; site: Site }> 
     await addLog({ brandId: turn.brandId, siteId: site?.id ?? '', kind: 'denied', detail: 'open tab' })
     throw new ToolError(DENIED)
   }
+  // sign-in pages give agents nothing but the status
+  const guard = await authGuard(turn.brandId, wc)
+  if (guard) throw new ToolError(guard)
   return { wc, site }
 }
 
@@ -468,7 +472,8 @@ export const TOOLS: Tool[] = [
       })
       return { queued: true, id: post.id, note: 'waiting for the user to review it in Settings > Agent access' }
     }
-  }
+  },
+  loginTool
 ]
 
 export async function callTool(turn: Turn, name: string, args: unknown): Promise<ToolResult> {

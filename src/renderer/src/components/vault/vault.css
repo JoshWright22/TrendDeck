@@ -1,0 +1,89 @@
+/* saved logins in settings and the two-factor code dialog, colors from docs/BRAND.md */
+
+.saved-logins {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.saved-logins h3 {
+  margin: 0 0 10px;
+  font: 800 15px/1.1 var(--head);
+  letter-spacing: -0.04em;
+}
+
+.saved-logins h4 {
+  margin: 14px 0 6px;
+  color: var(--smoke);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vault-warn {
+  margin: 6px 0;
+  color: var(--pink);
+  font-size: 12px;
+}
+
+.vault-sites {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vault-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  font-size: 13px;
+}
+
+.vault-name {
+  flex: none;
+  width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-user {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-form {
+  margin: 4px 0 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--felt);
+}
+
+.vault-code {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2em;
+}
+
+.vault-form textarea {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--felt);
+  color: var(--chalk);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+  user-select: text;
+}
+
+.vault-form textarea:focus {
+  outline: none;
+  border-color: var(--teal);
+}

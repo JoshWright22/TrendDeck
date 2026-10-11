@@ -17,7 +17,8 @@ const WORDS: Record<AccessLogEntry['kind'], string> = {
   denied: 'was blocked on',
   idea: 'saved an idea',
   draft: 'saved a draft',
-  'post-request': 'asked to post on'
+  'post-request': 'asked to post on',
+  login: 'signed in on'
 }
 
 function when(at: number): string {

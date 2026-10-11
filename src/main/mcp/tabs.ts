@@ -1,6 +1,9 @@
 import { BrowserWindow, session, webContents, type WebContents } from 'electron'
 import { partitionFor, type Brand, type Site } from '@shared/types'
 
+// two-factor and one-time code boxes, agents can't read or type into these
+const CODE_FIELD = `/otp|one.?time|2fa|two.?factor|verification.?code|security.?code|auth.?code|mfa|totp|passcode/i.test([el.name, el.id, el.getAttribute('placeholder'), el.getAttribute('aria-label')].join(' '))`
+
 // page scripts run in their own world so the site can't see or mess with them
 const WORLD_ID = 1717
 
@@ -83,10 +86,10 @@ const SNAPSHOT = `(() => {
     return s.visibility !== 'hidden' && s.display !== 'none'
   }
   const clip = (t, n) => (t || '').replace(/\\s+/g, ' ').trim().slice(0, n)
-  // field values only for plain text boxes, never passwords, card numbers or codes
   const secret = (el) => /password|hidden/.test(el.type || '') ||
-    /cc-|password|one-time-code/.test(el.getAttribute('autocomplete') || '')
-  const value = (el) => (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') && el.type !== 'file' && !secret(el) ? el.value : ''
+    /cc-|password|one-time-code/.test(el.getAttribute('autocomplete') || '') || ${CODE_FIELD}
+  // input values are never shown, only whether the box has something in it
+  const value = (el) => (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') && el.type !== 'file' && el.value ? '(has text)' : ''
   const label = (el) =>
     clip(el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') ||
       el.getAttribute('alt') || el.innerText || '', 120)
@@ -106,7 +109,7 @@ const SNAPSHOT = `(() => {
     const l = label(el)
     if (l) parts.push(JSON.stringify(l))
     const v = clip(value(el), 200)
-    if (v) parts.push('value=' + JSON.stringify(v))
+    if (v) parts.push(v)
     if (tag === 'a') parts.push('-> ' + clip(el.href, 160))
     if (secret(el)) parts.push('(private field, agents cannot type here)')
     if (el.disabled) parts.push('disabled')
@@ -164,7 +167,7 @@ export function locate(wc: WebContents, ref: number): Promise<RefInfo> {
         y: Math.round(r.top + r.height / 2),
         tag,
         type: tag === 'input' ? el.type : '',
-        secret: /password|hidden/.test(el.type || '') || /cc-|password|one-time-code/.test(el.getAttribute('autocomplete') || ''),
+        secret: /password|hidden/.test(el.type || '') || /cc-|password|one-time-code/.test(el.getAttribute('autocomplete') || '') || ${CODE_FIELD},
         editable: tag === 'textarea' || el.isContentEditable || (tag === 'input' && !['button','submit','checkbox','radio','file','image','reset'].includes(el.type))
       }
     })()`

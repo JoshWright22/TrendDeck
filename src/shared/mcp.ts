@@ -14,6 +14,7 @@ export type AccessKind =
   | 'idea'
   | 'draft'
   | 'post-request'
+  | 'login'
 
 export interface AccessLogEntry {
   id: string

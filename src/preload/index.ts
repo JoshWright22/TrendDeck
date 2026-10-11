@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AdblockCount, AppData, TrendDeckApi, TrendFeed } from '@shared/types'
 import type { McpApi } from '@shared/mcp'
+import type { VaultApi } from '@shared/vault'
 
 const api: TrendDeckApi = {
   platform: process.platform,
@@ -56,3 +57,15 @@ const mcp: McpApi = {
 }
 
 contextBridge.exposeInMainWorld('trenddeckMcp', mcp)
+
+// saved logins. there's no call that returns a password, main keeps those to itself
+const vault: VaultApi = {
+  getState: () => ipcRenderer.invoke('vault:state'),
+  save: (brandId, siteId, login) => ipcRenderer.invoke('vault:save', brandId, siteId, login),
+  remove: (brandId, siteId) => ipcRenderer.invoke('vault:remove', brandId, siteId),
+  onChanged: (fn) => listen('vault:changed', () => fn()),
+  onCodeRequest: (fn) => listen('vault:ask-code', fn),
+  answerCode: (id, code) => ipcRenderer.invoke('vault:code', id, code)
+}
+
+contextBridge.exposeInMainWorld('trenddeckVault', vault)

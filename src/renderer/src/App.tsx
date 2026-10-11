@@ -10,6 +10,7 @@ import { ChatToggle } from './components/PageHeader'
 import { PAGE_VIEWS } from './pages'
 import ShareTab from './components/mcp/ShareTab'
 import { useAgentEvents } from './components/mcp/useAgentEvents'
+import CodePrompt from './components/vault/CodePrompt'
 
 const ChatPane = lazy(() => import('./components/ChatPane'))
 
@@ -226,6 +227,7 @@ export default function App(): ReactNode {
         />
       )}
       {modal?.kind === 'site' && <SiteModal onSave={addSite} onClose={() => setModal(null)} />}
+      <CodePrompt />
       {modal?.kind === 'settings' && (
         <SettingsModal
           brandId={data.activeBrandId}
