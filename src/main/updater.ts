@@ -9,9 +9,27 @@ const INSTALL_ON_LAUNCH_MS = 120_000
 // version of an update that is downloaded and waiting, shown as a button in the title bar
 let ready: string | null = null
 let installNow: (() => void) | null = null
+// set while a check from the button is running, so its download installs as soon as it lands
+let manual = false
+let checkNow: (() => Promise<'latest' | 'downloading'>) | null = null
 
 ipcMain.handle('update:state', () => ready)
 ipcMain.handle('update:install', () => installNow?.())
+
+// the Check for updates button: installs a waiting update, otherwise asks GitHub and installs what it finds
+ipcMain.handle('update:check', async () => {
+  if (!app.isPackaged || !checkNow) return 'dev'
+  if (ready) {
+    installNow?.()
+    return 'installing'
+  }
+  try {
+    return await checkNow()
+  } catch (err) {
+    console.error('update check failed', err)
+    return 'error'
+  }
+})
 
 // New versions come from the GitHub releases page. The check sends nothing about you, it only asks
 // GitHub for the latest version file. Turn it off with settings.autoUpdate = false.
@@ -27,7 +45,7 @@ export async function setupUpdater(): Promise<void> {
   // silent install, then start the app again
   installNow = () => autoUpdater.quitAndInstall(true, true)
   autoUpdater.on('update-downloaded', (info) => {
-    if (Date.now() - started < INSTALL_ON_LAUNCH_MS) {
+    if (manual || Date.now() - started < INSTALL_ON_LAUNCH_MS) {
       installNow?.()
       return
     }
@@ -44,6 +62,16 @@ export async function setupUpdater(): Promise<void> {
     } catch (err) {
       console.error('update check failed', err)
     }
+  }
+
+  checkNow = async () => {
+    manual = true
+    const result = await autoUpdater.checkForUpdates()
+    if (!result?.isUpdateAvailable) {
+      manual = false
+      return 'latest'
+    }
+    return 'downloading'
   }
 
   // right after the window is up, so a waiting update goes in on launch

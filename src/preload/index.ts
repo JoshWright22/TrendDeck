@@ -35,6 +35,7 @@ const api: TrendDeckApi = {
     return () => ipcRenderer.removeListener('update:ready', listener)
   },
   installUpdate: () => ipcRenderer.invoke('update:install'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
   loadData: () => ipcRenderer.invoke('data:load'),
   saveData: (data: AppData) => ipcRenderer.invoke('data:save', data),
   clearBrandSession: (brandId: string) => ipcRenderer.invoke('brand:clear-session', brandId),

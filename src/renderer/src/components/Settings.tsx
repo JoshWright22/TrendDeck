@@ -337,6 +337,7 @@ export default function Settings(props: Props): ReactNode {
           <span>Update from GitHub releases</span>
         </label>
         <div className="suggest">
+          <UpdateButton />
           <button type="button" className="pill" onClick={() => props.onOpenUrl(REPO_URL)}>
             Source on GitHub
           </button>
@@ -390,5 +391,34 @@ export default function Settings(props: Props): ReactNode {
         </div>
       </div>
     </div>
+  )
+}
+
+const UPDATE_TEXT = {
+  idle: 'Check for updates',
+  checking: 'Checking...',
+  latest: "You're on the latest version",
+  downloading: 'Downloading, restarts when done',
+  installing: 'Restarting to update',
+  error: "Couldn't reach GitHub, try again",
+  dev: 'Updates only work in the installed app'
+} as const
+
+// checks GitHub now and installs whatever it finds, the app restarts on its own
+function UpdateButton(): ReactNode {
+  const [state, setState] = useState<keyof typeof UPDATE_TEXT>('idle')
+  const busy = state === 'checking' || state === 'downloading' || state === 'installing'
+  return (
+    <button
+      type="button"
+      className="pill teal"
+      disabled={busy}
+      onClick={() => {
+        setState('checking')
+        void window.trenddeck.checkUpdate().then(setState)
+      }}
+    >
+      {UPDATE_TEXT[state]}
+    </button>
   )
 }
