@@ -47,7 +47,7 @@ The surface is always Felt with an indigo spotlight glow. Accents stay small: on
 
 ## Motion
 
-Short and confident: deals 300-450 ms with a slight overshoot, flips 500 ms, fades 200 ms. Nothing loops forever except a slow glow. Respect reduced motion, and keep slow devices fast (fewer particles, no blur on big areas).
+Bouncy and punchy, like a dealer who's showing off. Deals snap in fast (250-350 ms) and land with a real overshoot and a little settle wobble. Flips (400 ms) pop with a quick scale-up at the halfway point. Buttons and chips squash on press and spring back. Wins hit hard: a spark burst, a short shake, a pop of yellow. Springs over linear eases everywhere (stiff, low damping). Nothing loops forever except a slow glow. Respect reduced motion, and keep slow devices fast (fewer particles, no blur on big areas).
 
 ## Voice
 
