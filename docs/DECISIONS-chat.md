@@ -15,10 +15,10 @@ Calls made while building the chat, so nobody has to guess later.
 
 - Builtin agents: Claude Code, Codex, Cursor (`agent`), Grok Build, OpenCode, Antigravity (`agy`), Qwen Code and Kimi. They're found by looking on PATH plus a few usual install folders, since apps started from the dock or start menu don't always get the shell's PATH. Nothing gets run to detect them.
 - Detection runs once when the chat opens. "Check again" looks again.
-- Every message is one headless run. The agent gets the brand context, the chat so far and the new message in one prompt, nothing is kept between runs by the agent itself. Old turns get dropped first once the chat passes about 14k characters.
-- Claude Code runs with `--tools ""` so it only writes text. Codex runs read-only. The others run in their print mode with their own defaults.
+- Every message is one headless run. The agent gets the brand context, the chat so far and the new message in one prompt. Claude is the exception, it resumes its session per thread (see Thread tools). Old turns get dropped first once the chat passes about 14k characters.
+- Claude Code can only search the web and open pages (see the work log section). Codex runs read-only. The others run in their print mode with their own defaults.
 - Agents run in an empty folder (`agent-room` in the user data folder) so they don't go reading your files.
-- Claude streams token by token through its json output. The rest stream whatever they print, some only print at the end.
+- Claude, Codex and Cursor stream through their json output. The rest stream whatever they print, some only print at the end.
 - The prompt goes in on stdin when the cli supports it (Claude, Codex, OpenCode). The others get it as an argument, which is fine since nothing goes through a shell.
 - Windows: npm installs clis as `.cmd` files, and node won't start those without a shell. The app reads the `.cmd` and runs the node script or exe inside it directly. If it can't, it only falls back to a shell when the prompt goes in on stdin, so the message never ends up on a command line cmd.exe would parse.
 - Stop kills the whole process tree. A run that goes past 10 minutes gets stopped.
@@ -55,3 +55,47 @@ Calls made while building the chat, so nobody has to guess later.
 ## Markdown
 
 - A small renderer in `chat/Markdown.tsx` builds react elements, never raw html. Headings, lists, quotes, tables, code blocks with a copy button, links. Links only open if they're http or https, in your normal browser.
+
+## Models
+
+- Next to the agent picker there's a model picker. The pick is saved on the thread per agent, so switching agents and back keeps it, and it can change between any two messages.
+- Clis don't have a way to list their models without starting a session, so the lists are fixed in `catalog.ts`. Claude gets its aliases (Opus, Sonnet, Haiku), Codex and Cursor get a couple of known names. Default always means let the cli pick. Clis with no known model flag only show Default.
+- Api agents ask their `/models` endpoint when you open the picker. That only lists models, nothing gets sent to one. If it fails you get the model saved on the agent.
+
+## Thinking and the work log
+
+- Claude, Codex and Cursor run with their json output now and get parsed in `agents/parse.ts`. Thinking goes into a Thinking block, tool calls go into a work log (what it did, page or file or command, running/done/failed and how long), then the answer.
+- Both blocks are open while they're what's happening and fold up when the answer starts. A click on either one sticks.
+- Claude mostly doesn't send its thinking text, only a token count. Then the block says how long it thought and that it doesn't show the rest.
+- Openai style apis: `reasoning_content` or `reasoning` in the stream counts as thinking.
+- Everything else still streams plain text with the three dots.
+- Claude can now search the web and open pages (`WebSearch,WebFetch` only, no shell or files). Without it the work log would always be empty. It runs with `--strict-mcp-config` so the user's own mcp servers don't come along.
+- A line that isn't json in Codex or Cursor output goes through as text, so a cli version with a different format still shows something.
+
+## Themed controls
+
+- `chat/ui/` has `Dropdown` and `Menu` plus `usePopover`. No native selects or menus are left in the chat. Arrows, Home/End, Enter, Escape and type to jump all work. Import from `chat/ui` anywhere in the app.
+
+## Usage
+
+- The gauge button in the composer shows the context this chat uses and each agent's limits.
+- Context: the tokens the agent reported on its last reply, otherwise a guess from the text length (it says "about").
+- Claude reports its 5 hour and weekly limits on every reply, those get saved in `agent-usage.json` and shown with when they were seen. Before the first reply it says unknown.
+- Codex limits come from its own session logs in `~/.codex/sessions`, the newest file only.
+- The rest say unknown. Opening the popover never runs an agent or sends anything.
+
+## Thread tools
+
+- Stop (button or Esc), Retry on the last reply, Edit on any of your messages. Editing drops everything after that message and runs again.
+- Typing while the agent works queues the message, it shows above the composer and goes out when the reply finishes. A stopped or failed reply holds the queue so you can look first. The queue lives in the window, not on disk.
+- Rename (F2), archive and delete (with a confirm) from the menu on each chat. Archived chats sit behind an "Archived" button at the bottom of the list. Sending in an archived chat brings it back.
+- Search looks in titles and message text.
+- Sessions: Claude keeps a session per thread now (no more `--no-session-persistence`) and later messages resume it with only the new message. Retry and edit clear it since the history changed. If resuming fails it starts over with the full prompt. Other clis still get the full chat every time.
+- Attachments: anything with id, name, type and size. Paperclip, drag and drop, paste or `attachToChat()` from `chat/attachments.ts` for the media library. The agent only gets names, types and sizes for now, it can't open the files.
+- Shortcuts: Ctrl+Shift+N new chat (Ctrl+N felt too likely to clash later), Ctrl+L type, Esc stop, Alt+Up/Down next or previous chat. They're listed under the chat list.
+
+## Approvals
+
+- Two new cards: `post` and `login`. They show Approve and Decline and nothing happens until you pick. The pick is saved on the reply and is final.
+- Approving a post copies it and opens the site tab so you can paste it. Approving a login opens the tab. The app still never posts by itself.
+- The agent sees the pick in the history next time ("The user approved a request card").

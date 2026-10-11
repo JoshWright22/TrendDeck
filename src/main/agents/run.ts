@@ -4,10 +4,15 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import type { CliSpec } from './catalog'
 import { resolveLaunch, splitCommand, which } from './detect'
+import { claudeParser, codexParser, cursorParser, type Parser, type Sink } from './parse'
 
-export interface RunHooks {
-  onText: (text: string) => void
+export interface RunHooks extends Sink {
   signal: AbortSignal
+}
+
+export interface CliOptions {
+  model?: string
+  session?: string
 }
 
 const isWin = process.platform === 'win32'
@@ -42,36 +47,6 @@ function killTree(child: ChildProcess): void {
   }
 }
 
-// claude's stream-json: partial text arrives as content_block_delta events
-function claudeParser(onText: (t: string) => void): { line: (l: string) => void; error: () => string } {
-  let sawDelta = false
-  let error = ''
-  return {
-    line(l) {
-      let ev: Record<string, unknown>
-      try {
-        ev = JSON.parse(l)
-      } catch {
-        return
-      }
-      if (ev.type === 'stream_event') {
-        const e = ev.event as { type?: string; delta?: { type?: string; text?: string } } | undefined
-        if (e?.type === 'content_block_delta' && e.delta?.type === 'text_delta' && e.delta.text) {
-          sawDelta = true
-          onText(e.delta.text)
-        }
-      } else if (ev.type === 'assistant' && !sawDelta) {
-        // older versions without partial messages send whole messages
-        const content = (ev.message as { content?: { type: string; text?: string }[] } | undefined)?.content ?? []
-        for (const c of content) if (c.type === 'text' && c.text) onText(c.text)
-      } else if (ev.type === 'result' && ev.is_error) {
-        error = typeof ev.result === 'string' ? ev.result : 'The agent returned an error'
-      }
-    },
-    error: () => error
-  }
-}
-
 interface SpawnPlan {
   file: string
   args: string[]
@@ -80,7 +55,7 @@ interface SpawnPlan {
   output: CliSpec['output']
 }
 
-async function planCli(spec: CliSpec, prompt: string): Promise<SpawnPlan> {
+async function planCli(spec: CliSpec, prompt: string, opts: CliOptions): Promise<SpawnPlan> {
   let path: string | null = null
   for (const bin of spec.bins) {
     path = await which(bin)
@@ -88,7 +63,12 @@ async function planCli(spec: CliSpec, prompt: string): Promise<SpawnPlan> {
   }
   if (!path) throw new Error(`${spec.name} isn't installed or isn't on PATH`)
   const launch = await resolveLaunch(path)
-  const args = spec.args.map((a) => (a === '{prompt}' ? prompt : a))
+  const extra: string[] = []
+  if (opts.session && spec.resume) extra.push(...spec.resume(opts.session))
+  if (opts.model && spec.modelFlag) extra.push(spec.modelFlag, opts.model)
+  const base = spec.args.map((a) => (a === '{prompt}' ? prompt : a))
+  // codex reads `-` as the prompt marker, so the extra flags go before the last arg there
+  const args = spec.id === 'codex' ? [...base.slice(0, -1), ...extra, ...base.slice(-1)] : [...extra, ...base]
   if (launch.shell && spec.prompt === 'arg') {
     throw new Error(`Couldn't start ${spec.name} without a shell. Add it as a custom command agent instead.`)
   }
@@ -151,12 +131,20 @@ async function runPlan(plan: SpawnPlan, hooks: RunHooks): Promise<void> {
     let stderr = ''
     let gotText = false
     let pending = ''
-    const parser = plan.output === 'claude-json' ? claudeParser((t) => emit(t)) : null
+    const sink: Sink = { ...hooks, text: (t) => emit(t) }
+    const parser: Parser | null =
+      plan.output === 'claude-json'
+        ? claudeParser(sink)
+        : plan.output === 'codex-json'
+          ? codexParser(sink)
+          : plan.output === 'cursor-json'
+            ? cursorParser(sink)
+            : null
 
     function emit(text: string): void {
       if (!text) return
       gotText = true
-      hooks.onText(text)
+      hooks.text(text)
     }
 
     const stop = (): void => killTree(child)
@@ -202,8 +190,8 @@ async function runPlan(plan: SpawnPlan, hooks: RunHooks): Promise<void> {
   })
 }
 
-export async function runCli(spec: CliSpec, prompt: string, hooks: RunHooks): Promise<void> {
-  await runPlan(await planCli(spec, prompt), hooks)
+export async function runCli(spec: CliSpec, prompt: string, opts: CliOptions, hooks: RunHooks): Promise<void> {
+  await runPlan(await planCli(spec, prompt, opts), hooks)
 }
 
 export async function runCommand(command: string, prompt: string, hooks: RunHooks): Promise<void> {
@@ -231,7 +219,7 @@ export async function runApi(
     res = await fetch(`${target.baseUrl}/chat/completions`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ model: target.model, messages, stream: true }),
+      body: JSON.stringify({ model: target.model, messages, stream: true, stream_options: { include_usage: true } }),
       signal
     })
   } catch (err) {
@@ -264,10 +252,18 @@ export async function runApi(
         const data = line.slice(5).trim()
         if (data === '[DONE]') return
         try {
-          const j = JSON.parse(data) as { choices?: { delta?: { content?: string } }[]; error?: { message?: string } }
+          const j = JSON.parse(data) as {
+            choices?: { delta?: { content?: string; reasoning_content?: string; reasoning?: string } }[]
+            usage?: { total_tokens?: number }
+            error?: { message?: string }
+          }
           if (j.error) throw new Error(j.error.message ?? 'The API returned an error')
-          const text = j.choices?.[0]?.delta?.content
-          if (text) hooks.onText(text)
+          const delta = j.choices?.[0]?.delta
+          // deepseek, glm and openrouter send their thinking next to the answer
+          const thought = delta?.reasoning_content ?? delta?.reasoning
+          if (thought) hooks.thinking(thought)
+          if (delta?.content) hooks.text(delta.content)
+          if (j.usage?.total_tokens) hooks.contextTokens(j.usage.total_tokens)
         } catch (err) {
           if (err instanceof SyntaxError) continue
           throw err

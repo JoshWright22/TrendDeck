@@ -3,6 +3,7 @@ import { SOURCE_NAMES, TREND_SOURCES, type Brand, type Site, type TrendItem, typ
 import { ExternalIcon } from '../components/Icons'
 import { CardCorners } from './Marks'
 import { safeHref } from './api'
+import type { Decision } from '@shared/chat'
 
 // cards the agent can drop into a reply. it writes a fenced block with the
 // language "trenddeck" and one json object inside, see EMBED_GUIDE in the main process
@@ -12,6 +13,8 @@ export type Embed =
   | { type: 'idea'; title: string; notes?: string }
   | { type: 'draft'; platform?: string; title?: string; body: string }
   | { type: 'site'; site: string; url?: string }
+  | { type: 'post'; site: string; title?: string; body: string }
+  | { type: 'login'; site: string; reason?: string }
 
 const str = (v: unknown, max = 4000): string => (typeof v === 'string' ? v.slice(0, max) : '')
 
@@ -68,6 +71,12 @@ export function parseEmbed(raw: string): Embed | null {
       return str(j.body) ? { type: 'draft', platform: str(j.platform, 40), title: str(j.title, 300), body: str(j.body, 10000) } : null
     case 'site':
       return str(j.site) ? { type: 'site', site: str(j.site, 100), url: str(j.url, 2000) } : null
+    case 'post':
+      return str(j.body)
+        ? { type: 'post', site: str(j.site, 100) || str(j.platform, 100), title: str(j.title, 300), body: str(j.body, 10000) }
+        : null
+    case 'login':
+      return str(j.site) ? { type: 'login', site: str(j.site, 100), reason: str(j.reason, 500) } : null
     default:
       return null
   }
@@ -79,6 +88,10 @@ export interface EmbedActions {
   savedTitles: Set<string>
   onSaveIdea: (title: string, url: string, source: TrendSource | 'manual') => void
   onOpenSite: (siteId: string, url?: string) => void
+  // approve/decline on post and login cards, keyed by the card's place in the reply
+  decision: (card: string) => Decision | undefined
+  // null while the reply is still coming in
+  onDecide: ((card: string, d: Decision) => void) | null
 }
 
 const PLATFORM_HOSTS: Record<string, string[]> = {
@@ -269,7 +282,81 @@ function SiteEmbed({ e, a }: { e: Extract<Embed, { type: 'site' }>; a: EmbedActi
   )
 }
 
-export function EmbedCard({ raw, closed, actions }: { raw: string; closed: boolean; actions: EmbedActions }): ReactNode {
+// the agent asks, nothing happens until the user picks. approving a post copies it and
+// opens the site tab to paste it in, the app never posts on its own
+function RequestEmbed({
+  e,
+  a,
+  card
+}: {
+  e: Extract<Embed, { type: 'post' | 'login' }>
+  a: EmbedActions
+  card: string
+}): ReactNode {
+  const site = findSite(a.brand.sites, e.site)
+  const decided = a.decision(card)
+  const approve = (): void => {
+    if (!a.onDecide) return
+    a.onDecide(card, 'approved')
+    if (e.type === 'post') void navigator.clipboard.writeText(e.title ? `${e.title}
+
+${e.body}` : e.body)
+    if (site) a.onOpenSite(site.id)
+  }
+  return (
+    <article className={`cx-card cx-request ${e.type}${decided ? ` ${decided}` : ''}`}>
+      <CardCorners tone={decided === 'approved' ? undefined : 'hot'} />
+      <header>
+        <span className="cx-kind">{e.type === 'post' ? 'Post request' : 'Login request'}</span>
+        <span className="muted">{site?.name ?? e.site}</span>
+      </header>
+      {e.type === 'post' ? (
+        <>
+          {e.title && <p className="cx-card-title">{e.title}</p>}
+          <div className="cx-draft-body">{e.body}</div>
+        </>
+      ) : (
+        <>
+          <p className="cx-card-title">Log in to {site?.name ?? e.site}</p>
+          {e.reason && <p className="cx-card-notes">{e.reason}</p>}
+        </>
+      )}
+      {!site && <p className="cx-card-detail">No tab with that name in this brand</p>}
+      <footer>
+        {decided ? (
+          <span className={`cx-decided ${decided}`}>{decided === 'approved' ? 'Approved' : 'Declined'}</span>
+        ) : (
+          <>
+            <span className="spacer" />
+            <button className="pill" disabled={!a.onDecide} onClick={() => a.onDecide?.(card, 'declined')}>
+              Decline
+            </button>
+            <button
+              className="pill teal"
+              disabled={!a.onDecide}
+              onClick={approve}
+              title={e.type === 'post' ? 'Copies the post and opens the tab so you can paste it' : 'Opens the tab so you can log in'}
+            >
+              Approve
+            </button>
+          </>
+        )}
+      </footer>
+    </article>
+  )
+}
+
+export function EmbedCard({
+  raw,
+  closed,
+  actions,
+  card = ''
+}: {
+  raw: string
+  closed: boolean
+  actions: EmbedActions
+  card?: string
+}): ReactNode {
   if (!closed) {
     return (
       <article className="cx-card cx-dealing" aria-label="Card on the way">
@@ -294,5 +381,8 @@ export function EmbedCard({ raw, closed, actions }: { raw: string; closed: boole
       return <DraftEmbed e={e} a={actions} />
     case 'site':
       return <SiteEmbed e={e} a={actions} />
+    case 'post':
+    case 'login':
+      return <RequestEmbed e={e} a={actions} card={card} />
   }
 }

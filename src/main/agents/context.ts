@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { SOURCE_NAMES, type Brand, type TrendFeed } from '@shared/types'
-import { EMBED_LANG, type Thread } from '@shared/chat'
+import { EMBED_LANG, type Attachment, type Thread, type ThreadMessage } from '@shared/chat'
 
 // what an agent gets with every message: the brand's name, keywords, top trends and
 // saved ideas. never cookies, logins or anything from inside a site tab
@@ -45,6 +45,16 @@ const EMBED_GUIDE = `You can show cards in the chat. Put one JSON object in a fe
 {"type":"site","site":"<site tab name from the list above>","url":"<optional page on that site>"}
 \`\`\`
 
+When you want to post something for the user or need them to log in somewhere, ask with one of these. Nothing happens until the user approves:
+
+\`\`\`${EMBED_LANG}
+{"type":"post","site":"<site tab name>","title":"<optional title>","body":"<the full post text>"}
+\`\`\`
+
+\`\`\`${EMBED_LANG}
+{"type":"login","site":"<site tab name>","reason":"<why you need it>"}
+\`\`\`
+
 Use a trend card when you talk about a specific trend, an idea card for each post idea, a draft card for anything ready to post and a site card to point at where to post it. Keep normal text short around the cards.`
 
 export async function brandContext(brand: Brand): Promise<string> {
@@ -77,6 +87,25 @@ export async function brandContext(brand: Brand): Promise<string> {
   return lines.join('\n')
 }
 
+function size(n: number): string {
+  return n > 1_000_000 ? `${(n / 1_000_000).toFixed(1)} MB` : n > 1000 ? `${Math.round(n / 1000)} KB` : `${n} bytes`
+}
+
+export function attachmentNote(files: Attachment[] | undefined): string {
+  if (!files?.length) return ''
+  return `\n\nAttached by the user (names only, you can't open them):\n${files
+    .map((f) => `- ${oneLine(f.name, 120)} (${f.type || 'file'}, ${size(f.size)})`)
+    .join('\n')}`
+}
+
+// what the agent should know about a past message besides its text
+export function turnText(m: ThreadMessage): string {
+  let text = m.text
+  if (m.role === 'user') text += attachmentNote(m.attachments)
+  for (const d of Object.values(m.decisions ?? {})) text += `\n\n(The user ${d} a request card in this reply.)`
+  return text
+}
+
 // earlier turns of the thread, newest kept first when it gets long
 export function history(thread: Thread, skipLast: number): { role: 'user' | 'agent'; text: string }[] {
   const msgs = thread.messages
@@ -85,7 +114,7 @@ export function history(thread: Thread, skipLast: number): { role: 'user' | 'age
   const out: { role: 'user' | 'agent'; text: string }[] = []
   let used = 0
   for (let i = msgs.length - 1; i >= 0; i--) {
-    const text = msgs[i].text.slice(0, MAX_TURN_CHARS)
+    const text = turnText(msgs[i]).slice(0, MAX_TURN_CHARS)
     if (used + text.length > MAX_HISTORY_CHARS) break
     used += text.length
     out.unshift({ role: msgs[i].role, text })

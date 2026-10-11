@@ -1,5 +1,7 @@
-// the agent clis we know how to run headless. each one gets the whole prompt
-// in one go and prints its answer, nothing is kept between runs
+import type { ModelOption } from '@shared/chat'
+
+// the agent clis we know how to run headless. each one gets the prompt in one go
+// and prints its answer. claude keeps a session per thread, the rest start fresh
 
 export interface CliSpec {
   id: string
@@ -9,8 +11,13 @@ export interface CliSpec {
   // stdin: prompt is piped in. arg: prompt replaces the {prompt} arg
   prompt: 'stdin' | 'arg'
   args: string[]
-  // claude prints json events, the rest print plain text
-  output: 'text' | 'claude-json'
+  // json event formats we can read thinking and tool calls from, text for the rest
+  output: 'text' | 'claude-json' | 'codex-json' | 'cursor-json'
+  // flag that picks the model, no flag means only the agent's default
+  modelFlag?: string
+  models?: ModelOption[]
+  // args that resume a saved session, put before the rest
+  resume?: (session: string) => string[]
   setup: string
   url: string
 }
@@ -21,18 +28,28 @@ export const CLIS: CliSpec[] = [
     name: 'Claude Code',
     bins: ['claude'],
     prompt: 'stdin',
-    // no tools, it only has to write text back
+    // web lookups only, no shell and no files. --strict-mcp-config keeps the user's own mcp servers out
     args: [
       '-p',
       '--output-format',
       'stream-json',
       '--verbose',
       '--include-partial-messages',
-      '--no-session-persistence',
+      '--strict-mcp-config',
       '--tools',
-      ''
+      'WebSearch,WebFetch',
+      '--allowedTools',
+      'WebSearch,WebFetch'
     ],
     output: 'claude-json',
+    modelFlag: '--model',
+    models: [
+      { id: '', label: 'Default' },
+      { id: 'opus', label: 'Opus' },
+      { id: 'sonnet', label: 'Sonnet' },
+      { id: 'haiku', label: 'Haiku' }
+    ],
+    resume: (session) => ['--resume', session],
     setup: 'claude auth login',
     url: 'https://claude.com/product/claude-code'
   },
@@ -41,8 +58,14 @@ export const CLIS: CliSpec[] = [
     name: 'Codex',
     bins: ['codex'],
     prompt: 'stdin',
-    args: ['exec', '--skip-git-repo-check', '--sandbox', 'read-only', '--color', 'never', '-'],
-    output: 'text',
+    args: ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'read-only', '--color', 'never', '-'],
+    output: 'codex-json',
+    modelFlag: '-m',
+    models: [
+      { id: '', label: 'Default' },
+      { id: 'gpt-5-codex', label: 'GPT-5 Codex' },
+      { id: 'gpt-5', label: 'GPT-5' }
+    ],
     setup: 'codex login',
     url: 'https://developers.openai.com/codex/cli'
   },
@@ -51,8 +74,15 @@ export const CLIS: CliSpec[] = [
     name: 'Cursor',
     bins: ['agent', 'cursor-agent'],
     prompt: 'arg',
-    args: ['-p', '--output-format', 'text', '{prompt}'],
-    output: 'text',
+    args: ['-p', '--output-format', 'stream-json', '{prompt}'],
+    output: 'cursor-json',
+    modelFlag: '--model',
+    models: [
+      { id: '', label: 'Default' },
+      { id: 'auto', label: 'Auto' },
+      { id: 'sonnet-4.5', label: 'Sonnet 4.5' },
+      { id: 'gpt-5', label: 'GPT-5' }
+    ],
     setup: 'agent login',
     url: 'https://cursor.com/cli'
   },
@@ -73,6 +103,7 @@ export const CLIS: CliSpec[] = [
     prompt: 'stdin',
     args: ['run'],
     output: 'text',
+    modelFlag: '-m',
     setup: 'opencode auth login',
     url: 'https://opencode.ai'
   },
@@ -93,6 +124,7 @@ export const CLIS: CliSpec[] = [
     prompt: 'arg',
     args: ['-p', '{prompt}'],
     output: 'text',
+    modelFlag: '-m',
     setup: 'qwen',
     url: 'https://github.com/QwenLM/qwen-code'
   },

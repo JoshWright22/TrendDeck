@@ -815,16 +815,15 @@
   gap: 8px;
 }
 
-.cx-agent {
-  max-width: 220px;
+.cx-agent .ui-dd-btn,
+.cx-model .ui-dd-btn {
   height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
   background: var(--raised);
-  color: var(--chalk);
-  font-size: 12px;
-  cursor: pointer;
+}
+
+.cx-model .ui-dd-btn {
+  max-width: 160px;
+  color: var(--smoke);
 }
 
 .cx-send {
@@ -931,4 +930,435 @@
 
 .cx-agent-form label {
   margin-bottom: 10px;
+}
+
+/* thread list: search, menu, rename, archive */
+
+.cx-threads-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 6px;
+}
+
+.cx-search,
+.cx-rename {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--felt);
+  color: var(--chalk);
+  font-size: 12.5px;
+  outline: none;
+}
+
+.cx-search:focus,
+.cx-rename:focus {
+  border-color: var(--teal);
+}
+
+.cx-rename {
+  flex: 1;
+  height: 24px;
+  padding: 0 6px;
+}
+
+.cx-thread .cx-thread-menu {
+  opacity: 0;
+}
+
+.cx-thread:hover .cx-thread-menu,
+.cx-thread.active .cx-thread-menu,
+.cx-thread:focus-within .cx-thread-menu {
+  opacity: 1;
+}
+
+.cx-thread-menu .ui-menu-btn {
+  width: 22px;
+  height: 22px;
+}
+
+.cx-thread-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  color: var(--chalk);
+  font-size: 12.5px;
+}
+
+.cx-thread-confirm .pill {
+  height: 22px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+
+.pill.danger {
+  background: var(--pink);
+  color: var(--felt);
+}
+
+.cx-archived-toggle {
+  align-self: flex-start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.cx-archived-toggle:hover {
+  background: var(--raised);
+  color: var(--chalk);
+}
+
+.cx-keys {
+  margin: 8px 10px 0;
+  line-height: 1.4;
+}
+
+/* thinking and work log */
+
+.cx-work {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 8px;
+}
+
+.cx-fold {
+  border-left: 2px solid var(--line);
+  padding-left: 10px;
+}
+
+.cx-fold.live {
+  border-left-color: var(--teal);
+}
+
+.cx-fold-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 0;
+  color: var(--smoke);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.cx-fold-head:hover {
+  color: var(--chalk);
+}
+
+.cx-fold.live .cx-fold-head > span:first-of-type {
+  color: var(--chalk);
+  animation: cx-glow 1.6s ease-in-out infinite;
+}
+
+.cx-fold-caret {
+  transition: transform 0.15s ease-out;
+}
+
+.cx-fold.open .cx-fold-caret {
+  transform: rotate(90deg);
+}
+
+.cx-fold-body {
+  padding: 4px 0 6px;
+  animation: cx-rise 0.18s ease-out;
+}
+
+.cx-think-text {
+  margin: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  color: var(--smoke);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  user-select: text;
+}
+
+.cx-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cx-step {
+  display: grid;
+  grid-template-columns: 8px auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12.5px;
+}
+
+.cx-step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--teal);
+}
+
+.cx-step.running .cx-step-dot {
+  background: var(--yellow);
+  animation: cx-glow 1.2s ease-in-out infinite;
+}
+
+.cx-step.error .cx-step-dot {
+  background: var(--pink);
+}
+
+.cx-step-label {
+  color: var(--chalk);
+  white-space: nowrap;
+}
+
+.cx-step-detail {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--smoke);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx-step-time {
+  color: var(--smoke);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* message tools: edit, retry, copy */
+
+.cx-msg-user-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.cx-msg-user-wrap .cx-edit-btn {
+  opacity: 0;
+}
+
+.cx-msg-user-wrap:hover .cx-edit-btn,
+.cx-edit-btn:focus-visible {
+  opacity: 1;
+}
+
+.cx-msg.user.editing {
+  align-self: stretch;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cx-edit {
+  min-height: 60px;
+  border: 0;
+  background: none;
+  color: var(--chalk);
+  resize: vertical;
+  outline: none;
+}
+
+.cx-msg-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.cx-tool {
+  padding: 2px 8px;
+  border-radius: 6px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.cx-tool:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--chalk);
+}
+
+/* composer: files, queue, usage */
+
+.cx-composer.dragging .cx-box {
+  border-color: var(--teal);
+}
+
+.cx-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cx-files.in-msg {
+  margin-top: 8px;
+}
+
+.cx-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cx-files.in-msg .cx-file {
+  padding-right: 10px;
+}
+
+.cx-file button {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: var(--smoke);
+}
+
+.cx-file button:hover {
+  background: var(--raised);
+  color: var(--chalk);
+}
+
+.cx-file svg {
+  width: 10px;
+  height: 10px;
+}
+
+.cx-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.cx-queue li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+
+.cx-queue-tag {
+  color: var(--yellow);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cx-queue-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx-usage-pop {
+  width: 280px;
+  max-width: 280px;
+  max-height: 380px;
+  padding: 10px 12px;
+}
+
+.cx-usage-head {
+  margin: 6px 0 4px;
+  color: var(--smoke);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cx-usage-ctx {
+  margin: 0 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cx-usage-agent {
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+.cx-usage-agent p {
+  margin: 2px 0;
+}
+
+.cx-usage-name {
+  font-weight: 600;
+}
+
+.cx-usage-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  margin: 4px 0;
+  font-size: 12.5px;
+}
+
+.cx-usage-left {
+  font-variant-numeric: tabular-nums;
+}
+
+.cx-usage-bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--raised);
+  overflow: hidden;
+}
+
+.cx-usage-bar span {
+  display: block;
+  height: 100%;
+  background: var(--teal);
+}
+
+.cx-usage-bar span.hot {
+  background: var(--pink);
+}
+
+/* post and login requests */
+
+.cx-card.cx-request,
+.cx.compact .cx-card.cx-request {
+  aspect-ratio: auto;
+  width: min(100%, 340px);
+}
+
+.cx-request.declined {
+  opacity: 0.6;
+}
+
+.cx-decided {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cx-decided.approved {
+  color: var(--teal);
+}
+
+.cx-decided.declined {
+  color: var(--smoke);
 }
