@@ -4,7 +4,7 @@ The idea: your brands are a hand of cards, and TrendDeck deals you the trends wo
 
 ## Logo
 
-`resources/logo.svg`: a hand of three playing cards fanned from the bottom (indigo, pink, teal on top), white edges, a spark suit mark in two corners of every card, and a black TD on the teal card where the D's curve rises into a yellow spark.
+`resources/logo.svg`: a hand of three playing cards fanned from the bottom (indigo, pink, teal on top), white edges, large black YouTube and Instagram logos centered on the back cards and mostly hidden by the top card, a spark suit mark in two corners of every card, and a black TD on the teal card where the D's curve rises into a yellow spark.
 
 - Use it on off-black. On a light background, keep the white card edges and add the soft shadow.
 - Minimum size 16 px (`resources/icon.ico` has the small sizes).
