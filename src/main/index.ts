@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, session, webContents, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { ID_PATTERN, isHttpUrl, partitionFor, type AppData } from '@shared/types'
+import { setupUpdater } from './updater'
 import { loadData, saveData } from './store'
 import { dropTrends, setupTrends } from './trends'
 import { attachBrand, blocksPopup, setupAdblock } from './adblock'
@@ -152,6 +153,7 @@ void app.whenReady().then(() => {
   // net.fetch needs the app ready, so the blocker starts here
   setupAdblock()
   createWindow()
+  setupUpdater()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })

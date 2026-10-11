@@ -24,6 +24,9 @@ jobs:
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: release/TrendDeck-Setup.exe
+          files: |
+            release/TrendDeck-Setup.exe
+            release/TrendDeck-Setup.exe.blockmap
+            release/latest.yml
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true

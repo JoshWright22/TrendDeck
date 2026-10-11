@@ -29,4 +29,8 @@ nsis:
   runAfterFinish: true
   deleteAppDataOnUninstall: false
   uninstallDisplayName: TrendDeck
-publish: null
+# the app updates itself from the github releases page
+publish:
+  provider: github
+  owner: JoshWright22
+  repo: TrendDeck
