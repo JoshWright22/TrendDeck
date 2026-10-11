@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import type { Site } from '@shared/types'
-import { CloseIcon, PlusIcon } from './Icons'
+import { CloseIcon, PlusIcon, ShieldIcon } from './Icons'
 
 interface Props {
   sites: Site[]
@@ -11,61 +11,88 @@ interface Props {
   onAdd: () => void
 }
 
+function host(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
+}
+
+// the sidebar's site list, drag a row onto another to reorder
 export default function SiteTabs(props: Props): ReactNode {
   const { sites, activeId, onSelect, onRemove, onMove, onAdd } = props
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
 
   return (
-    <div className="tabs" role="tablist">
-      {sites.map((s) => (
-        <div
-          key={s.id}
-          role="tab"
-          aria-selected={s.id === activeId}
-          className={`tab${s.id === activeId ? ' active' : ''}${
-            overId === s.id && dragId !== s.id ? ' drop' : ''
-          }`}
-          title={`${s.name} (drag to reorder)`}
-          draggable
-          onClick={() => onSelect(s.id)}
-          onDragStart={(e) => {
-            setDragId(s.id)
-            e.dataTransfer.effectAllowed = 'move'
-          }}
-          onDragOver={(e) => {
-            if (!dragId) return
-            e.preventDefault()
-            setOverId(s.id)
-          }}
-          onDrop={(e) => {
-            e.preventDefault()
-            if (dragId && dragId !== s.id) onMove(dragId, s.id)
-            setDragId(null)
-            setOverId(null)
-          }}
-          onDragEnd={() => {
-            setDragId(null)
-            setOverId(null)
-          }}
-        >
-          <span className="tab-name">{s.name}</span>
-          <button
-            className="tab-close"
-            title={`Remove ${s.name}`}
-            aria-label={`Remove ${s.name}`}
-            onClick={(e) => {
-              e.stopPropagation()
-              onRemove(s.id)
+    <section className="side-section" aria-label="Sites">
+      <div className="side-label">
+        <span>Sites</span>
+        <button className="icon-btn small" title="Add site" aria-label="Add site" onClick={onAdd}>
+          <PlusIcon />
+        </button>
+      </div>
+      <div className="site-list" role="list">
+        {sites.map((s) => (
+          <div
+            key={s.id}
+            role="listitem"
+            className={`side-item site-row${s.id === activeId ? ' active' : ''}${
+              overId === s.id && dragId !== s.id ? ' drop' : ''
+            }`}
+            title={`${host(s.url)} (drag to reorder)`}
+            tabIndex={0}
+            draggable
+            onClick={() => onSelect(s.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onSelect(s.id)
+              }
+            }}
+            onDragStart={(e) => {
+              setDragId(s.id)
+              e.dataTransfer.effectAllowed = 'move'
+            }}
+            onDragOver={(e) => {
+              if (!dragId) return
+              e.preventDefault()
+              setOverId(s.id)
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              if (dragId && dragId !== s.id) onMove(dragId, s.id)
+              setDragId(null)
+              setOverId(null)
+            }}
+            onDragEnd={() => {
+              setDragId(null)
+              setOverId(null)
             }}
           >
-            <CloseIcon />
-          </button>
-        </div>
-      ))}
-      <button className="icon-btn" title="Add site" aria-label="Add site" onClick={onAdd}>
-        <PlusIcon />
-      </button>
-    </div>
+            <span className="site-dot">{s.name.slice(0, 1).toUpperCase()}</span>
+            <span className="side-name">{s.name}</span>
+            {!s.adblock && (
+              <span className="row-flag" title="Ad blocker off for this site">
+                <ShieldIcon off />
+              </span>
+            )}
+            <button
+              className="row-close"
+              title={`Remove ${s.name}`}
+              aria-label={`Remove ${s.name}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                onRemove(s.id)
+              }}
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        ))}
+        {sites.length === 0 && <p className="side-empty">No sites yet</p>}
+      </div>
+    </section>
   )
 }

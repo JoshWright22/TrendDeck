@@ -8,7 +8,11 @@ import {
   isHttpUrl,
   type AppData,
   type Brand,
-  type Site
+  type ChatMessage,
+  type ChatThread,
+  type Idea,
+  type Site,
+  TREND_SOURCES
 } from '@shared/types'
 
 const FILE_NAME = 'trenddeck.json'
@@ -22,29 +26,89 @@ function defaultData(): AppData {
     id: randomUUID(),
     name: 'My Brand',
     keywords: [],
-    sites: DEFAULT_SITES.map((s) => ({ ...s, id: randomUUID() }))
+    subreddits: [],
+    adblock: true,
+    sites: DEFAULT_SITES.map((s) => ({ ...s, id: randomUUID(), adblock: true })),
+    threads: [],
+    ideas: []
   }
-  return { version: 1, activeBrandId: brand.id, chatOpen: false, brands: [brand] }
+  return {
+    version: 1,
+    activeBrandId: brand.id,
+    chatOpen: false,
+    settings: { youtubeApiKey: '' },
+    brands: [brand]
+  }
 }
 
 function cleanSite(raw: unknown): Site | null {
   const s = raw as Partial<Site> | null
   if (!s || typeof s.id !== 'string' || !ID_PATTERN.test(s.id)) return null
   if (typeof s.name !== 'string' || typeof s.url !== 'string' || !isHttpUrl(s.url)) return null
-  return { id: s.id, name: s.name.slice(0, 60), url: s.url }
+  return { id: s.id, name: s.name.slice(0, 60), url: s.url, adblock: s.adblock !== false }
+}
+
+function cleanMessage(raw: unknown): ChatMessage | null {
+  const m = raw as Partial<ChatMessage> | null
+  if (!m || typeof m.id !== 'string' || !ID_PATTERN.test(m.id)) return null
+  if (m.role !== 'user' && m.role !== 'agent') return null
+  if (typeof m.text !== 'string') return null
+  return { id: m.id, role: m.role, text: m.text.slice(0, 20000), at: Number(m.at) || 0 }
+}
+
+function cleanThread(raw: unknown): ChatThread | null {
+  const t = raw as Partial<ChatThread> | null
+  if (!t || typeof t.id !== 'string' || !ID_PATTERN.test(t.id)) return null
+  const messages = Array.isArray(t.messages)
+    ? t.messages.map(cleanMessage).filter((m): m is ChatMessage => m !== null)
+    : []
+  const title = typeof t.title === 'string' ? t.title.slice(0, 80) : 'New chat'
+  return { id: t.id, title, updatedAt: Number(t.updatedAt) || 0, messages }
+}
+
+function cleanIdea(raw: unknown): Idea | null {
+  const i = raw as Partial<Idea> | null
+  if (!i || typeof i.id !== 'string' || !ID_PATTERN.test(i.id)) return null
+  if (typeof i.title !== 'string' || typeof i.url !== 'string') return null
+  if (i.url && !isHttpUrl(i.url)) return null
+  const source = (TREND_SOURCES as readonly string[]).includes(i.source as string)
+    ? (i.source as Idea['source'])
+    : 'manual'
+  return { id: i.id, title: i.title.slice(0, 300), url: i.url, source, savedAt: Number(i.savedAt) || 0 }
+}
+
+function strings(raw: unknown, max: number): string[] {
+  return Array.isArray(raw)
+    ? raw.filter((k): k is string => typeof k === 'string').map((k) => k.slice(0, max))
+    : []
 }
 
 function cleanBrand(raw: unknown): Brand | null {
   const b = raw as Partial<Brand> | null
   if (!b || typeof b.id !== 'string' || !ID_PATTERN.test(b.id)) return null
   if (typeof b.name !== 'string') return null
-  const keywords = Array.isArray(b.keywords)
-    ? b.keywords.filter((k): k is string => typeof k === 'string')
-    : []
+  const keywords = strings(b.keywords, 80)
+  // subreddit names go into urls, so only the characters reddit allows
+  const subreddits = strings(b.subreddits, 21).filter((r) => /^[A-Za-z0-9_]{2,21}$/.test(r))
   const sites = Array.isArray(b.sites)
     ? b.sites.map(cleanSite).filter((s): s is Site => s !== null)
     : []
-  return { id: b.id, name: b.name.slice(0, 60), keywords, sites }
+  const threads = Array.isArray(b.threads)
+    ? b.threads.map(cleanThread).filter((t): t is ChatThread => t !== null)
+    : []
+  const ideas = Array.isArray(b.ideas)
+    ? b.ideas.map(cleanIdea).filter((i): i is Idea => i !== null)
+    : []
+  return {
+    id: b.id,
+    name: b.name.slice(0, 60),
+    keywords,
+    subreddits,
+    adblock: b.adblock !== false,
+    sites,
+    threads,
+    ideas
+  }
 }
 
 // never trust the file or the renderer, rebuild the shape by hand
@@ -55,7 +119,16 @@ export function sanitize(raw: unknown): AppData {
   const active = brands.some((b) => b.id === d.activeBrandId)
     ? (d.activeBrandId as string)
     : (brands[0]?.id ?? null)
-  return { version: 1, activeBrandId: active, chatOpen: d.chatOpen === true, brands }
+  const key = (d.settings as Partial<AppData['settings']> | undefined)?.youtubeApiKey
+  const settings = { youtubeApiKey: typeof key === 'string' ? key.trim().slice(0, 200) : '' }
+  return { version: 1, activeBrandId: active, chatOpen: d.chatOpen === true, settings, brands }
+}
+
+let current: AppData | null = null
+
+// the last data loaded or saved, for the main process to read
+export function getData(): AppData | null {
+  return current
 }
 
 export async function loadData(): Promise<AppData> {
@@ -69,7 +142,8 @@ export async function loadData(): Promise<AppData> {
     return data
   }
   try {
-    return sanitize(JSON.parse(text))
+    current = sanitize(JSON.parse(text))
+    return current
   } catch {
     // keep the broken file around instead of silently wiping it
     await fs.rename(file, `${file}.broken-${Date.now()}`).catch(() => {})
@@ -84,6 +158,7 @@ let queue: Promise<void> = Promise.resolve()
 // writes go through a temp file and a queue so a crash mid-save can't leave half a file
 export function saveData(data: AppData): Promise<void> {
   const clean = sanitize(data)
+  current = clean
   const run = async (): Promise<void> => {
     const file = filePath()
     const tmp = `${file}.tmp`

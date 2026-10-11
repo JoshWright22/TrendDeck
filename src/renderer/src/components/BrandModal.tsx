@@ -6,33 +6,89 @@ import { CloseIcon } from './Icons'
 interface Props {
   // null means we are making a new brand
   brand: Brand | null
-  onSave: (name: string, keywords: string[]) => void
+  onSave: (name: string, keywords: string[], subreddits: string[]) => void
   onDelete: () => void
   onClose: () => void
 }
 
+interface ChipList {
+  values: string[]
+  draft: string
+}
+
+function merge(list: ChipList, clean: (s: string) => string): string[] {
+  const all = [...list.values]
+  for (const raw of list.draft.split(',')) {
+    const k = clean(raw)
+    if (k && !all.some((x) => x.toLowerCase() === k.toLowerCase())) all.push(k)
+  }
+  return all
+}
+
+const cleanKeyword = (s: string): string => s.trim()
+// people paste "r/buildapc" or the whole url
+const cleanSub = (s: string): string =>
+  s
+    .trim()
+    .replace(/^(https?:\/\/)?(www\.|old\.)?reddit\.com\//i, '')
+    .replace(/^\/?r\//i, '')
+    .replace(/\/.*$/, '')
+    .replace(/[^A-Za-z0-9_]/g, '')
+    .slice(0, 21)
+
+function Chips(props: {
+  label: string
+  placeholder: string
+  list: ChipList
+  prefix?: string
+  clean: (s: string) => string
+  onChange: (list: ChipList) => void
+}): ReactNode {
+  const { label, placeholder, list, prefix = '', clean, onChange } = props
+  const commit = (): void => onChange({ values: merge(list, clean), draft: '' })
+  return (
+    <>
+      <label>
+        {label}
+        <input
+          value={list.draft}
+          placeholder={placeholder}
+          onChange={(e) => onChange({ ...list, draft: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ',') {
+              e.preventDefault()
+              commit()
+            }
+          }}
+          onBlur={commit}
+        />
+      </label>
+      {list.values.length > 0 && (
+        <div className="chips">
+          {list.values.map((k) => (
+            <span key={k} className="chip">
+              {prefix}
+              {k}
+              <button
+                type="button"
+                aria-label={`Remove ${k}`}
+                onClick={() => onChange({ ...list, values: list.values.filter((x) => x !== k) })}
+              >
+                <CloseIcon />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function BrandModal({ brand, onSave, onDelete, onClose }: Props): ReactNode {
   const [name, setName] = useState(brand?.name ?? '')
-  const [keywords, setKeywords] = useState<string[]>(brand?.keywords ?? [])
-  const [draft, setDraft] = useState('')
+  const [keywords, setKeywords] = useState<ChipList>({ values: brand?.keywords ?? [], draft: '' })
+  const [subs, setSubs] = useState<ChipList>({ values: brand?.subreddits ?? [], draft: '' })
   const [confirmDelete, setConfirmDelete] = useState(false)
-
-  const withDraft = (): string[] => {
-    const extra = draft
-      .split(',')
-      .map((k) => k.trim())
-      .filter(Boolean)
-    const all = [...keywords]
-    for (const k of extra) {
-      if (!all.some((x) => x.toLowerCase() === k.toLowerCase())) all.push(k)
-    }
-    return all
-  }
-
-  const commitDraft = (): void => {
-    setKeywords(withDraft())
-    setDraft('')
-  }
 
   const canSave = name.trim().length > 0
 
@@ -41,7 +97,7 @@ export default function BrandModal({ brand, onSave, onDelete, onClose }: Props):
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          if (canSave) onSave(name.trim(), withDraft())
+          if (canSave) onSave(name.trim(), merge(keywords, cleanKeyword), merge(subs, cleanSub))
         }}
       >
         <label>
@@ -55,37 +111,23 @@ export default function BrandModal({ brand, onSave, onDelete, onClose }: Props):
           />
         </label>
 
-        <label>
-          Niche keywords
-          <input
-            value={draft}
-            placeholder="Type one and press Enter"
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ',') {
-                e.preventDefault()
-                commitDraft()
-              }
-            }}
-            onBlur={commitDraft}
-          />
-        </label>
-        {keywords.length > 0 && (
-          <div className="chips">
-            {keywords.map((k) => (
-              <span key={k} className="chip">
-                {k}
-                <button
-                  type="button"
-                  aria-label={`Remove ${k}`}
-                  onClick={() => setKeywords(keywords.filter((x) => x !== k))}
-                >
-                  <CloseIcon />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
+        <Chips
+          label="Niche keywords"
+          placeholder="Type one and press Enter"
+          list={keywords}
+          clean={cleanKeyword}
+          onChange={setKeywords}
+        />
+        <p className="form-hint">Trends searches YouTube, Google Trends and Reddit for these.</p>
+
+        <Chips
+          label="Subreddits"
+          placeholder="buildapc"
+          prefix="r/"
+          list={subs}
+          clean={cleanSub}
+          onChange={setSubs}
+        />
 
         <div className="modal-actions">
           {brand &&

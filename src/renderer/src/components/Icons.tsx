@@ -67,3 +67,106 @@ export const ChatIcon = (): ReactNode => (
     <path d="M4 5h16v11H9l-5 4V5z" />
   </Icon>
 )
+
+export const ChevronIcon = (): ReactNode => (
+  <Icon>
+    <path d="M7 10l5 5 5-5" />
+  </Icon>
+)
+
+export const TrendsIcon = (): ReactNode => (
+  <Icon>
+    <path d="M3 17l6-6 4 4 8-8" />
+    <path d="M15 7h6v6" />
+  </Icon>
+)
+
+export const IdeasIcon = (): ReactNode => (
+  <Icon>
+    <path d="M9 18h6M10 21h4" />
+    <path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" />
+  </Icon>
+)
+
+export const ScheduleIcon = (): ReactNode => (
+  <Icon>
+    <rect x="4" y="5" width="16" height="15" rx="2" />
+    <path d="M4 10h16M9 3v4M15 3v4" />
+  </Icon>
+)
+
+export const WriterIcon = (): ReactNode => (
+  <Icon>
+    <path d="M4 20h16" />
+    <path d="M14 4l4 4-9 9H5v-4l9-9z" />
+  </Icon>
+)
+
+export const AnalyticsIcon = (): ReactNode => (
+  <Icon>
+    <path d="M5 20V11M12 20V4M19 20v-6" />
+  </Icon>
+)
+
+export const PanelIcon = (): ReactNode => (
+  <Icon>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M15 4v16" />
+  </Icon>
+)
+
+export const SendIcon = (): ReactNode => (
+  <Icon>
+    <path d="M12 19V5M6 11l6-6 6 6" />
+  </Icon>
+)
+
+export const TrashIcon = (): ReactNode => (
+  <Icon>
+    <path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13" />
+  </Icon>
+)
+
+// the spark suit from the logo, filled
+export const Spark = ({ className }: { className?: string }): ReactNode => (
+  <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+    <path
+      fill="currentColor"
+      d="M12 1c.9 6.2 3.8 9.1 11 11-7.2 1.9-10.1 4.8-11 11-.9-6.2-3.8-9.1-11-11 7.2-1.9 10.1-4.8 11-11z"
+    />
+  </svg>
+)
+
+export const SettingsIcon = (): ReactNode => (
+  <Icon>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1" />
+  </Icon>
+)
+
+export const SearchIcon = (): ReactNode => (
+  <Icon>
+    <circle cx="11" cy="11" r="6" />
+    <path d="M20 20l-4.5-4.5" />
+  </Icon>
+)
+
+export const ExternalIcon = (): ReactNode => (
+  <Icon>
+    <path d="M14 4h6v6M20 4l-9 9" />
+    <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+  </Icon>
+)
+
+export const SaveIcon = (): ReactNode => (
+  <Icon>
+    <path d="M6 3h12v18l-6-4-6 4V3z" />
+  </Icon>
+)
+
+export const ShieldIcon = ({ off }: { off?: boolean }): ReactNode => (
+  <Icon>
+    <path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z" />
+    {off ? <path d="M4 4l16 16" /> : <path d="M9 12l2 2 4-4" />}
+  </Icon>
+)

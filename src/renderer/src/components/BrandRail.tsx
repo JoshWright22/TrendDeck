@@ -10,21 +10,24 @@ interface Props {
   onAdd: () => void
 }
 
-function initials(name: string): string {
+export function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean)
   if (words.length === 0) return '?'
   if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
   return (words[0][0] + words[1][0]).toUpperCase()
 }
 
+const mod = navigator.platform.startsWith('Mac') ? 'Cmd' : 'Ctrl'
+
 export default function BrandRail({ brands, activeId, onSelect, onEdit, onAdd }: Props): ReactNode {
   return (
-    <nav className="rail panel" aria-label="Brands">
-      {brands.map((b) => (
+    <nav className="rail" aria-label="Brands">
+      {brands.map((b, i) => (
         <button
           key={b.id}
           className={`brand-icon${b.id === activeId ? ' active' : ''}`}
-          title={`${b.name} (right click to edit)`}
+          title={`${b.name}${i < 9 ? ` (${mod}+${i + 1})` : ''}, right click to edit`}
+          aria-pressed={b.id === activeId}
           onClick={() => onSelect(b.id)}
           onContextMenu={(e) => {
             e.preventDefault()

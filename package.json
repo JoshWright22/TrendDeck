@@ -18,6 +18,9 @@
     "postinstall": "install-electron"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/inter-tight": "^5.3.0",
+    "@ghostery/adblocker-electron": "^2.20.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
