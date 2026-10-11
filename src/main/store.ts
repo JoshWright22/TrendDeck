@@ -14,6 +14,8 @@ import {
   type ChatThread,
   type Idea,
   type Site,
+  TAB_CAP_DEFAULT,
+  TAB_CAP_MAX,
   TREND_SOURCES
 } from '@shared/types'
 
@@ -39,7 +41,8 @@ function defaultData(): AppData {
     version: 1,
     activeBrandId: brand.id,
     chatOpen: false,
-    settings: { youtubeApiKey: '' },
+    onboarded: false,
+    settings: { youtubeApiKey: '', tabCap: TAB_CAP_DEFAULT, autoUpdate: true },
     brands: [brand]
   }
 }
@@ -130,9 +133,17 @@ export function sanitize(raw: unknown): AppData {
   const active = brands.some((b) => b.id === d.activeBrandId)
     ? (d.activeBrandId as string)
     : (brands[0]?.id ?? null)
-  const key = (d.settings as Partial<AppData['settings']> | undefined)?.youtubeApiKey
-  const settings = { youtubeApiKey: typeof key === 'string' ? key.trim().slice(0, 200) : '' }
-  return { version: 1, activeBrandId: active, chatOpen: d.chatOpen === true, settings, brands }
+  const s = (d.settings ?? {}) as Partial<AppData['settings']>
+  const key = s.youtubeApiKey
+  const cap = Math.round(Number(s.tabCap))
+  const settings = {
+    youtubeApiKey: typeof key === 'string' ? key.trim().slice(0, 200) : '',
+    tabCap: cap >= 1 && cap <= TAB_CAP_MAX ? cap : TAB_CAP_DEFAULT,
+    autoUpdate: s.autoUpdate !== false
+  }
+  // files from before setup existed count as done
+  const onboarded = d.onboarded !== false
+  return { version: 1, activeBrandId: active, chatOpen: d.chatOpen === true, onboarded, settings, brands }
 }
 
 let current: AppData | null = null

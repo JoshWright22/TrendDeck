@@ -1,22 +1,24 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
-import { DEFAULT_SITES, hostOf, isHttpUrl, partitionFor, type Brand, type Site } from '@shared/types'
+import { DEFAULT_SITES, hostOf, isHttpUrl, partitionFor, TAB_CAP_DEFAULT, type Brand, type Site } from '@shared/types'
 import { pickSite } from './links'
 import { useAppData } from './useAppData'
+import { useLiveTabs } from './useLiveTabs'
 import Sidebar, { type View } from './components/Sidebar'
-import BrandModal from './components/BrandModal'
-import SiteModal from './components/SiteModal'
-import SettingsModal from './components/SettingsModal'
 import SiteView from './components/SiteView'
 import TitleBar, { type SearchPick } from './components/TitleBar'
 import { ChatToggle } from './components/PageHeader'
 import { PAGE_VIEWS } from './pages'
 
 const ChatPane = lazy(() => import('./components/ChatPane'))
+const Settings = lazy(() => import('./components/Settings'))
+// modals only load the first time one opens
+const BrandModal = lazy(() => import('./components/BrandModal'))
+const SiteModal = lazy(() => import('./components/SiteModal'))
+const Onboarding = lazy(() => import('./components/Onboarding'))
 
 type ModalState =
   | { kind: 'brand'; id: string | null }
   | { kind: 'site' }
-  | { kind: 'settings' }
   | null
 
 const HOME: View = { kind: 'page', page: 'Trends' }
@@ -49,6 +51,14 @@ export default function App(): ReactNode {
       : undefined
   // a removed site falls back to trends
   const view: View = picked.kind === 'site' && !site ? HOME : picked
+  const { tabs, isLive } = useLiveTabs(
+    data?.brands ?? [],
+    temps,
+    brand && site ? { brandId: brand.id, siteId: site.id } : null,
+    // nothing warms up behind the first run setup
+    data?.onboarded ? (brand?.id ?? null) : null,
+    data?.settings.tabCap ?? TAB_CAP_DEFAULT
+  )
 
   const brandIds = data?.brands.map((b) => b.id).join(',') ?? ''
   useEffect(() => {
@@ -71,6 +81,32 @@ export default function App(): ReactNode {
 
   if (!data) return <div className="boot" />
 
+  if (!data.onboarded && brand) {
+    return (
+      <Suspense fallback={<div className="boot" />}>
+        <Onboarding
+          brand={brand}
+          onDone={(patch) =>
+            update((d) => ({
+              ...d,
+              onboarded: true,
+              brands: d.brands.map((b) =>
+                patch && b.id === brand.id
+                  ? {
+                      ...b,
+                      name: patch.name,
+                      keywords: patch.keywords,
+                      sites: b.sites.filter((s) => patch.siteIds.includes(s.id))
+                    }
+                  : b
+              )
+            }))
+          }
+        />
+      </Suspense>
+    )
+  }
+
   const editBrand = (id: string, fn: (b: Brand) => Brand): void => {
     update((d) => ({ ...d, brands: d.brands.map((b) => (b.id === id ? fn(b) : b)) }))
   }
@@ -86,7 +122,8 @@ export default function App(): ReactNode {
     if (match) {
       const key = `${brand.id}:${match.id}`
       lastUrl.current[key] = url
-      if (site?.id === match.id) setNav({ key, url, n: Date.now() })
+      // a tab that's already loaded, even out of view, just goes to the link
+      if (isLive(brand.id, match.id)) setNav({ key, url, n: Date.now() })
       setView({ kind: 'site', id: match.id })
       return
     }
@@ -203,7 +240,7 @@ export default function App(): ReactNode {
           onCloseTemp={closeTemp}
           onKeepTemp={keepTemp}
           onMoveSite={moveSite}
-          onSettings={() => setModal({ kind: 'settings' })}
+          onSettings={() => setView({ kind: 'settings' })}
         />
 
         <main className="main">
@@ -215,17 +252,35 @@ export default function App(): ReactNode {
               </button>
             </div>
           )}
-          {/* only the open site gets a webview, the rest aren't rendered at all */}
-          {brand && site && (
-            <SiteView
-              key={siteKey}
-              site={site}
-              partition={partitionFor(brand.id)}
-              startUrl={lastUrl.current[siteKey] ?? site.url}
-              onUrl={(url) => (lastUrl.current[siteKey] = url)}
-              navigate={nav?.key === siteKey ? nav : null}
-              right={<ChatToggle chatOpen={data.chatOpen} onToggleChat={toggleChat} />}
-            />
+          {/* sites you've visited stay loaded and hidden, so going back is instant */}
+          <div className="site-stack">
+            {tabs.map((t) => (
+              <SiteView
+                key={t.key}
+                site={t.site}
+                hidden={t.key !== siteKey}
+                partition={partitionFor(t.brandId)}
+                startUrl={lastUrl.current[t.key] ?? t.site.url}
+                onUrl={(url) => (lastUrl.current[t.key] = url)}
+                navigate={nav?.key === t.key ? nav : null}
+                right={<ChatToggle chatOpen={data.chatOpen} onToggleChat={toggleChat} />}
+              />
+            ))}
+          </div>
+          {brand && view.kind === 'settings' && (
+            <Suspense fallback={<div className="page" />}>
+              <Settings
+                data={data}
+                brand={brand}
+                update={update}
+                editBrand={editBrand}
+                onDeleteBrand={deleteBrand}
+                onAddSite={() => setModal({ kind: 'site' })}
+                onOpenUrl={openUrl}
+                chatOpen={data.chatOpen}
+                onToggleChat={toggleChat}
+              />
+            </Suspense>
           )}
           {brand && PageView && view.kind === 'page' && (
             <Suspense fallback={<div className="page" />}>
@@ -257,34 +312,18 @@ export default function App(): ReactNode {
         )}
       </div>
 
-      {modal?.kind === 'brand' && (
-        <BrandModal
-          key={modal.id ?? 'new'}
-          brand={editing ?? null}
-          onSave={saveBrand}
-          onDelete={() => modal.id && deleteBrand(modal.id)}
-          onClose={() => setModal(null)}
-        />
-      )}
-      {modal?.kind === 'site' && <SiteModal onSave={addSite} onClose={() => setModal(null)} />}
-      {modal?.kind === 'settings' && (
-        <SettingsModal
-          settings={data.settings}
-          brands={data.brands}
-          activeId={data.activeBrandId}
-          onSave={(settings, adblock) => {
-            update((d) => ({
-              ...d,
-              settings,
-              brands: d.brands.map((b) =>
-                adblock[b.id] ? { ...b, adblock: adblock[b.id].on, adblockAllow: adblock[b.id].allow } : b
-              )
-            }))
-            setModal(null)
-          }}
-          onClose={() => setModal(null)}
-        />
-      )}
+      <Suspense fallback={null}>
+        {modal?.kind === 'brand' && (
+          <BrandModal
+            key={modal.id ?? 'new'}
+            brand={editing ?? null}
+            onSave={saveBrand}
+            onDelete={() => modal.id && deleteBrand(modal.id)}
+            onClose={() => setModal(null)}
+          />
+        )}
+        {modal?.kind === 'site' && <SiteModal onSave={addSite} onClose={() => setModal(null)} />}
+      </Suspense>
     </div>
   )
 }

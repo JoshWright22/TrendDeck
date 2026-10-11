@@ -12,7 +12,7 @@ import {
   WriterIcon
 } from './Icons'
 
-export type View = { kind: 'page'; page: Page } | { kind: 'site'; id: string }
+export type View = { kind: 'page'; page: Page } | { kind: 'site'; id: string } | { kind: 'settings' }
 
 const NAV_ICONS: Record<Page, () => ReactNode> = {
   Trends: TrendsIcon,
@@ -89,7 +89,11 @@ export default function Sidebar(props: Props): ReactNode {
         />
       )}
 
-      <button className="side-item settings-btn" onClick={props.onSettings}>
+      <button
+        className={`side-item settings-btn${view.kind === 'settings' ? ' active' : ''}`}
+        aria-current={view.kind === 'settings' ? 'page' : undefined}
+        onClick={props.onSettings}
+      >
         <SettingsIcon />
         <span className="side-name">Settings</span>
       </button>

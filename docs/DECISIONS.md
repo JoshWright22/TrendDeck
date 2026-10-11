@@ -6,11 +6,41 @@ Calls made while building, so nobody has to guess later.
 
 - Brand switcher is a row of small brand cards in the title bar, not a dropdown. Every brand stays one click away and the shortcut number shows on hover.
 - The app always opens on Trends. What each brand has open isn't saved, only kept while the app runs.
-- Only the open site has a webview. Leaving a site unmounts it, and coming back reopens the last page you were on (in memory only). Logins live in the brand's session so nothing is lost, the page just reloads.
+- Sites you visit stay loaded after you leave them, hidden with CSS so switching back is instant. Each brand keeps its 6 most recently used ones, the oldest gets closed when you open a 7th. The number is in Settings > Tabs, 1 to 20. A closed one reopens on the last page you were on, it just reloads.
+- Other brands keep their tabs too, so switching brands and back is instant as well. That's more memory with a lot of brands, the cap is per brand to keep it simple.
+- Hidden, not `display: none`. A webview that loses its size has to lay the page out again when it comes back, which is the delay this is meant to remove. Webviews never move in the page either, moving one reloads it.
+- A hidden tab is muted, its videos get paused, and it stops painting. After 5 minutes out of view it's frozen so its scripts stop too, and it wakes up the moment you open it. Pages with "studio" or "upload" in the address are never frozen so an upload keeps going.
+- After 4 seconds without input the brand's first 3 sites load in the background, one at a time 8 seconds apart, so the usual ones are ready before you click. Only into free slots, it never closes a tab you used to make room. Each site is only warmed once per run.
+- Switching back to a site went from about 580 ms before anything showed and 8 s until the page finished loading, to about 25 ms with nothing to load. Four sites open went from 1.4 GB to 1.9 GB of memory, that's the trade.
 - Ctrl+1..9 (Cmd on macOS) picks the brand in rail order. When a site has focus the main process catches the keys first, otherwise the site would eat them.
 - Chat sits on the right, toggled from the top right of every page. Threads are saved per brand. No agent is wired up yet, so sending just saves your message to the thread.
 - Pages and the chat pane are lazy loaded, each one is its own chunk.
 - Fonts (Inter, Inter Tight) come from @fontsource and get bundled, latin subset only to keep the build small.
+
+## Startup
+
+- The ad blocker library and its engine load one second after the window first paints. Before that nothing has opened a site yet, so nothing slips through in practice.
+- The lists only download and rebuild when the cached engine is over 4 hours old. Before, every start downloaded all of them and rebuilt the engine, which kept the cpu busy right when the window was trying to show.
+- A stale trends cache waits until 5 seconds after launch to refresh, the cached feed shows meanwhile.
+- The updater module only loads in the installed app.
+- The ui bundle is minified now (698 kB to 248 kB) and the modals and setup screen are their own chunks.
+- Measured on a busy test machine, median of 5 runs each: start to first paint went from 6.3 s to 4.6 s, memory 3 seconds after start from 1018 MB to 535 MB. After 30 seconds it's about the same either way (790 to 900 MB) since that's when the warmed sites and trends fetch land.
+- Most of what's left of the start is the gpu process coming up. With `--disable-gpu` the first paint lands in about 1.3 s, but then sites scroll and play video on the cpu, which is worse on a slow machine. So it stays on.
+
+## First run
+
+- A fresh install opens on a short setup instead of the app: name your brand and niche, pick your sites, done. Three dots show where you are. Skip keeps the default "My Brand" with every site.
+- Data from before setup existed counts as done, so nobody who already uses the app sees it.
+- The niche is one comma separated field there to keep it short. Settings has the full keyword editor and subreddits.
+- Nothing warms up in the background while setup is open.
+
+## Settings
+
+- Settings is a screen in the main area, not a modal, with a section list on the left: Brand, Sites, Ad blocker, Tabs, Trends, About. Trends holds the YouTube key, it didn't fit anywhere else.
+- Changes save as you make them, there's no Save button. Text fields save when you leave them or press Enter.
+- Brand and Sites are for the open brand. The ad blocker lists every brand with the open one first, same as before.
+- Default sites you removed show up under Sites as one click buttons to add them back.
+- About has the version from package.json, the repo link (opens in a tab like every other link) and the switch for updates. The updater already read that setting but the store used to drop it, so it couldn't be turned off before.
 
 ## Trends
 
@@ -55,7 +85,7 @@ Calls made while building, so nobody has to guess later.
 
 ## Sound
 
-- Sites only play sound while you can see them. Minimize or hide the window and every site goes quiet, it comes back on restore. Only the open site has a webview anyway.
+- Sites only play sound while you can see them. Minimize or hide the window and every site goes quiet, it comes back on restore. A site tab that's open in the background stays muted until you go back to it.
 - `--mute-audio` or `TRENDDECK_MUTE=1` mutes everything, the app window, sites and popups. Test runs always use one of them.
 
 ## Agents

@@ -14,7 +14,8 @@ import {
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
-import { ElectronBlocker, Request } from '@ghostery/adblocker-electron'
+// the library is big, it gets loaded after the window has painted
+import type { ElectronBlocker } from '@ghostery/adblocker-electron'
 import { hostOf, ID_PATTERN, partitionFor } from '@shared/types'
 import { getData } from './store'
 
@@ -66,6 +67,8 @@ const ALLOW_HOSTS = new Set([
 const ALLOW_HOST_START = /^(login|auth|signin|sso|accounts?|id)\./i
 const ALLOW_PATH = /^\/(i\/flow\/login|accounts\/login|login|signin|sign-in|sign_in|auth|oauth|account\/login|session)\b/i
 
+type Lib = typeof import('@ghostery/adblocker-electron')
+let lib: Lib | null = null
 let engine: ElectronBlocker | null = null
 let refreshing = false
 const brandOf = new WeakMap<Session, string>()
@@ -134,14 +137,14 @@ function onHeadersReceived(
 // the lists have no popup type, so check the url as a plain request
 export function blocksPopup(opener: WebContents, url: string): boolean {
   const brandId = brandOf.get(opener.session)
-  if (!engine || !brandId || !blockingOn(brandId, opener.getURL())) return false
-  const request = Request.fromRawDetails({ url, sourceUrl: opener.getURL(), type: 'other' })
+  if (!engine || !lib || !brandId || !blockingOn(brandId, opener.getURL())) return false
+  const request = lib.Request.fromRawDetails({ url, sourceUrl: opener.getURL(), type: 'other' })
   return engine.match(request).match
 }
 
 function cosmetics(url: string, injection: boolean, msg?: { classes?: string[]; hrefs?: string[]; ids?: string[] }) {
-  if (!engine) return null
-  const { hostname, domain } = Request.fromRawDetails({ url })
+  if (!engine || !lib) return null
+  const { hostname, domain } = lib.Request.fromRawDetails({ url })
   const first = msg === undefined
   return engine.getCosmeticsFilters({
     url,
@@ -226,7 +229,8 @@ async function refresh(): Promise<void> {
     ])
     if (lists.every((l) => !l)) return
     const bin = await build(lists, resources)
-    engine = ElectronBlocker.deserialize(bin)
+    lib ??= await import('@ghostery/adblocker-electron')
+    engine = lib.ElectronBlocker.deserialize(bin)
     const file = join(dir(), ENGINE_FILE)
     await fs.writeFile(`${file}.tmp`, bin)
     await fs.rename(`${file}.tmp`, file)
@@ -237,21 +241,37 @@ async function refresh(): Promise<void> {
   }
 }
 
-async function loadCached(): Promise<void> {
+// true when the cached engine is new enough to skip downloading the lists
+async function loadCached(): Promise<boolean> {
   try {
-    const buf = await fs.readFile(join(dir(), ENGINE_FILE))
+    const file = join(dir(), ENGINE_FILE)
+    const [buf, stat] = await Promise.all([fs.readFile(file), fs.stat(file)])
+    lib ??= await import('@ghostery/adblocker-electron')
     // a fresh engine may have landed while this was reading
-    engine ??= ElectronBlocker.deserialize(new Uint8Array(buf))
+    engine ??= lib.ElectronBlocker.deserialize(new Uint8Array(buf))
+    return Date.now() - stat.mtimeMs < REFRESH_MS
   } catch {
     // missing or from an older version, the refresh fixes both
+    return false
   }
+}
+
+let started = false
+
+// loads the cached engine, and only fetches and rebuilds the lists when they're old.
+// called once the window has painted so none of it slows the start
+export function startAdblock(): void {
+  if (started) return
+  started = true
+  void loadCached().then((fresh) => {
+    if (!fresh) void refresh()
+  })
+  setInterval(() => void refresh(), REFRESH_MS)
 }
 
 export function setupAdblock(): void {
   // the old prebuilt engine from before the switch to uBO's lists
   void fs.rm(join(app.getPath('userData'), 'adblock-engine.bin'), { force: true })
-  void loadCached().then(() => refresh())
-  setInterval(() => void refresh(), REFRESH_MS)
 
   // the preload asks for scriptlets before the page runs anything
   // returnValue sends the reply the moment it's set, so it only gets set once

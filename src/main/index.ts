@@ -1,10 +1,12 @@
 import { app, BrowserWindow, ipcMain, session, webContents, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { ID_PATTERN, isHttpUrl, partitionFor, type AppData } from '@shared/types'
+import { styleSite } from './site-style'
 import { setupUpdater } from './updater'
 import { loadData, saveData } from './store'
 import { dropTrends, setupTrends } from './trends'
-import { attachBrand, blocksPopup, setupAdblock } from './adblock'
+import { attachBrand, blocksPopup, setupAdblock, startAdblock } from './adblock'
+import { isSiteHidden, setupHiddenSites, trackSite } from './hidden-sites'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -17,7 +19,7 @@ function syncMute(win: BrowserWindow): void {
   const hidden = !win.isVisible() || win.isMinimized()
   for (const wc of webContents.getAllWebContents()) {
     if (wc.getType() === 'webview' && wc.hostWebContents?.id === win.webContents.id) {
-      wc.setAudioMuted(MUTE_ALL || hidden)
+      wc.setAudioMuted(MUTE_ALL || hidden || isSiteHidden(wc.id))
     }
   }
 }
@@ -60,7 +62,11 @@ function createWindow(): void {
     }
   })
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    win.show()
+    // the ad blocker engine is big, give the first paint a head start
+    setTimeout(startAdblock, 1000)
+  })
   const sendMax = (): void => win.webContents.send('window:maximized', win.isMaximized())
   win.on('maximize', sendMax)
   win.on('unmaximize', sendMax)
@@ -104,6 +110,8 @@ function createWindow(): void {
 app.on('web-contents-created', (_event, contents) => {
   if (MUTE_ALL) contents.setAudioMuted(true)
   if (contents.getType() !== 'webview') return
+  trackSite(contents)
+  styleSite(contents)
   // a focused site eats key presses, so catch the brand shortcuts before it does
   contents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown' || !(input.control || input.meta) || input.alt || input.shift) return
@@ -147,13 +155,14 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
 })
 
 setupTrends()
+setupHiddenSites(syncMute)
 
 void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()
-  // net.fetch needs the app ready, so the blocker starts here
+  // net.fetch needs the app ready, so the blocker hooks up here. its engine loads after first paint
   setupAdblock()
   createWindow()
-  setupUpdater()
+  void setupUpdater()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })

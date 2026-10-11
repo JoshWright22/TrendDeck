@@ -28,7 +28,8 @@ const api: TrendDeckApi = {
     const listener = (_event: unknown, feed: TrendFeed): void => fn(feed)
     ipcRenderer.on('trends:update', listener)
     return () => ipcRenderer.removeListener('trends:update', listener)
-  }
+  },
+  setSiteHidden: (webContentsId: number, hidden: boolean) => ipcRenderer.send('site:hidden', webContentsId, hidden)
 }
 
 contextBridge.exposeInMainWorld('trenddeck', api)

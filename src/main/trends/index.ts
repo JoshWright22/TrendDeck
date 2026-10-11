@@ -14,6 +14,8 @@ import { SOURCES, type Ctx, type RawItem } from './sources'
 
 const STALE_MS = 3 * 3600_000
 const CHECK_MS = 10 * 60_000
+// right after launch the first paint matters more than fresh trends, the cache shows meanwhile
+const START_GRACE_MS = 5000
 const PER_SOURCE = 30
 const MAX_POINTS = 24
 // keeps a refresh to a sane number of requests
@@ -139,7 +141,11 @@ export function setupTrends(): void {
   ipcMain.handle('trends:get', async (_event, brandId: unknown) => {
     if (typeof brandId !== 'string' || !ID_PATTERN.test(brandId)) return null
     const feed = await readCache(brandId)
-    if (isStale(feed)) void refreshTrends(brandId)
+    if (isStale(feed)) {
+      const wait = START_GRACE_MS - process.uptime() * 1000
+      if (wait > 0) setTimeout(() => void refreshTrends(brandId), wait)
+      else void refreshTrends(brandId)
+    }
     return feeds.get(brandId) ?? feed
   })
 
