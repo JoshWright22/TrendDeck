@@ -15,6 +15,7 @@ import { forgetBrand } from './mcp/state'
 import { forgetBrandLogins, setupVault } from './vault'
 import { dropChats, setupAgents, stopBrand } from './agents'
 import { dropVoice, setupVoice } from './voice'
+import { dropInboxBrand, setupInbox } from './inbox'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -168,6 +169,7 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   stopBrand(brandId)
   await dropChats(brandId)
   await dropVoice(brandId)
+  await dropInboxBrand(brandId)
 })
 
 setupTrends()
@@ -177,6 +179,7 @@ setupVault()
 setupAgents()
 setupVoice()
 setupHiddenSites(syncMute)
+setupInbox()
 
 void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()

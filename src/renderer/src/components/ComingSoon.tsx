@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export const PAGES = ['Trends', 'Ideas', 'Voice', 'Media', 'Schedule', 'Writer', 'Analytics', 'Posting'] as const
+export const PAGES = ['Trends', 'Ideas', 'Voice', 'Media', 'Schedule', 'Writer', 'Analytics', 'Posting', 'Inbox'] as const
 export type Page = (typeof PAGES)[number]
 
 const BLURBS: Record<Page, string> = {
@@ -11,7 +11,8 @@ const BLURBS: Record<Page, string> = {
   Schedule: 'A calendar of what goes out where and when.',
   Writer: 'Draft titles, captions and scripts for each site.',
   Analytics: 'How your posts did across every site, in one place.',
-  Posting: 'Post to every site from one place.'
+  Posting: 'Post to every site from one place.',
+  Inbox: 'Comments from every site in one list.'
 }
 
 export default function ComingSoon({ page }: { page: Page }): ReactNode {

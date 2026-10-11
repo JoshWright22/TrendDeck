@@ -1,0 +1,160 @@
+/* inbox page, colors from docs/BRAND.md */
+
+.health-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.health-dot.in {
+  background: var(--teal);
+}
+
+.health-dot.out {
+  background: var(--pink);
+}
+
+.inbox-tabs {
+  display: flex;
+  gap: 6px;
+  margin-left: 10px;
+}
+
+.inbox-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.inbox-bar select {
+  background: var(--panel);
+  color: var(--chalk);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+}
+
+.inbox-note {
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inbox-item {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  animation: inbox-in 200ms ease-out both;
+}
+
+.inbox-item.unread {
+  border-left: 3px solid var(--teal);
+}
+
+.inbox-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.inbox-meta b {
+  color: var(--chalk);
+  font-weight: 600;
+}
+
+.inbox-text {
+  margin: 6px 0 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.inbox-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inbox-reply {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.inbox-reply textarea,
+.inbox-add input {
+  flex: 1;
+  background: var(--felt);
+  color: var(--chalk);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font: inherit;
+}
+
+.inbox-add {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 14px;
+  max-width: 480px;
+}
+
+.inbox-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 22px;
+}
+
+.accounts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.account .health-dot {
+  margin-left: 0;
+  width: 9px;
+  height: 9px;
+}
+
+.account small {
+  display: block;
+  color: var(--smoke);
+}
+
+@keyframes inbox-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inbox-item {
+    animation: none;
+  }
+}

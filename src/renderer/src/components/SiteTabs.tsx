@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { Site } from '@shared/types'
+import type { SiteHealth } from '@shared/inbox'
+import { HealthDot } from '../pages/inbox/useInbox'
 import { CloseIcon, PinIcon, PlusIcon } from './Icons'
 
 interface Props {
@@ -13,6 +15,8 @@ interface Props {
   onRemove: (id: string) => void
   onMove: (fromId: string, toId: string) => void
   onAdd: () => void
+  // login state per site id, from the inbox
+  health?: Record<string, SiteHealth>
 }
 
 function host(url: string): string {
@@ -77,6 +81,7 @@ export default function SiteTabs(props: Props): ReactNode {
           >
             <span className="site-dot">{s.name.slice(0, 1).toUpperCase()}</span>
             <span className="side-name">{s.name}</span>
+            {props.health && <HealthDot state={props.health[s.id]?.state} />}
             <button
               className="row-close"
               title={`Remove ${s.name}`}
