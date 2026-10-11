@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { Brand } from '@shared/types'
 import {
   PLATFORMS,
@@ -10,7 +10,7 @@ import {
   type Visibility
 } from '@shared/posting'
 import Modal from '../components/Modal'
-import { fileName } from './bits'
+import MediaPicker from '../pages/media/MediaPicker'
 
 interface Props {
   brand: Brand
@@ -33,13 +33,25 @@ export default function Composer({ brand, settings, post, onClose }: Props): Rea
   const [platforms, setPlatforms] = useState<Platform[]>(post ? [post.platform] : [])
   const [title, setTitle] = useState(post?.title ?? '')
   const [body, setBody] = useState(post?.body ?? '')
-  const [mediaPath, setMediaPath] = useState(post?.mediaPath ?? '')
+  // a media library id, posting turns it into a file itself
+  const [mediaId, setMediaId] = useState(post?.mediaId ?? '')
+  const [mediaName, setMediaName] = useState('')
+  const [picking, setPicking] = useState(false)
   const [mediaUrl, setMediaUrl] = useState(post?.mediaUrl ?? '')
   const [subreddit, setSubreddit] = useState(post?.subreddit || brand.subreddits[0] || '')
   const [visibility, setVisibility] = useState<Visibility>(post?.visibility ?? 'public')
   const [mode, setMode] = useState<When>(post?.scheduledAt ? 'later' : post ? 'draft' : 'now')
   const [at, setAt] = useState(toLocalInput(post?.scheduledAt ?? Date.now() + 60 * 60 * 1000))
   const [error, setError] = useState('')
+
+  // name for a post that already had a file
+  useEffect(() => {
+    if (!post?.mediaId) return
+    void window.trenddeck.media.list(brand.id, {}).then((l) => {
+      const m = l.find((x) => x.id === post.mediaId)
+      setMediaName(m ? `${m.name}${m.ext ? `.${m.ext}` : ''}` : 'not in Media anymore')
+    })
+  }, [brand.id, post?.mediaId])
 
   const has = (p: Platform): boolean => platforms.includes(p)
   const anyTitle = platforms.some((p) => PLATFORM_RULES[p].needsTitle)
@@ -53,7 +65,7 @@ export default function Composer({ brand, settings, post, onClose }: Props): Rea
     const r = PLATFORM_RULES[p]
     const name = PLATFORM_NAMES[p]
     const apiIg = p === 'instagram' && settings.modes.instagram === 'api'
-    if (r.needsMedia && !mediaPath && !apiIg) issues.push(`${name} needs an image or video`)
+    if (r.needsMedia && !mediaId && !apiIg) issues.push(`${name} needs an image or video`)
     if (apiIg && !mediaUrl) issues.push('Instagram api mode needs a public link to the media')
     if (r.needsTitle && !title.trim()) issues.push(`${name} needs a title`)
     if (r.titleMax && title.length > r.titleMax) issues.push(`${name} titles stop at ${r.titleMax}`)
@@ -75,7 +87,8 @@ export default function Composer({ brand, settings, post, onClose }: Props): Rea
       platform,
       title: title.trim(),
       body: body.trim(),
-      mediaPath,
+      mediaId,
+      byAgent: post?.byAgent ?? false,
       mediaUrl: mediaUrl.trim(),
       subreddit: subreddit.replace(/^r\//i, '').trim(),
       visibility,
@@ -91,12 +104,9 @@ export default function Composer({ brand, settings, post, onClose }: Props): Rea
     onClose()
   }
 
-  const pick = async (): Promise<void> => {
-    const path = await window.trenddeck.posting.pickMedia()
-    if (path) setMediaPath(path)
-  }
 
   return (
+    <>
     <Modal title={post ? `Review for ${PLATFORM_NAMES[post.platform]}` : 'New post'} onClose={onClose}>
       <form
         className="composer"
@@ -144,15 +154,13 @@ export default function Composer({ brand, settings, post, onClose }: Props): Rea
         <div className="field">
           <span className="field-name">Image or video</span>
           <div className="media-row">
-            <button type="button" className="pill" onClick={() => void pick()}>
-              {mediaPath ? 'Change' : 'Pick a file'}
+            <button type="button" className="pill" onClick={() => setPicking(true)}>
+              {mediaId ? 'Change' : 'Pick from Media'}
             </button>
-            {mediaPath ? (
+            {mediaId ? (
               <>
-                <span className="media-name" title={mediaPath}>
-                  {fileName(mediaPath)}
-                </span>
-                <button type="button" className="btn ghost" onClick={() => setMediaPath('')}>
+                <span className="media-name">{mediaName}</span>
+                <button type="button" className="btn ghost" onClick={() => setMediaId('')}>
                   Remove
                 </button>
               </>
@@ -249,5 +257,21 @@ export default function Composer({ brand, settings, post, onClose }: Props): Rea
         </div>
       </form>
     </Modal>
+    {picking && (
+      <MediaPicker
+        brandId={brand.id}
+        multiple={false}
+        onClose={() => setPicking(false)}
+        onPick={(items) => {
+          const m = items[0]
+          if (m) {
+            setMediaId(m.id)
+            setMediaName(`${m.name}${m.ext ? `.${m.ext}` : ''}`)
+          }
+          setPicking(false)
+        }}
+      />
+    )}
+    </>
   )
 }

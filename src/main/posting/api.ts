@@ -3,7 +3,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 import { promises as fs } from 'node:fs'
 import { basename, extname } from 'node:path'
-import type { PostItem } from '@shared/posting'
+import type { ReadyPost } from '@shared/posting'
 import { partitionFor } from '@shared/types'
 
 // official api mode, only runs when you queue a post for a platform set to api
@@ -186,7 +186,7 @@ async function youtubeToken(keys: Keys): Promise<string> {
 
 const YT_CHUNK = 32 * 256 * 1024
 
-async function youtube(post: PostItem, keys: Keys): Promise<string> {
+async function youtube(post: ReadyPost, keys: Keys): Promise<string> {
   const token = await youtubeToken(keys)
   const size = (await fs.stat(post.mediaPath)).size
   const start = await net.fetch(
@@ -235,7 +235,7 @@ async function youtube(post: PostItem, keys: Keys): Promise<string> {
 const TT = 'https://open.tiktokapis.com/v2/post/publish'
 const TT_CHUNK = 10 * 1024 * 1024
 
-async function tiktok(post: PostItem, keys: Keys): Promise<string> {
+async function tiktok(post: ReadyPost, keys: Keys): Promise<string> {
   need(keys, 'accessToken')
   const auth = { authorization: `Bearer ${keys.accessToken}`, 'content-type': 'application/json; charset=UTF-8' }
   const info = await json<{ data: { privacy_level_options?: string[] } }>(
@@ -296,7 +296,7 @@ async function tiktok(post: PostItem, keys: Keys): Promise<string> {
 
 const IG_VERSION = 'v23.0'
 
-async function instagram(post: PostItem, keys: Keys): Promise<string> {
+async function instagram(post: ReadyPost, keys: Keys): Promise<string> {
   need(keys, 'userId', 'accessToken')
   // tokens from instagram login start with IG, facebook login tokens use the facebook host
   const host = keys.accessToken.startsWith('IG') ? 'https://graph.instagram.com' : 'https://graph.facebook.com'
@@ -345,7 +345,7 @@ async function instagram(post: PostItem, keys: Keys): Promise<string> {
 
 // x api v2, text and one image
 
-async function x(post: PostItem, keys: Keys): Promise<string> {
+async function x(post: ReadyPost, keys: Keys): Promise<string> {
   need(keys, 'accessToken')
   const auth = `Bearer ${keys.accessToken}`
   const body: { text: string; media?: { media_ids: string[] } } = { text: post.body.slice(0, 280) }
@@ -378,7 +378,7 @@ async function x(post: PostItem, keys: Keys): Promise<string> {
   return `https://x.com/i/status/${res.data.id}`
 }
 
-export async function postViaApi(post: PostItem, keys: Keys): Promise<string> {
+export async function postViaApi(post: ReadyPost, keys: Keys): Promise<string> {
   switch (post.platform) {
     case 'youtube':
       return youtube(post, keys)

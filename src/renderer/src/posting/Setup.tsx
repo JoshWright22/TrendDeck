@@ -25,10 +25,11 @@ export default function Setup({ brand, settings }: Props): ReactNode {
           onChange={(e) => void api.setBrand(brand.id, { autoPost: e.target.checked })}
         />
         <span>
-          <strong>Press Post for me</strong>
+          <strong>Skip the post check</strong>
           <span className="muted small">
-            Off: TrendDeck fills everything in and stops at the Post button so you can check it.
-            On: it presses Post too, scheduled posts go out on their own.
+            Off: every post, yours or an agent's, opens in {brand.name}'s tab for the site filled in
+            and waits for you to press Post. On: it presses Post itself in a background window,
+            scheduled and agent posts go out on their own.
           </span>
         </span>
       </label>

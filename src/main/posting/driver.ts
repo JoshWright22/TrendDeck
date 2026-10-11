@@ -1,6 +1,6 @@
 import { BrowserWindow, type WebContents } from 'electron'
 import { isHttpUrl, partitionFor } from '@shared/types'
-import { PLATFORM_NAMES, type PostItem, type StepReport } from '@shared/posting'
+import { PLATFORM_NAMES, type ReadyPost, type StepReport } from '@shared/posting'
 import type { Adapter, Selectors, Step } from './adapters/types'
 
 const POLL_MS = 400
@@ -81,9 +81,15 @@ export class Closed extends Error {
   }
 }
 
+// a page posting drives: its own window, or the brand's site tab in the app
 export interface Session {
-  win: BrowserWindow
+  wc: WebContents
+  // set for a posting window, null for a site tab
+  winId: number | null
   closed: () => boolean
+  reveal: () => void
+  close: () => void
+  onClosed: (fn: () => void) => void
 }
 
 export function openWindow(brandId: string, title: string, show: boolean): Session {
@@ -114,12 +120,40 @@ export function openWindow(brandId: string, title: string, show: boolean): Sessi
       : { action: 'deny' }
   )
   if (show) win.showInactive()
-  return { win, closed: () => closed || win.isDestroyed() }
+  return {
+    wc: win.webContents,
+    winId: win.id,
+    closed: () => closed || win.isDestroyed(),
+    reveal: () => {
+      win.show()
+      win.focus()
+    },
+    close: () => !win.isDestroyed() && win.close(),
+    onClosed: (fn) => win.on('closed', fn)
+  }
+}
+
+// the brand's own site tab in the app window. leaving the tab unmounts it, that counts as closing
+export function tabSession(wc: WebContents, host: BrowserWindow): Session {
+  return {
+    wc,
+    winId: null,
+    closed: () => wc.isDestroyed(),
+    reveal: () => {
+      if (host.isDestroyed()) return
+      if (host.isMinimized()) host.restore()
+      host.show()
+      host.focus()
+    },
+    // the tab is the user's, it stays open
+    close: () => {},
+    onClosed: (fn) => wc.once('destroyed', fn)
+  }
 }
 
 async function exec<T>(s: Session, code: string): Promise<T> {
   if (s.closed()) throw new Closed()
-  return (await s.win.webContents.executeJavaScript(code, true)) as T
+  return (await s.wc.executeJavaScript(code, true)) as T
 }
 
 async function waitFor(
@@ -146,7 +180,7 @@ async function waitFor(
 
 async function goto(s: Session, url: string): Promise<void> {
   try {
-    await s.win.webContents.loadURL(url)
+    await s.wc.loadURL(url)
   } catch {
     // redirects reject the load promise, the page still opens
   }
@@ -155,7 +189,7 @@ async function goto(s: Session, url: string): Promise<void> {
 
 // files go in through the devtools protocol, the page can't set them from js
 async function attachFile(s: Session, step: string, sels: Selectors, path: string): Promise<void> {
-  const wc: WebContents = s.win.webContents
+  const wc: WebContents = s.wc
   const dbg = wc.debugger
   if (!dbg.isAttached()) dbg.attach('1.3')
   const res = (await dbg.sendCommand('Runtime.evaluate', {
@@ -184,7 +218,7 @@ async function typeInto(s: Session, step: string, sels: Selectors, text: string)
     )
   )
   if (!ok) throw new StepError(step, 'field went away before typing')
-  if (text) await s.win.webContents.insertText(text)
+  if (text) await s.wc.insertText(text)
   else await exec(s, `document.execCommand('delete')`)
 }
 
@@ -197,7 +231,7 @@ async function click(s: Session, step: string, sels: Selectors): Promise<void> {
 }
 
 export interface RunOptions {
-  post: PostItem
+  post: ReadyPost
   adapter: Adapter
   // only look for each step, don't fill or press anything
   check?: boolean
@@ -258,7 +292,7 @@ export async function runSteps(s: Session, opts: RunOptions): Promise<StepReport
   return report
 }
 
-async function runStep(s: Session, step: Step, post: PostItem, check: boolean): Promise<void> {
+async function runStep(s: Session, step: Step, post: ReadyPost, check: boolean): Promise<void> {
   const timeout = step.timeout ?? DEFAULT_TIMEOUT
   switch (step.kind) {
     case 'goto':
@@ -301,7 +335,7 @@ export async function pressPost(s: Session, adapter: Adapter): Promise<void> {
 // true once the site shows the post went out
 export async function isDone(s: Session, adapter: Adapter): Promise<boolean> {
   const { texts = [], find = [], url } = adapter.done
-  if (url && url.test(s.win.webContents.getURL())) return true
+  if (url && url.test(s.wc.getURL())) return true
   return exec<boolean>(
     s,
     `(() => {
@@ -316,7 +350,7 @@ export async function isDone(s: Session, adapter: Adapter): Promise<boolean> {
   })
 }
 
-export function windowTitle(post: PostItem, check: boolean): string {
+export function windowTitle(post: ReadyPost, check: boolean): string {
   const name = PLATFORM_NAMES[post.platform]
   return check ? `TrendDeck self-check: ${name}` : `TrendDeck posting to ${name}`
 }

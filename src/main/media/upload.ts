@@ -14,11 +14,13 @@ export interface UploadFile {
 export interface ResolveOpts {
   // true when an agent asked for this file, then its switch has to be on
   forAgent: boolean
+  // when set the file has to be in this brand's library
+  brandId?: string
 }
 
 export async function resolveForUpload(id: string, opts: ResolveOpts): Promise<UploadFile> {
   const item = await findItem(id)
-  if (!item) throw new Error('not in the media library')
+  if (!item || (opts.brandId && item.brandId !== opts.brandId)) throw new Error('not in the media library')
   if (opts.forAgent && !item.agentAllowed) throw new Error('agents are not allowed to use this file')
   const st = await fs.stat(item.path).catch(() => null)
   if (!st?.isFile()) throw new Error(`${item.name} is missing, find it again in Media`)

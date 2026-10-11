@@ -1,13 +1,17 @@
 import { app, BrowserWindow, type WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
-import { extname, isAbsolute, join, resolve, sep } from 'node:path'
-import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { isHttpUrl, SOURCE_NAMES, TREND_SOURCES, type Brand, type Site, type TrendFeed } from '@shared/types'
 import { getData } from '../store'
 import { addLog, changeState, isGranted, loadState, logEntry } from './state'
 import type { Turn } from './turns'
 import { authGuard, loginTool } from '../vault'
+import { listMedia } from '../media'
+import { resolveForUpload } from '../media/upload'
+import { queueAgentPost } from '../posting'
+import { brandSettings } from '../posting/store'
+import { PLATFORMS, type Platform } from '@shared/posting'
 import {
   click,
   focusRef,
@@ -99,30 +103,15 @@ async function trendFeed(brandId: string): Promise<TrendFeed | null> {
   }
 }
 
-const UPLOAD_TYPES = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.webp', '.heic', '.avif', '.bmp',
-  '.mp4', '.mov', '.webm', '.mkv', '.avi', '.m4v',
-  '.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac',
-  '.pdf', '.txt', '.csv', '.srt', '.vtt'
-])
-
-// media and plain docs only, and nothing from the app's own folder or hidden folders,
-// so an agent can't post a key file or someone's logins
-async function checkUpload(raw: string): Promise<string> {
-  if (!isAbsolute(raw)) throw new ToolError(`use a full path: ${raw}`)
-  const path = resolve(raw)
-  if (!UPLOAD_TYPES.has(extname(path).toLowerCase())) {
-    throw new ToolError(`only images, video, audio, pdf, txt, csv and subtitle files can be uploaded: ${raw}`)
+// agents only get files from the brand's media library the user allowed for agents.
+// resolveForUpload is the one place an id turns into a path, the agent never sees it
+async function checkUpload(turn: Turn, id: string): Promise<string> {
+  try {
+    const file = await resolveForUpload(id, { forAgent: true, brandId: turn.brandId })
+    return file.path
+  } catch (err) {
+    throw new ToolError(`${id}: ${err instanceof Error ? err.message : String(err)}`)
   }
-  const inside = (root: string): boolean => path.toLowerCase().startsWith(resolve(root).toLowerCase() + sep)
-  if (inside(app.getPath('userData'))) throw new ToolError("files in TrendDeck's own folder can't be uploaded")
-  const rel = path.startsWith(homedir()) ? path.slice(homedir().length) : path
-  if (rel.split(/[\\/]/).some((part) => part.startsWith('.'))) {
-    throw new ToolError(`files in hidden folders can't be uploaded: ${raw}`)
-  }
-  const stat = await fs.stat(path).catch(() => null)
-  if (!stat?.isFile()) throw new ToolError(`no file at ${raw}`)
-  return path
 }
 
 function send(channel: string, payload: unknown): void {
@@ -274,19 +263,29 @@ export const TOOLS: Tool[] = [
     }
   },
   {
+    name: 'list_media',
+    description:
+      "Files in this brand's media library the user allowed for agents: id, name, type, size, length, tags and where each was posted. No paths. Use the ids with upload_file and request_post.",
+    inputSchema: obj({ query: str('optional name or tag to search for') }),
+    run: async (turn, args) => {
+      const query = text(args, 'query', 200, false)
+      return listMedia(turn.brandId, query ? { query } : {})
+    }
+  },
+  {
     name: 'upload_file',
     description:
-      'Put local files into a file input in the open tab by its [ref] (file inputs show in read_page even when hidden). Full paths. Images, video, audio, pdf, txt, csv and subtitles only.',
+      'Put files from the media library into a file input in the open tab by its [ref] (file inputs show in read_page even when hidden). Takes media ids from list_media, only files the user allowed for agents.',
     inputSchema: obj(
-      { ref: num('ref of an input type=file'), paths: { type: 'array', items: { type: 'string' }, description: 'full file paths' } },
-      ['ref', 'paths']
+      { ref: num('ref of an input type=file'), media_ids: { type: 'array', items: { type: 'string' }, description: 'ids from list_media' } },
+      ['ref', 'media_ids']
     ),
     run: async (turn, args) => {
       const { wc, site } = await allowedTab(turn)
-      const raw = Array.isArray(args.paths) ? args.paths.filter((p): p is string => typeof p === 'string') : []
-      if (raw.length === 0 || raw.length > 20) throw new ToolError('give 1 to 20 file paths')
+      const raw = Array.isArray(args.media_ids) ? args.media_ids.filter((p): p is string => typeof p === 'string') : []
+      if (raw.length === 0 || raw.length > 20) throw new ToolError('give 1 to 20 media ids from list_media')
       const files: string[] = []
-      for (const p of raw) files.push(await checkUpload(p))
+      for (const id of raw) files.push(await checkUpload(turn, id))
       const mark = randomUUID()
       const isFile = await markRef(wc, Number(args.ref), mark)
       if (!isFile) {
@@ -437,40 +436,49 @@ export const TOOLS: Tool[] = [
   {
     name: 'request_post',
     description:
-      'Ask the user to post something. It only goes into their review list in TrendDeck, nothing is posted until they do it themselves.',
+      "Post something for this brand. TrendDeck opens the site in the brand's own session, fills the post in and waits for the user to check it and press Post. It goes out only when they do, unless they turned that check off for this brand. Media comes from list_media ids.",
     inputSchema: obj(
       {
-        platform: str('e.g. youtube, tiktok, x, instagram, reddit'),
-        site: str('optional site id or name it should go out on'),
-        title: str('title or first line'),
-        body: str('the post text'),
-        when: str('optional suggested time, ISO 8601')
+        platform: str('youtube, tiktok, instagram, x or reddit'),
+        title: str('title, needed for youtube and reddit'),
+        body: str('the post text, caption or description'),
+        media_id: str('optional media id from list_media, needed for youtube, tiktok and instagram'),
+        subreddit: str('reddit only, without r/'),
+        when: str('optional time to post, ISO 8601. empty means now')
       },
       ['platform', 'body']
     ),
     run: async (turn, args) => {
       const brand = brandOf(turn)
-      const siteKey = text(args, 'site', 100, false)
-      const site = siteKey ? findSite(brand, siteKey) : null
+      const platform = text(args, 'platform', 40).toLowerCase() as Platform
+      if (!PLATFORMS.includes(platform)) throw new ToolError(`platform should be one of ${PLATFORMS.join(', ')}`)
       const whenRaw = text(args, 'when', 40, false)
       const when = whenRaw ? Date.parse(whenRaw) : 0
       if (whenRaw && Number.isNaN(when)) throw new ToolError('when should be an ISO date like 2026-10-12T18:00:00Z')
-      const post = {
-        id: randomUUID(),
+      if (when && when < Date.now() - 60000) throw new ToolError('when is in the past')
+      const mediaId = text(args, 'media_id', 100, false)
+      // checked now so the agent hears about a file it can't use right away
+      if (mediaId) await checkUpload(turn, mediaId)
+      const post = await queueAgentPost({
         brandId: brand.id,
-        siteId: site?.id ?? '',
-        platform: text(args, 'platform', 40),
+        platform,
         title: text(args, 'title', 300, false),
         body: text(args, 'body', 20000),
-        when,
-        createdAt: Date.now(),
-        status: 'waiting' as const
-      }
-      await changeState((s) => {
-        s.posts.push(post)
-        s.log.push(logEntry({ brandId: brand.id, siteId: post.siteId, kind: 'post-request', detail: `${post.platform}: ${post.title.slice(0, 60)}` }))
+        mediaId,
+        mediaUrl: '',
+        subreddit: text(args, 'subreddit', 30, false),
+        visibility: 'public',
+        scheduledAt: when || null
       })
-      return { queued: true, id: post.id, note: 'waiting for the user to review it in Settings > Agent access' }
+      await addLog({ brandId: brand.id, siteId: '', kind: 'post-request', detail: `${platform}: ${post.title.slice(0, 60)}` })
+      const audit = !brandSettings(brand.id).autoPost
+      return {
+        queued: true,
+        id: post.id,
+        note: audit
+          ? 'the user checks it in the site and presses Post themselves, see the Posting page for how it went'
+          : 'this brand posts without a check, it goes out when its turn comes'
+      }
     }
   },
   loginTool

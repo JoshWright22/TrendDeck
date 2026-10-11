@@ -15,6 +15,12 @@ export function useAgentEvents(
       lastUrl.current[`${brandId}:${siteId}`] = url
       setViews((all) => ({ ...all, [brandId]: { kind: 'site', id: siteId } }))
     })
+    // post audit: switch to the brand and its tab for the site, posting fills it in from main
+    const offPost = window.trenddeck.posting.onOpenSite(({ brandId, siteId, url }) => {
+      lastUrl.current[`${brandId}:${siteId}`] = url
+      setViews((all) => ({ ...all, [brandId]: { kind: 'site', id: siteId } }))
+      update((d) => (d.activeBrandId === brandId ? d : { ...d, activeBrandId: brandId }))
+    })
     const offIdea = api.onIdea(({ brandId, title, url }) => {
       update((d) => ({
         ...d,
@@ -33,6 +39,7 @@ export function useAgentEvents(
     })
     return () => {
       offOpen()
+      offPost()
       offIdea()
     }
   }, [update, setViews, lastUrl])

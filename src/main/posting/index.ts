@@ -1,6 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { promises as fs } from 'node:fs'
 import { ID_PATTERN } from '@shared/types'
 import {
   PLATFORMS,
@@ -10,6 +9,7 @@ import {
   type Platform,
   type PostItem,
   type PostMode,
+  type ReadyPost,
   type StepReport
 } from '@shared/posting'
 import { ADAPTERS } from './adapters'
@@ -19,6 +19,7 @@ import {
   isDone,
   markPostButton,
   openWindow,
+  tabSession,
   pressPost,
   runSteps,
   windowTitle,
@@ -26,6 +27,9 @@ import {
 } from './driver'
 import { postViaApi, connectYouTube } from './api'
 import * as store from './store'
+import { recordPost, resolveForUpload } from '../media/upload'
+import { getData } from '../store'
+import { siteForUrl, waitForTab } from '../mcp/tabs'
 
 const TICK_MS = 20 * 1000
 // due more than this long ago when the app opens, it waits for you instead of firing late
@@ -61,7 +65,15 @@ function log(post: PostItem, mode: PostMode, result: LogEntry['result'], message
 }
 
 // a reason it can't go out, or null when it's good
-async function problem(post: PostItem, mode: PostMode): Promise<string | null> {
+// the media library id becomes a path here and only here. agent posts only get files
+// the user allowed for agents, and the file has to be in the post's own brand
+async function prepare(post: PostItem): Promise<ReadyPost> {
+  if (!post.mediaId) return { ...post, mediaPath: '' }
+  const file = await resolveForUpload(post.mediaId, { forAgent: post.byAgent, brandId: post.brandId })
+  return { ...post, mediaPath: file.path }
+}
+
+function problemWith(post: ReadyPost, mode: PostMode): string | null {
   const rules = PLATFORM_RULES[post.platform]
   if (rules.needsTitle && !post.title.trim()) return 'needs a title'
   if (post.platform === 'reddit' && !post.subreddit) return 'needs a subreddit'
@@ -70,10 +82,6 @@ async function problem(post: PostItem, mode: PostMode): Promise<string | null> {
     return null
   }
   if (rules.needsMedia && !post.mediaPath) return 'needs an image or video'
-  if (post.mediaPath) {
-    const st = await fs.stat(post.mediaPath).catch(() => null)
-    if (!st?.isFile()) return `can't find the media file at ${post.mediaPath}`
-  }
   if (!post.body.trim() && !post.mediaPath && !post.title.trim()) return 'nothing to post'
   return null
 }
@@ -104,17 +112,20 @@ async function runOne(id: string): Promise<void> {
   if (!post || post.status === 'posted' || post.status === 'review') return
   const settings = store.brandSettings(post.brandId)
   const mode = settings.modes[post.platform]
-  const bad = await problem(post, mode)
-  if (bad) {
-    await store.patchPost(id, { status: 'failed', note: bad })
-    await log(post, mode, 'failed', bad)
+  const ready = await prepare(post).catch((err: unknown) => (err instanceof Error ? err.message : String(err)))
+  const bad = typeof ready === 'string' ? ready : problemWith(ready, mode)
+  if (bad || typeof ready === 'string') {
+    const note = bad ?? 'nothing to post'
+    await store.patchPost(id, { status: 'failed', note })
+    await log(post, mode, 'failed', note)
     return
   }
   await store.patchPost(id, { status: 'running', note: '' })
   if (mode === 'api') {
     try {
-      const url = await postViaApi(post, store.getKeys(post.brandId, post.platform))
+      const url = await postViaApi(ready, store.getKeys(post.brandId, post.platform))
       await store.patchPost(id, { status: 'posted', note: '', url })
+      await markMedia(post, url)
       await log(post, 'api', 'posted', url ? `posted, ${url}` : 'posted')
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -123,13 +134,40 @@ async function runOne(id: string): Promise<void> {
     }
     return
   }
-  await runTabs(post, settings.autoPost)
+  await runTabs(ready, settings.autoPost)
 }
 
-async function runTabs(post: PostItem, autoPost: boolean): Promise<void> {
+// the media library shows where each file went out
+async function markMedia(post: PostItem, url: string): Promise<void> {
+  if (post.mediaId) await recordPost(post.mediaId, post.platform, url).catch(() => {})
+}
+
+// post audit: brings up the brand's own tab for the site with the compose page, so you check the
+// post where you normally work. null when the brand has no tab for the site or it didn't come up
+async function auditTab(post: ReadyPost): Promise<Session | null> {
+  const brand = getData()?.brands.find((b) => b.id === post.brandId)
+  const first = ADAPTERS[post.platform].steps.find((x) => x.kind === 'goto')
+  if (!brand || !first || first.kind !== 'goto') return null
+  const url = first.url(post)
+  const site = siteForUrl(brand, url)
+  if (!site) return null
+  const host = BrowserWindow.getAllWindows().find((w) => !posting.has(w.id) && !w.isDestroyed() && !w.getParentWindow())
+  if (!host) return null
+  host.webContents.send('posting:open-site', { brandId: brand.id, siteId: site.id, url })
+  const want = new URL(url).hostname.replace(/^www\./, '')
+  const wc = await waitForTab(brand.id, want.split('.').slice(-2).join('.'), 15000)
+  if (!wc) return null
+  return tabSession(wc, host)
+}
+
+async function runTabs(post: ReadyPost, autoPost: boolean): Promise<void> {
   const adapter = ADAPTERS[post.platform]
-  const s = openWindow(post.brandId, windowTitle(post, false), true)
-  posting.add(s.win.id)
+  // with the audit on (the default) the post fills in the brand's tab and waits for you.
+  // skipping the audit runs in a background window so it doesn't take over your tab
+  const tab = autoPost ? null : await auditTab(post)
+  const s = tab ?? openWindow(post.brandId, windowTitle(post, false), true)
+  if (tab) tab.reveal()
+  if (s.winId !== null) posting.add(s.winId)
   const id = post.id
   try {
     await runSteps(s, {
@@ -157,10 +195,11 @@ async function runTabs(post: PostItem, autoPost: boolean): Promise<void> {
       const end = Date.now() + 3 * 60 * 1000
       while (Date.now() < end) {
         if (await isDone(s, adapter)) {
-          const url = s.win.webContents.getURL()
+          const url = s.wc.getURL()
           await store.patchPost(id, { status: 'posted', note: '', url: post.platform === 'reddit' ? url : '' })
           await log(post, 'tabs', 'posted', 'posted by the app')
-          setTimeout(() => !s.closed() && s.win.close(), 3000)
+          await markMedia(post, post.platform === 'reddit' ? url : '')
+          setTimeout(() => !s.closed() && s.close(), 3000)
           return
         }
         await new Promise((r) => setTimeout(r, DONE_POLL_MS))
@@ -180,8 +219,7 @@ async function runTabs(post: PostItem, autoPost: boolean): Promise<void> {
   await markPostButton(s, adapter)
   await store.patchPost(id, { status: 'review', note: 'filled in, press Post when it looks right' })
   await log(post, 'tabs', 'review', 'filled in and waiting for you to press Post')
-  s.win.show()
-  s.win.focus()
+  s.reveal()
   watch(post, s, 'review')
 }
 
@@ -196,16 +234,17 @@ function watch(post: PostItem, s: Session, from: 'review' | 'failed'): void {
         if (!done || s.closed()) return
         clearInterval(timer)
         open.delete(post.id)
-        const url = post.platform === 'reddit' ? s.win.webContents.getURL() : ''
+        const url = post.platform === 'reddit' ? s.wc.getURL() : ''
         await store.patchPost(post.id, { status: 'posted', note: '', url })
         await log(post, 'tabs', 'posted', 'you pressed Post')
-        setTimeout(() => !s.closed() && s.win.close(), 3000)
+        await markMedia(post, url)
+        setTimeout(() => !s.closed() && s.close(), 3000)
       })
       .catch(() => {})
   }, DONE_POLL_MS)
-  s.win.on('closed', () => {
+  s.onClosed(() => {
     clearInterval(timer)
-    posting.delete(s.win.id)
+    if (s.winId !== null) posting.delete(s.winId)
     open.delete(post.id)
     const cur = store.getPost(post.id)
     if (!cur || cur.status === 'posted') return
@@ -245,12 +284,14 @@ async function tick(first: boolean): Promise<void> {
 }
 
 async function selfCheck(brandId: string, platform: Platform, subreddit: string): Promise<CheckReport> {
-  const post: PostItem = {
+  const post: ReadyPost = {
     id: 'self-check',
     brandId,
     platform,
     title: '',
     body: '',
+    mediaId: '',
+    byAgent: false,
     mediaPath: '',
     mediaUrl: '',
     subreddit: subreddit || 'test',
@@ -263,7 +304,7 @@ async function selfCheck(brandId: string, platform: Platform, subreddit: string)
     url: ''
   }
   const s = openWindow(brandId, windowTitle(post, true), true)
-  posting.add(s.win.id)
+  if (s.winId !== null) posting.add(s.winId)
   let steps: StepReport[] = []
   try {
     steps = await runSteps(s, { post, adapter: ADAPTERS[platform], check: true })
@@ -271,8 +312,8 @@ async function selfCheck(brandId: string, platform: Platform, subreddit: string)
     const r = (err as { report?: StepReport[] }).report
     steps = r ?? [{ name: 'window', state: 'broke', detail: err instanceof Error ? err.message : String(err) }]
   } finally {
-    if (!s.closed()) s.win.close()
-    posting.delete(s.win.id)
+    if (!s.closed()) s.close()
+    if (s.winId !== null) posting.delete(s.winId)
   }
   const ok = !steps.some((x) => x.state === 'broke')
   const broke = steps.find((x) => x.state === 'broke')
@@ -287,6 +328,26 @@ async function selfCheck(brandId: string, platform: Platform, subreddit: string)
     message: ok ? 'self-check passed' : `self-check: "${broke?.name}" broke, ${broke?.detail}`
   })
   return { platform, at: Date.now(), ok, steps }
+}
+
+// an agent's post goes through the same queue and the same audit as yours: the compose page gets
+// filled in and waits for you to press Post, unless the brand turned the audit off
+export async function queueAgentPost(raw: Omit<PostItem, 'id' | 'status' | 'createdAt' | 'updatedAt' | 'note' | 'url' | 'byAgent'>): Promise<PostItem> {
+  const now = Date.now()
+  const post = store.cleanPost({
+    ...raw,
+    id: randomUUID(),
+    byAgent: true,
+    status: raw.scheduledAt ? 'scheduled' : 'queued',
+    createdAt: now,
+    updatedAt: now,
+    note: 'asked for by an agent',
+    url: ''
+  })
+  if (!post) throw new Error("couldn't read that post")
+  await store.putPosts([post])
+  if (!post.scheduledAt) enqueue(post.id)
+  return post
 }
 
 export function setupPosting(): void {
@@ -326,7 +387,7 @@ export function setupPosting(): void {
   ipcMain.handle('posting:remove', async (_e, id: unknown) => {
     if (!validId(id)) return
     const s = open.get(id)
-    if (s && !s.closed()) s.win.close()
+    if (s && !s.closed()) s.close()
     await store.removePost(id)
   })
 
@@ -349,24 +410,10 @@ export function setupPosting(): void {
   ipcMain.handle('posting:focus', (_e, id: unknown) => {
     const s = validId(id) ? open.get(id) : undefined
     if (!s || s.closed()) return false
-    s.win.show()
-    s.win.focus()
+    s.reveal()
     return true
   })
 
-  ipcMain.handle('posting:pick-media', async (e) => {
-    const win = BrowserWindow.fromWebContents(e.sender)
-    const opts: Electron.OpenDialogOptions = {
-      title: 'Pick an image or video',
-      properties: ['openFile'],
-      filters: [
-        { name: 'Images and videos', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'mov', 'webm', 'm4v'] },
-        { name: 'All files', extensions: ['*'] }
-      ]
-    }
-    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
-    return res.canceled ? null : (res.filePaths[0] ?? null)
-  })
 
   ipcMain.handle('posting:set-brand', async (_e, brandId: unknown, patch: unknown) => {
     if (!validId(brandId) || !patch || typeof patch !== 'object') return
@@ -419,7 +466,7 @@ export function setupPosting(): void {
 // a deleted brand takes its queue, log and keys with it
 export async function dropPostingBrand(brandId: string): Promise<void> {
   for (const [id, s] of open) {
-    if (store.getPost(id)?.brandId === brandId && !s.closed()) s.win.close()
+    if (store.getPost(id)?.brandId === brandId && !s.closed()) s.close()
   }
   await store.dropBrand(brandId)
 }

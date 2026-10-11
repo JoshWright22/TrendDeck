@@ -5,7 +5,7 @@ import { PlusIcon } from '../components/Icons'
 import type { PageProps } from '../pages/types'
 import Composer from './Composer'
 import Setup from './Setup'
-import { RisingMark, StatusChip, fileName, usePosting, when } from './bits'
+import { RisingMark, StatusChip, usePosting, when } from './bits'
 import './posting.css'
 
 type Tab = 'queue' | 'log' | 'setup'
@@ -142,7 +142,8 @@ function PostCard({ post, index, onReview }: { post: PostItem; index: number; on
       </div>
       <div className="post-meta">
         {post.platform === 'reddit' && post.subreddit && <span>r/{post.subreddit}</span>}
-        {post.mediaPath && <span title={post.mediaPath}>{fileName(post.mediaPath)}</span>}
+        {post.mediaId && <span>has media</span>}
+        {post.byAgent && <span>from an agent</span>}
         <span>
           {post.status === 'scheduled' && post.scheduledAt
             ? `Goes out ${when(post.scheduledAt)}`

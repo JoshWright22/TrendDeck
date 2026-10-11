@@ -81,3 +81,14 @@ Calls made while building, so nobody has to guess later.
 - YouTube's API sign in used to open in the system browser, which isn't the brand's session, so you'd sign into Google twice. It opens in a small window on the brand's session now.
 - The posting window used to block every popup, so a login popup there went nowhere. It treats popups like a site tab does now: sized ones open on the same session, links are blocked.
 - The token swaps and API calls for posting and analytics keys don't use a session. They aren't logins, they carry their own key.
+
+## Media, agents and the post audit
+
+- Posts keep a media library id, not a path. The composer picks files with the Media picker and the old file dialog is gone. Main turns the id into a path with `resolveForUpload` right before a post runs, for both tabs and api mode, and the file has to be in the post's own brand. Once a post goes out the file gets marked posted in Media.
+- Posts saved before this lose their file, they had a path and paths aren't accepted from the page anymore.
+- The MCP `upload_file` tool takes media ids from a new `list_media` tool, never paths. It goes through `resolveForUpload` with `forAgent` on, so only files the user allowed for agents work. The old path checks are gone with it.
+- `request_post` makes a real post in the Posting queue marked as from an agent, with an optional media id. Agent posts only get agent allowed files, checked when asked and again when it runs. The old "Waiting for you" list in Agent access stays for requests made before this.
+- Post audit is the default for every post, yours or an agent's. The app switches to the brand and its tab for the site, fills the post in there and waits at Post. Leaving the tab counts as closing the review.
+- Skipping the audit is the per brand "Press Post for me" setting from posting, renamed "Skip the post check", still off by default. With it on posts run in a background window like before so they don't take over your tab.
+- If the brand has no tab for the site, or the tab doesn't come up in 15 seconds, the audit falls back to the separate posting window on the same session. It still stops at Post.
+- An agent with a site allowed can still click around that site's own tab, including a site's Post button. The audit covers posts that go through `request_post` and the queue, not clicks in a shared tab.

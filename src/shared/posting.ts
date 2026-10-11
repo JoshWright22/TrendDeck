@@ -52,8 +52,11 @@ export interface PostItem {
   title: string
   // caption, description or post text
   body: string
-  // full path to a local image or video, empty for text posts
-  mediaPath: string
+  // media library id of the image or video, empty for text posts.
+  // main turns it into a path with resolveForUpload right before posting
+  mediaId: string
+  // an agent asked for this post, its file has to be allowed for agents
+  byAgent: boolean
   // instagram api mode needs the media at a public link
   mediaUrl: string
   // reddit only, without the r/
@@ -67,6 +70,11 @@ export interface PostItem {
   note: string
   // link to the post when we know it
   url: string
+}
+
+// main only: a post with its media id turned into a path, built right before it runs
+export interface ReadyPost extends PostItem {
+  mediaPath: string
 }
 
 export type LogResult = 'posted' | 'failed' | 'review' | 'closed' | 'missed' | 'check'
@@ -83,7 +91,8 @@ export interface LogEntry {
 }
 
 export interface BrandPosting {
-  // press the final Post button without waiting for the user
+  // skip the post audit: press the final Post button without waiting for the user.
+  // off by default, then every post waits in the brand's tab for you to press Post
   autoPost: boolean
   modes: Record<Platform, PostMode>
   // which api keys are saved, the keys themselves never leave main
@@ -137,7 +146,6 @@ export interface PostingApi {
   markPosted(id: string): Promise<void>
   // brings the review window to the front
   focus(id: string): Promise<boolean>
-  pickMedia(): Promise<string | null>
   setBrand(brandId: string, patch: Partial<Pick<BrandPosting, 'autoPost' | 'modes'>>): Promise<void>
   // empty values are skipped so saved secrets stay put, null clears them all
   setKeys(brandId: string, platform: Platform, values: Record<string, string> | null): Promise<void>
@@ -145,4 +153,6 @@ export interface PostingApi {
   connectYouTube(brandId: string): Promise<string>
   check(brandId: string, platform: Platform, subreddit: string): Promise<CheckReport>
   clearLog(brandId: string): Promise<void>
+  // post audit: main asks the app to bring up the brand's tab for a site
+  onOpenSite(fn: (to: { brandId: string; siteId: string; url: string }) => void): () => void
 }

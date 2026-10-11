@@ -1,4 +1,4 @@
-import type { Platform, PostItem } from '@shared/posting'
+import type { Platform, ReadyPost } from '@shared/posting'
 
 // selectors are tried in order, first visible match wins
 //   plain css                 'button[data-testid="tweetButton"]'
@@ -15,14 +15,14 @@ interface Base {
   // when it's missing just move on
   optional?: boolean
   // skip the step for this post, e.g. no media attached
-  when?: (post: PostItem) => boolean
+  when?: (post: ReadyPost) => boolean
 }
 
 export type Step =
-  | (Base & { kind: 'goto'; url: (post: PostItem) => string })
+  | (Base & { kind: 'goto'; url: (post: ReadyPost) => string })
   | (Base & { kind: 'click'; find: Selectors })
   | (Base & { kind: 'wait'; find: Selectors })
-  | (Base & { kind: 'type'; find: Selectors; text: (post: PostItem) => string })
+  | (Base & { kind: 'type'; find: Selectors; text: (post: ReadyPost) => string })
   | (Base & { kind: 'file'; find: Selectors })
   | (Base & { kind: 'pause'; ms: number })
 

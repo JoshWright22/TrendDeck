@@ -39,14 +39,14 @@ Calls made while building the local MCP server, so nobody has to guess later.
 - Field values only show for plain text boxes. Passwords, hidden fields, card fields and one-time codes never show, and `type` refuses them.
 - Clicks and typing go through real input events, so sites treat them like a person.
 - `open_site` only works on the brand that's on screen. If you switched brands mid answer it says so instead of pulling you back.
-- `upload_file` takes full paths to images, video, audio, pdf, txt, csv or subtitle files. Nothing from hidden folders or TrendDeck's own folder. It sets the files with the devtools protocol, so the file input has to be on the page (they show in `read_page` even when hidden).
+- `upload_file` takes media library ids from `list_media`, only files allowed for agents. See DECISIONS.md. It sets the files with the devtools protocol, so the file input has to be on the page (they show in `read_page` even when hidden).
 - No cookie, storage, password or script tool. There is no way for an agent to run its own code in a page.
 
 ## Ideas, drafts and posts
 
 - `save_idea` goes through the ui, which adds the idea to the brand like any other. Saving the same title and link twice does nothing.
 - Drafts and post requests live in the MCP state file for now. There's no Writer or Schedule yet, so `list_schedule` shows post requests (with the time the agent suggested) and drafts.
-- `request_post` never posts. It adds the post to "Waiting for you" in Settings > Agent access, where you can copy it, mark it posted or dismiss it.
+- `request_post` puts a real post in the Posting queue. It waits in the brand's tab for you to press Post unless the brand skips the post check. See DECISIONS.md.
 
 ## Saved logins and `login`
 
