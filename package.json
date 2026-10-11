@@ -1,0 +1,34 @@
+{
+  "name": "trenddeck",
+  "productName": "TrendDeck",
+  "version": "0.1.0",
+  "description": "Desktop marketing app for creators. One workspace per brand, every site logged in.",
+  "license": "MIT",
+  "author": "Josh Wright",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JoshWright22/TrendDeck.git"
+  },
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "npm run typecheck && electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "postinstall": "install-electron"
+  },
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "electron": "^44.7.0",
+    "electron-vite": "^5.0.0",
+    "typescript": "~5.9",
+    "vite": "^7.3.7"
+  }
+}
