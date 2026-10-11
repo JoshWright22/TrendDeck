@@ -1,3 +1,5 @@
+import type { VoiceApi } from './voice'
+
 export interface Site {
   id: string
   name: string
@@ -140,7 +142,7 @@ export function isHttpUrl(value: string): boolean {
 
 export type WindowAction = 'minimize' | 'maximize' | 'close' | 'state'
 
-export interface TrendDeckApi {
+export interface TrendDeckApi extends VoiceApi {
   platform: string
   // resolves to whether the window is maximized after the action
   windowControl(action: WindowAction): Promise<boolean>

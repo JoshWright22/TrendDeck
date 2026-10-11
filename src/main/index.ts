@@ -5,6 +5,7 @@ import { setupUpdater } from './updater'
 import { loadData, saveData } from './store'
 import { dropTrends, setupTrends } from './trends'
 import { attachBrand, blocksPopup, setupAdblock } from './adblock'
+import { dropVoice, setupVoice } from './voice'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -144,9 +145,11 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   await ses.clearStorageData()
   await ses.clearCache()
   await dropTrends(brandId)
+  await dropVoice(brandId)
 })
 
 setupTrends()
+setupVoice()
 
 void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()

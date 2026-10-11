@@ -1,0 +1,293 @@
+/* brand voice page */
+
+.v-tabs {
+  display: flex;
+  gap: 6px;
+  margin-left: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.v-tabs .filter-chip {
+  white-space: nowrap;
+}
+
+.v-card {
+  max-width: 860px;
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  animation: v-in 0.2s ease-out both;
+}
+
+@keyframes v-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v-card {
+    animation: none;
+  }
+}
+
+.v-card h3 {
+  margin: 0 0 10px;
+  font: 800 16px/1.2 var(--head);
+  letter-spacing: -0.02em;
+}
+
+.v-card > p {
+  margin: 0 0 12px;
+}
+
+.v-field {
+  margin-bottom: 12px;
+}
+
+.v-field label,
+.v-handles label {
+  display: block;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.v-card input:not([type='checkbox']):not([type='file']),
+.v-card textarea,
+.filters .v-search {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--felt);
+  color: var(--chalk);
+  font-size: 13px;
+  user-select: text;
+}
+
+.v-card textarea {
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.v-card input:focus,
+.v-card textarea:focus,
+.filters .v-search:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
+.v-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.v-handles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.v-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
+.v-row select {
+  margin-left: 4px;
+}
+
+.v-paste {
+  min-height: 90px;
+}
+
+.v-results {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.v-results .bad,
+.v-note.bad {
+  color: var(--pink);
+}
+
+.v-note {
+  max-width: 860px;
+  margin: 0 0 14px;
+  color: var(--smoke);
+  font-size: 13px;
+}
+
+.filters .v-search {
+  width: 220px;
+  margin: 0 0 0 auto;
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+
+.v-post-list {
+  max-width: 860px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.v-post {
+  margin-bottom: 10px;
+  padding: 10px 14px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.v-post.starred {
+  border-color: rgba(255, 216, 20, 0.45);
+}
+
+.v-post-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.v-plat {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--raised);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.v-star.on {
+  color: var(--yellow);
+}
+
+.v-post-text {
+  display: -webkit-box;
+  margin: 6px 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  white-space: pre-wrap;
+  font-size: 13px;
+  line-height: 1.45;
+  cursor: pointer;
+  user-select: text;
+}
+
+.v-post-text.open {
+  display: block;
+}
+
+.v-post-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.v-tag-input {
+  width: 80px;
+  padding: 2px 8px;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  background: none;
+  font-size: 12px;
+}
+
+.v-tag-input:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
+.v-post-link {
+  margin-left: auto;
+}
+
+.v-more {
+  display: block;
+  margin: 6px 0;
+}
+
+.v-summary {
+  min-height: 320px;
+  font: 12px/1.5 ui-monospace, Consolas, monospace;
+}
+
+.v-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.v-switch input {
+  accent-color: var(--teal);
+}
+
+.v-card input.v-budget {
+  display: inline-block;
+  width: 90px;
+  margin: 0 4px;
+  padding: 4px 8px;
+}
+
+.v-meter {
+  height: 6px;
+  margin: 14px 0 6px;
+  border-radius: 999px;
+  background: var(--raised);
+  overflow: hidden;
+}
+
+.v-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--teal);
+  transition: width 0.2s ease-out;
+}
+
+.v-meter span.full {
+  background: var(--yellow);
+}
+
+.v-sizes {
+  margin: 0 0 10px;
+  color: var(--smoke);
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.v-preview {
+  max-height: 420px;
+  margin: 0;
+  padding: 12px 14px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--felt);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: 12px/1.5 ui-monospace, Consolas, monospace;
+  user-select: text;
+}

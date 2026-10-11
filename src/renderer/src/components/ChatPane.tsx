@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ChatThread } from '@shared/types'
 import { CloseIcon, PlusIcon, SendIcon, TrashIcon } from './Icons'
+import { onDraft } from '../pages/voice/chatDraft'
 
 interface Props {
   brandName: string
@@ -25,6 +26,9 @@ export default function ChatPane({ brandName, threads, onChange, onClose }: Prop
   const [draft, setDraft] = useState('')
   const listEnd = useRef<HTMLDivElement>(null)
   const thread = threads.find((t) => t.id === openId) ?? null
+
+  // a message drafted somewhere else, like "learn my voice", lands in the box unsent
+  useEffect(() => onDraft(setDraft), [])
 
   useEffect(() => {
     listEnd.current?.scrollIntoView({ block: 'end' })

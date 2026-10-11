@@ -28,7 +28,10 @@ const api: TrendDeckApi = {
     const listener = (_event: unknown, feed: TrendFeed): void => fn(feed)
     ipcRenderer.on('trends:update', listener)
     return () => ipcRenderer.removeListener('trends:update', listener)
-  }
+  },
+  voiceLoad: (brandId) => ipcRenderer.invoke('voice:load', brandId),
+  voiceSave: (brandId, data) => ipcRenderer.invoke('voice:save', brandId, data),
+  voiceImport: (brandId, platforms) => ipcRenderer.invoke('voice:import', brandId, platforms)
 }
 
 contextBridge.exposeInMainWorld('trenddeck', api)
