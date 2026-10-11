@@ -1,4 +1,4 @@
-<p align="center"><img src="resources/logo.svg" width="120" alt="TrendDeck"></p>
+![TrendDeck](docs/banner.png)
 
 # TrendDeck
 
@@ -20,6 +20,8 @@ Working now:
 - **Every account at once.** Each brand gets its own browser session, so two brands can be logged into two different accounts on the same site and they never mix.
 - **Site tabs.** Reddit, X, Instagram, TikTok, YouTube, YouTube Studio, vidIQ and 1of10 to start. Add any site with a name and a URL, drag to reorder.
 - **Local first.** Everything is saved on your computer. No account, no server.
+
+Brand colors, type and logo rules are in [docs/BRAND.md](docs/BRAND.md).
 
 Coming next:
 
