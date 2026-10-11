@@ -4,7 +4,7 @@
 
 TrendDeck is a marketing desktop for creators. Every brand you run gets its own workspace: every account logged in at once, what's trending in your niche, and a chat pane that turns trends into posts.
 
-Works with the AI subscriptions you already have. If Claude Code or Codex is set up on your computer, TrendDeck can use it.
+Works with the AI subscriptions you already have: Claude Code, Codex, Cursor, Grok Build, OpenCode and Google Antigravity. If one is set up on your computer, TrendDeck can use it.
 
 ## "So what's the catch?"
 
@@ -26,7 +26,7 @@ Brand colors, type and logo rules are in [docs/BRAND.md](docs/BRAND.md).
 Coming next:
 
 - **Trends**: one ranked feed of what's rising in your niche across Reddit, YouTube, Google Trends and TikTok
-- **Chat**: ask your AI agent for ideas, outlines, titles and posts, with your brand and trends as context
+- **Chat**: ask your AI agent (any of the six above) for ideas, outlines, titles and posts, with your brand and trends as context
 - **Ideas and Schedule**: a board from idea to posted, and a calendar of what goes out where
 - **Writer**: drafts for every platform from one idea
 - **Analytics**: how your posts did, pulled from your own logged-in accounts
@@ -40,6 +40,10 @@ Coming next:
 >
 > - Claude: install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`
 > - Codex: install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`
+> - Cursor: install [Cursor CLI](https://cursor.com/cli) and run `agent login`
+> - Grok Build: install [Grok Build CLI](https://x.ai/cli) and run `grok login`
+> - OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
+> - Antigravity: install the [Antigravity CLI](https://antigravity.google) and sign in with Google
 >
 > Everything else works without one.
 
