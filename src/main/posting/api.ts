@@ -1,9 +1,10 @@
-import { net, shell } from 'electron'
+import { BrowserWindow, net } from 'electron'
 import { createHash, randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 import { promises as fs } from 'node:fs'
 import { basename, extname } from 'node:path'
 import type { PostItem } from '@shared/posting'
+import { partitionFor } from '@shared/types'
 
 // official api mode, only runs when you queue a post for a platform set to api
 
@@ -66,14 +67,25 @@ const GOOGLE_AUTH = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_TOKEN = 'https://oauth2.googleapis.com/token'
 const YT_SCOPE = 'https://www.googleapis.com/auth/youtube.upload'
 
-// desktop oauth with a loopback redirect, the sign in happens in your normal browser
-export function connectYouTube(keys: Keys): Promise<string> {
+// desktop oauth with a loopback redirect. the sign in opens in a window on the brand's session,
+// so a google account already logged in there is picked up instead of asking again
+export function connectYouTube(keys: Keys, brandId: string): Promise<string> {
   need(keys, 'clientId', 'clientSecret')
   const verifier = randomBytes(32).toString('base64url')
   const challenge = createHash('sha256').update(verifier).digest('base64url')
   const state = randomBytes(16).toString('hex')
   return new Promise((resolve, reject) => {
     let redirect = ''
+    let win: BrowserWindow | null = null
+    let done = false
+    const finish = (): void => {
+      done = true
+      clearTimeout(timer)
+      server.close()
+      const w = win
+      win = null
+      if (w && !w.isDestroyed()) setTimeout(() => !w.isDestroyed() && w.close(), 1500)
+    }
     const server = createServer((req, res) => {
       const u = new URL(req.url ?? '/', redirect)
       if (u.pathname !== '/') {
@@ -113,7 +125,7 @@ export function connectYouTube(keys: Keys): Promise<string> {
       })().catch(reject)
     })
     const timer = setTimeout(() => {
-      server.close()
+      finish()
       reject(new Error('sign in timed out'))
     }, 5 * 60 * 1000)
     server.listen(0, '127.0.0.1', () => {
@@ -131,7 +143,26 @@ export function connectYouTube(keys: Keys): Promise<string> {
         code_challenge_method: 'S256',
         state
       })}`
-      void shell.openExternal(url)
+      win = new BrowserWindow({
+        width: 520,
+        height: 700,
+        autoHideMenuBar: true,
+        backgroundColor: '#0E0E10',
+        title: 'Connect YouTube',
+        webPreferences: {
+          partition: partitionFor(brandId),
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true
+        }
+      })
+      win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+      win.on('closed', () => {
+        if (done) return
+        finish()
+        reject(new Error('sign in cancelled'))
+      })
+      void win.loadURL(url)
     })
   })
 }

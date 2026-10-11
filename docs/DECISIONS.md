@@ -71,3 +71,11 @@ Calls made while building, so nobody has to guess later.
 - Posting is the sixth page in the sidebar, after Analytics.
 - Each feature kept its own rising line mark component instead of sharing the one in `Icons.tsx`. They draw the same mark, merging them can wait.
 - The feature decisions stay in their own files: DECISIONS-ideas.md, DECISIONS-writer.md and DECISIONS-posting.md.
+
+## One session per brand
+
+- Everything a brand does runs on its one saved session, `persist:brand-<id>`: site tabs, temporary tabs, login popups, the hidden trend and analytics windows, the posting window and the self-check. Log into a site once in any of them and the rest are logged in too.
+- Checked by setting a cookie in a site tab and reading it from a popup the tab opened. Same cookie.
+- YouTube's API sign in used to open in the system browser, which isn't the brand's session, so you'd sign into Google twice. It opens in a small window on the brand's session now.
+- The posting window used to block every popup, so a login popup there went nowhere. It treats popups like a site tab does now: sized ones open on the same session, links are blocked.
+- The token swaps and API calls for posting and analytics keys don't use a session. They aren't logins, they carry their own key.

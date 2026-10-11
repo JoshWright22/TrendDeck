@@ -143,7 +143,7 @@ function PlatformRow({ platform, brand, settings }: Props & { platform: Platform
                 className="pill"
                 disabled={!saved.includes('clientId') || !saved.includes('clientSecret')}
                 onClick={() => {
-                  setNote('Finish the sign in in your browser')
+                  setNote('Finish the sign in in the window that opened')
                   void api.connectYouTube(brand.id).then((r) => setNote(r === 'connected' ? 'Connected' : r))
                 }}
               >

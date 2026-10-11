@@ -6,7 +6,7 @@ Calls made while building posting, so nobody has to guess later.
 
 - Posting is its own page in the sidebar with three tabs: Queue, Log and Setup.
 - One post goes to one site. Picking three sites in New post makes three cards in the queue, so each one can fail or get fixed on its own.
-- Default is the logged in tab. The app opens a separate window on the brand's own session, so it has the same logins as the site tabs but doesn't take over the tab you have open.
+- Default is the logged in tab. The app opens a separate window on the brand's own session, so it has the same logins as the site tabs but doesn't take over the tab you have open. Login popups in that window work like they do in a site tab and stay on the same session.
 - The window fills everything in and stops at the final Post button with a teal ring round it. You press Post. The app watches the page and marks the card Posted when the site says it went out.
 - Closing the window before that marks it "Not sent". If you posted and the app missed it, press "It went out" on the card.
 - "Press Post for me" is per brand and off by default. With it on the app presses Post and waits up to 3 minutes to see it go out.
@@ -40,7 +40,7 @@ Calls made while building posting, so nobody has to guess later.
 
 - Set per brand and per site in Setup, since each brand is a different account. That's why it's on the Posting page and not in the main Settings window.
 - Keys are saved in `posting-keys.json` in the user data folder, encrypted with the OS keychain when it's available. The page only learns which keys are saved, never their values.
-- YouTube: Data API resumable upload. Sign in uses a desktop OAuth client you make yourself, the browser opens for the sign in and a local loopback page catches the code.
+- YouTube: Data API resumable upload. Sign in uses a desktop OAuth client you make yourself. The sign in opens in a window on the brand's own session, so a Google account already logged in there is offered right away, and a local loopback page catches the code.
 - TikTok: Content Posting API direct post with a pasted user token. Apps TikTok hasn't reviewed can only post private, so it falls back to private when public isn't allowed.
 - Instagram: Graph API. Instagram downloads the media itself, so API mode needs a public https link to it on each post. Tokens starting with IG go to graph.instagram.com, the rest to graph.facebook.com.
 - X: API v2 with a pasted OAuth 2 user token. Text and one image. Video goes through the tab for now.

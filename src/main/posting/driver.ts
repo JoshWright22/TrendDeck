@@ -1,5 +1,5 @@
 import { BrowserWindow, type WebContents } from 'electron'
-import { partitionFor } from '@shared/types'
+import { isHttpUrl, partitionFor } from '@shared/types'
 import { PLATFORM_NAMES, type PostItem, type StepReport } from '@shared/posting'
 import type { Adapter, Selectors, Step } from './adapters/types'
 
@@ -107,7 +107,12 @@ export function openWindow(brandId: string, title: string, show: boolean): Sessi
   win.on('closed', () => (closed = true))
   // keep the title ours so the user knows which window is posting
   win.on('page-title-updated', (e) => e.preventDefault())
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  // same as a site tab: sized popups are login flows and stay on the brand's session, the rest is denied
+  win.webContents.setWindowOpenHandler(({ url, disposition }) =>
+    disposition === 'new-window' && isHttpUrl(url)
+      ? { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true } }
+      : { action: 'deny' }
+  )
   if (show) win.showInactive()
   return { win, closed: () => closed || win.isDestroyed() }
 }

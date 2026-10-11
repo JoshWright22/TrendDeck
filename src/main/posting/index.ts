@@ -391,7 +391,7 @@ export function setupPosting(): void {
   ipcMain.handle('posting:connect-youtube', async (_e, brandId: unknown) => {
     if (!validId(brandId)) return 'bad brand'
     try {
-      const token = await connectYouTube(store.getKeys(brandId, 'youtube'))
+      const token = await connectYouTube(store.getKeys(brandId, 'youtube'), brandId)
       await store.setKeys(brandId, 'youtube', { refreshToken: token })
       return 'connected'
     } catch (err) {
