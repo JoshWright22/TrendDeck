@@ -1,62 +1,72 @@
+<p align="center"><img src="resources/logo.svg" width="120" alt="TrendDeck"></p>
+
 # TrendDeck
 
-A desktop marketing app for creators. Each brand you run gets its own workspace with every site you post on open in a tab and already logged in.
+TrendDeck is a marketing desktop for creators. Every brand you run gets its own workspace: every account logged in at once, what's trending in your niche, and a chat pane that turns trends into posts.
 
-Free and open source, MIT licensed.
+Works with the AI subscriptions you already have. If Claude Code or Codex is set up on your computer, TrendDeck can use it.
 
-![screenshot](docs/screenshot.png)
+## "So what's the catch?"
 
-*screenshot goes here once the app has a bit more in it*
+There isn't one. I built TrendDeck because I run more than one brand and got sick of logging in and out of the same five sites all day, then digging through ten tabs to figure out what to post next. The paid tools that do pieces of this are slow, cost a monthly fee each, and don't talk to each other.
+
+I wanted one app that's fast on a cheap laptop, keeps everything on your machine, and is fully open. If it ever goes the wrong way, fork it and build the one you want.
 
 ## What it does
 
-Built so far:
+Working now:
 
-- **Brand rail** on the left. Add, rename and delete brands. Right click a brand to edit it.
-- **Separate logins per brand.** Every brand has its own browser session, so two brands can be logged into two different accounts on the same site and they never mix.
-- **Site tabs.** Each site is a live page that stays logged in between runs. Starts with Reddit, X, Instagram, TikTok, YouTube, YouTube Studio, vidIQ and 1of10. Add your own with a name and a URL, remove the ones you don't use, drag tabs to reorder.
-- **Back, forward, reload and home** on every tab.
-- **Niche keywords** per brand. Nothing reads them yet, the Trends page will.
-- Everything is saved locally in one JSON file. No account, no server.
+- **Brands.** A rail of brands on the left. Each one has its own logins, niche keywords and recommendations, and switching is one click.
+- **Every account at once.** Each brand gets its own browser session, so two brands can be logged into two different accounts on the same site and they never mix.
+- **Site tabs.** Reddit, X, Instagram, TikTok, YouTube, YouTube Studio, vidIQ and 1of10 to start. Add any site with a name and a URL, drag to reorder.
+- **Local first.** Everything is saved on your computer. No account, no server.
 
-Planned:
+Coming next:
 
-- **Trends**: what's picking up in your niche
-- **Ideas**: post and video ideas from the trends you save
-- **Schedule**: a calendar of what goes out where
-- **Writer**: titles, captions and scripts
-- **Analytics**: how your posts did across sites
-- **Chat**: a side pane to ask about any of the above
+- **Trends**: one ranked feed of what's rising in your niche across Reddit, YouTube, Google Trends and TikTok
+- **Chat**: ask your AI agent for ideas, outlines, titles and posts, with your brand and trends as context
+- **Ideas and Schedule**: a board from idea to posted, and a calendar of what goes out where
+- **Writer**: drafts for every platform from one idea
+- **Analytics**: how your posts did, pulled from your own logged-in accounts
+- **Posting**: TrendDeck posts for you through your logged-in tabs, or through official APIs if you'd rather
+- **Ad blocker** built in, and a **phone emulator** for app-only features
 
-Those pages are in the nav already but only say "coming soon".
+## Installation
 
-## Install
+> [!NOTE]
+> The chat features need at least one agent installed and logged in:
+>
+> - Claude: install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`
+> - Codex: install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`
+>
+> Everything else works without one.
 
-You need [Node.js](https://nodejs.org) 22.12 or newer.
+There's no installer yet, so for now you run it from source. You need [Node.js](https://nodejs.org) 22.12 or newer.
 
-```
+```bash
 git clone https://github.com/JoshWright22/TrendDeck.git
 cd TrendDeck
 npm install
-```
-
-`npm install` also downloads Electron, so the first one takes a minute.
-
-## Dev
-
-```
 npm run dev
 ```
 
-Opens the app with hot reload.
+The first `npm install` also downloads Electron, so it takes a minute.
+
+## Development
+
+```bash
+npm run dev        # app with hot reload
+npm run build      # type check and build into out/
+npm start          # run the build
+```
 
 ```
-npm run build
+src/main       electron main process, window setup and the json store
+src/preload    the small api the ui is allowed to call
+src/renderer   the react ui
+src/shared     types used by both sides
+resources      logo and app icons
 ```
-
-Type checks and builds into `out/`. `npm start` runs that build.
-
-There's no installer yet, for now you run it from source.
 
 ## Where your data lives
 
@@ -66,16 +76,7 @@ Brands and sites are in `trenddeck.json` in the app's user data folder:
 - macOS: `~/Library/Application Support/TrendDeck`
 - Linux: `~/.config/TrendDeck`
 
-Logins are in the same folder under `Partitions`, one folder per brand. Deleting a brand wipes its logins too.
-
-## Layout
-
-```
-src/main       electron main process, window setup and the json store
-src/preload    the small api the ui is allowed to call
-src/renderer   the react ui
-src/shared     types used by both sides
-```
+Logins live in the same folder under `Partitions`, one folder per brand. Deleting a brand wipes its logins too.
 
 ## License
 
