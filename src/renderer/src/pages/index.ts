@@ -5,12 +5,13 @@ import type { PageProps } from './types'
 // each page is its own chunk and only loads the first time you open it
 const Stub = lazy(() => import('./Stub'))
 const Trends = lazy(() => import('./Trends'))
-const Ideas = lazy(() => import('./Ideas'))
+const Ideas = lazy(() => import('./ideas/IdeasBoard'))
+const Schedule = lazy(() => import('./schedule/SchedulePage'))
 
 export const PAGE_VIEWS: Record<Page, LazyExoticComponent<ComponentType<PageProps>>> = {
   Trends,
   Ideas,
-  Schedule: Stub,
+  Schedule,
   Writer: Stub,
   Analytics: Stub
 }
