@@ -54,8 +54,8 @@ export default function UsagePopover({ agents, thread }: { agents: AgentInfo[]; 
         onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-          <path d="M2 12a5 5 0 1 1 10 0" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M7 12l2.6-3.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M3.46 11.04A5 5 0 1 1 10.54 11.04" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M7 7.5l2.2-2.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       </button>
       {open && (

@@ -1705,3 +1705,26 @@
     padding-right: 224px;
   }
 }
+
+/* shows when you scroll up while a reply is coming in */
+.cx-jump {
+  position: absolute;
+  left: 50%;
+  bottom: 150px;
+  z-index: 4;
+  transform: translateX(-50%);
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--felt);
+  font-weight: 500;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  animation: cx-rise 0.2s ease-out both;
+}
+
+/* everything in the conversation can be highlighted and copied, cards included */
+.cx-messages,
+.cx-messages * {
+  user-select: text;
+}

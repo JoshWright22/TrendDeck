@@ -44,10 +44,14 @@ export const CLIS: CliSpec[] = [
     output: 'claude-json',
     modelFlag: '--model',
     models: [
-      { id: '', label: 'Default' },
-      { id: 'opus', label: 'Opus' },
-      { id: 'sonnet', label: 'Sonnet' },
-      { id: 'haiku', label: 'Haiku' }
+      { id: '', label: 'Default model' },
+      { id: 'opus', label: 'Opus (latest)' },
+      { id: 'sonnet', label: 'Sonnet (latest)' },
+      { id: 'haiku', label: 'Haiku (latest)' },
+      { id: 'claude-opus-5-5', label: 'Opus 5.5' },
+      { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5' },
+      { id: 'claude-haiku-5-5', label: 'Haiku 5.5' },
+      { id: 'claude-fable-5-1', label: 'Fable 5.1' }
     ],
     resume: (session) => ['--resume', session],
     setup: 'claude auth login',
@@ -62,7 +66,7 @@ export const CLIS: CliSpec[] = [
     output: 'codex-json',
     modelFlag: '-m',
     models: [
-      { id: '', label: 'Default' },
+      { id: '', label: 'Default model' },
       { id: 'gpt-5-codex', label: 'GPT-5 Codex' },
       { id: 'gpt-5', label: 'GPT-5' }
     ],
@@ -78,7 +82,7 @@ export const CLIS: CliSpec[] = [
     output: 'cursor-json',
     modelFlag: '--model',
     models: [
-      { id: '', label: 'Default' },
+      { id: '', label: 'Default model' },
       { id: 'auto', label: 'Auto' },
       { id: 'sonnet-4.5', label: 'Sonnet 4.5' },
       { id: 'gpt-5', label: 'GPT-5' }

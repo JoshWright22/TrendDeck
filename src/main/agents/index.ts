@@ -30,7 +30,7 @@ export { dropChats }
 const MAX_MESSAGE = 8000
 // streaming replies get saved this often, the rest is saved when they finish
 const SAVE_EVERY_MS = 3000
-const DEFAULT_MODEL: ModelOption[] = [{ id: '', label: 'Default' }]
+const DEFAULT_MODEL: ModelOption[] = [{ id: '', label: 'Default model' }]
 
 let detected: AgentInfo[] | null = null
 

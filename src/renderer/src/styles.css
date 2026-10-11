@@ -314,14 +314,16 @@ select:focus-visible,
   display: grid;
   place-items: center;
   flex: none;
-  width: 22px;
-  height: 30px;
+  width: 24px;
+  height: 32px;
+  padding: 0;
   border-radius: 5px;
   background: var(--raised);
   border: 1px solid var(--line);
   color: var(--smoke);
-  font: 800 9px/1 var(--head);
+  font: 800 11px/1 var(--head);
   letter-spacing: -0.02em;
+  text-align: center;
   transition:
     transform 0.15s var(--ease),
     border-color 0.15s,

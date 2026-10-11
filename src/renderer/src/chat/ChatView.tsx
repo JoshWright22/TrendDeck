@@ -321,9 +321,22 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
 
   const last = thread?.messages.at(-1)
   const lastSize = (last?.text.length ?? 0) + (last?.thinking?.length ?? 0) + (last?.steps?.length ?? 0)
-  useEffect(() => {
+  // follow the reply only while you're at the bottom, scrolling up to read stops it
+  const scroller = useRef<HTMLDivElement>(null)
+  const [following, setFollowing] = useState(true)
+  const onScroll = (): void => {
+    const el = scroller.current
+    if (el) setFollowing(el.scrollHeight - el.scrollTop - el.clientHeight < 60)
+  }
+  const jumpDown = (): void => {
+    setFollowing(true)
     listEnd.current?.scrollIntoView({ block: 'end' })
-  }, [thread?.messages.length, lastSize, openId])
+  }
+  useEffect(() => {
+    if (following) listEnd.current?.scrollIntoView({ block: 'end' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thread?.messages.length, lastSize])
+  useEffect(() => jumpDown(), [openId])
 
   const usable = useMemo(() => (agents ?? []).filter((a) => a.installed), [agents])
   const agentId =
@@ -336,7 +349,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
 
   const model = agentId ? ((thread ? thread.models?.[agentId] : newModels[agentId]) ?? '') : ''
   const modelOptions = useMemo(() => {
-    const list = (agentId && modelLists[agentId]) || agent?.models || [{ id: '', label: 'Default' }]
+    const list = (agentId && modelLists[agentId]) || agent?.models || [{ id: '', label: 'Default model' }]
     return list.some((m) => m.id === model) ? list : [...list, { id: model, label: model }]
   }, [agentId, agent, modelLists, model])
 
@@ -655,14 +668,14 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
     if (!qs.length || !thread) return null
     const after = thread.messages[i + 1]
     const answered = after?.role === 'user' ? readAnswers(qs, after.text) : null
-    // only the newest reply can be answered, and only once it's done
-    const open = !after && m.status !== 'streaming' && !busy && !!agentId
+    // questions you typed past stay open, picking one later sends it as a new message
+    const open = !answered && m.status !== 'streaming' && !busy && !!agentId
     return (
       <div className="cx-hand cx-q-hand">
         <QuestionDeck
           key={`${m.id}-${qs.length}`}
           questions={qs}
-          answered={answered ?? (after ? qs.map(() => '') : null)}
+          answered={answered}
           onAnswer={open ? (text) => void send(text) : null}
         />
       </div>
@@ -804,7 +817,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
 
         {compact && showThreads && <div className="cx-threads-pop">{threadList}</div>}
 
-        <div className="cx-messages">
+        <div className="cx-messages" ref={scroller} onScroll={onScroll}>
           <div className="cx-column">
             {thread && thread.messages.length > 0 ? (
               thread.messages.map((m, i) => (m.role === 'user' ? userMessage(m) : agentMessage(m, i)))
@@ -839,6 +852,11 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
             <div ref={listEnd} />
           </div>
         </div>
+        {!following && !home && (
+          <button type="button" className="cx-jump" onClick={jumpDown}>
+            Jump to latest
+          </button>
+        )}
 
         <form
           className={`cx-composer${dragging ? ' dragging' : ''}`}
