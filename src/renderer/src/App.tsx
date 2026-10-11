@@ -10,6 +10,7 @@ import { ChatToggle } from './components/PageHeader'
 import { PAGE_VIEWS } from './pages'
 
 const ChatPane = lazy(() => import('./components/ChatPane'))
+const PhoneView = lazy(() => import('./emulator/PhoneView'))
 
 type ModalState =
   | { kind: 'brand'; id: string | null }
@@ -178,6 +179,15 @@ export default function App(): ReactNode {
             onUrl={(url) => (lastUrl.current[siteKey] = url)}
             right={<ChatToggle chatOpen={data.chatOpen} onToggleChat={toggleChat} />}
           />
+        )}
+        {brand && view.kind === 'phone' && (
+          <Suspense fallback={<div className="page" />}>
+            <PhoneView
+              key={brand.id}
+              brand={brand}
+              right={<ChatToggle chatOpen={data.chatOpen} onToggleChat={toggleChat} />}
+            />
+          </Suspense>
         )}
         {brand && PageView && view.kind === 'page' && (
           <Suspense fallback={<div className="page" />}>

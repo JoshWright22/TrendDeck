@@ -3,6 +3,7 @@ import type { Brand } from '@shared/types'
 import BrandRail from './BrandRail'
 import SiteTabs from './SiteTabs'
 import Shield from './Shield'
+import PhoneTab from '../emulator/PhoneTab'
 import { PAGES, type Page } from './ComingSoon'
 import {
   AnalyticsIcon,
@@ -14,7 +15,7 @@ import {
   WriterIcon
 } from './Icons'
 
-export type View = { kind: 'page'; page: Page } | { kind: 'site'; id: string }
+export type View = { kind: 'page'; page: Page } | { kind: 'site'; id: string } | { kind: 'phone' }
 
 const NAV_ICONS: Record<Page, () => ReactNode> = {
   Trends: TrendsIcon,
@@ -103,6 +104,8 @@ export default function Sidebar(props: Props): ReactNode {
           onAdd={props.onAddSite}
         />
       )}
+
+      {brand && <PhoneTab active={view.kind === 'phone'} onClick={() => props.onView({ kind: 'phone' })} />}
 
       <button className="side-item settings-btn" onClick={props.onSettings}>
         <SettingsIcon />
