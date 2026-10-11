@@ -6,6 +6,7 @@ import { loadData, saveData } from './store'
 import { dropTrends, setupTrends } from './trends'
 import { attachBrand, blocksPopup, setupAdblock } from './adblock'
 import { dropAnalytics, setupAnalytics } from './analytics'
+import { dropPostingBrand, setupPosting } from './posting'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -146,6 +147,7 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   await ses.clearCache()
   await dropTrends(brandId)
   await dropAnalytics(brandId)
+  await dropPostingBrand(brandId)
 })
 
 setupTrends()
@@ -155,6 +157,7 @@ void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()
   // net.fetch needs the app ready, so the blocker starts here
   setupAdblock()
+  setupPosting()
   createWindow()
   setupUpdater()
   app.on('activate', () => {

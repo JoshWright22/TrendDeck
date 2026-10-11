@@ -25,7 +25,7 @@ Calls made while building, so nobody has to guess later.
 - Only the first 5 keywords and 8 subreddits are used per refresh to stay under rate limits.
 - Cache is one json per brand in `trends/` in the user data folder. Auto refresh checks the open brand every 10 minutes and refreshes when the cache is over 3 hours old.
 - Thumbnails aren't loaded, the app never pulls remote images.
-- Ideas is a plain list per brand for now. Saving the same link twice does nothing.
+- Saving the same link twice as an idea does nothing.
 
 ## Window
 
@@ -61,3 +61,13 @@ Calls made while building, so nobody has to guess later.
 ## Agents
 
 - An agent only runs when you send a chat message. Nothing else calls one: not trends, not the ad blocker, not analytics, not a timer. Anything that wants an agent's help has to go through a message you send.
+
+## Merging the feature branches
+
+- Ideas board and schedule, writer and analytics, and posting were built on an older commit and merged onto the new shell in that order. Each one keeps the shell from main and adds its pages to the sidebar and the page list.
+- Each branch added `platform`, `windowControl` and `onMaximized` to the preload. Main already had them, so there's one copy.
+- The writer branch still had `adblockAttach` and `onAdblockCount` from the old ad blocker. Main dropped those when the blocker moved to the session, so they're gone.
+- The ideas board replaced `pages/Ideas.tsx` and the last stub page went away once every page was real, so `Stub.tsx` is gone too.
+- Posting is the sixth page in the sidebar, after Analytics.
+- Each feature kept its own rising line mark component instead of sharing the one in `Icons.tsx`. They draw the same mark, merging them can wait.
+- The feature decisions stay in their own files: DECISIONS-ideas.md, DECISIONS-writer.md and DECISIONS-posting.md.

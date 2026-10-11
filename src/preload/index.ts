@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AppData, StatPlatform, TrendDeckApi, TrendFeed } from '@shared/types'
+import { postingApi } from './posting'
 
 const api: TrendDeckApi = {
   platform: process.platform,
@@ -14,6 +15,7 @@ const api: TrendDeckApi = {
     ipcRenderer.on('open:url', listener)
     return () => ipcRenderer.removeListener('open:url', listener)
   },
+  posting: postingApi,
   loadData: () => ipcRenderer.invoke('data:load'),
   saveData: (data: AppData) => ipcRenderer.invoke('data:save', data),
   clearBrandSession: (brandId: string) => ipcRenderer.invoke('brand:clear-session', brandId),
