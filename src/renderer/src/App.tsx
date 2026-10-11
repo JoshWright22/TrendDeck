@@ -9,7 +9,7 @@ import SiteView from './components/SiteView'
 import { ChatToggle } from './components/PageHeader'
 import { PAGE_VIEWS } from './pages'
 
-const ChatPane = lazy(() => import('./components/ChatPane'))
+const ChatView = lazy(() => import('./chat/ChatView'))
 
 type ModalState =
   | { kind: 'brand'; id: string | null }
@@ -17,7 +17,7 @@ type ModalState =
   | { kind: 'settings' }
   | null
 
-const HOME: View = { kind: 'page', page: 'Trends' }
+const HOME: View = { kind: 'chat' }
 
 const newId = (): string => crypto.randomUUID()
 
@@ -127,6 +127,13 @@ export default function App(): ReactNode {
     })
   }
 
+  // from a card in the chat, url is already checked to be on the same site
+  const openSite = (siteId: string, url?: string): void => {
+    if (!brand) return
+    if (url) lastUrl.current[`${brand.id}:${siteId}`] = url
+    setView({ kind: 'site', id: siteId })
+  }
+
   const editing = modal?.kind === 'brand' ? data.brands.find((b) => b.id === modal.id) : undefined
   const PageView = view.kind === 'page' ? PAGE_VIEWS[view.page] : null
   const siteKey = brand && site ? `${brand.id}:${site.id}` : ''
@@ -179,6 +186,16 @@ export default function App(): ReactNode {
             right={<ChatToggle chatOpen={data.chatOpen} onToggleChat={toggleChat} />}
           />
         )}
+        {brand && view.kind === 'chat' && (
+          <Suspense fallback={<div className="page" />}>
+            <ChatView
+              key={brand.id}
+              brand={brand}
+              editBrand={(fn) => editBrand(brand.id, fn)}
+              onOpenSite={openSite}
+            />
+          </Suspense>
+        )}
         {brand && PageView && view.kind === 'page' && (
           <Suspense fallback={<div className="page" />}>
             <PageView
@@ -194,13 +211,14 @@ export default function App(): ReactNode {
         )}
       </main>
 
-      {data.chatOpen && brand && (
+      {data.chatOpen && brand && view.kind !== 'chat' && (
         <Suspense fallback={<aside className="chat" />}>
-          <ChatPane
+          <ChatView
             key={brand.id}
-            brandName={brand.name}
-            threads={brand.threads}
-            onChange={(fn) => editBrand(brand.id, (b) => ({ ...b, threads: fn(b.threads) }))}
+            compact
+            brand={brand}
+            editBrand={(fn) => editBrand(brand.id, fn)}
+            onOpenSite={openSite}
             onClose={toggleChat}
           />
         </Suspense>
