@@ -18,6 +18,7 @@ const Settings = lazy(() => import('./components/Settings'))
 const BrandModal = lazy(() => import('./components/BrandModal'))
 const SiteModal = lazy(() => import('./components/SiteModal'))
 const Onboarding = lazy(() => import('./components/Onboarding'))
+const PhoneView = lazy(() => import('./emulator/PhoneView'))
 
 type ModalState =
   | { kind: 'brand'; id: string | null }
@@ -318,6 +319,15 @@ export default function App(): ReactNode {
                 brand={brand}
                 editBrand={(fn) => editBrand(brand.id, fn)}
                 onOpenSite={openSite}
+              />
+            </Suspense>
+          )}
+          {brand && view.kind === 'phone' && (
+            <Suspense fallback={<div className="page" />}>
+              <PhoneView
+                key={brand.id}
+                brand={brand}
+                right={<ChatToggle chatOpen={data.chatOpen} onToggleChat={toggleChat} />}
               />
             </Suspense>
           )}

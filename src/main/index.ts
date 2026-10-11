@@ -17,6 +17,7 @@ import { dropChats, setupAgents, stopBrand } from './agents'
 import { dropVoice, setupVoice } from './voice'
 import { dropInboxBrand, setupInbox } from './inbox'
 import { setupReuse } from './reuse'
+import { dropBrandPhone, setupEmulator } from './emulator'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -171,6 +172,7 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   await dropChats(brandId)
   await dropVoice(brandId)
   await dropInboxBrand(brandId)
+  await dropBrandPhone(brandId)
 })
 
 setupTrends()
@@ -181,6 +183,7 @@ setupAgents()
 setupVoice()
 setupHiddenSites(syncMute)
 setupInbox()
+setupEmulator()
 
 void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()

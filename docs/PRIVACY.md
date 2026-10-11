@@ -29,8 +29,9 @@ All of it is in the app's user data folder:
 | Media library | `media/<brand id>.json`, `media/<brand id>/` | file list, thumbnails and copies you asked for |
 | Posting | `posting.json`, `posting-keys.json` | queue, log and settings, API keys locked with your system keychain when it's there |
 | Posting pace | `reuse-pace.json` | daily limits and gaps per site |
+| Phone | `android/` | the Android tools if TrendDeck set them up, and one phone per brand with its apps and logins |
 
-Deleting a brand deletes its logins, its saved logins, its trends cache, its agent access data, its chats, its voice, its inbox, its media library and its posts. Deleting the folder deletes everything.
+Deleting a brand deletes its logins, its saved logins, its trends cache, its agent access data, its chats, its voice, its inbox, its media library, its posts and its phone. Deleting the folder deletes everything.
 
 ## What goes out, and when
 
@@ -44,6 +45,7 @@ Nothing goes out unless it's one of these.
 - **Spellcheck on Linux.** Chromium downloads its spellcheck dictionary from Google the first time you type in a text box. On Windows and macOS it uses the system spellchecker and nothing is downloaded.
 - **Brand voice import, inbox and analytics refresh.** Only when you press Import or Refresh. The app opens your own pages on those sites in a hidden window on the brand's session and reads them.
 - **Shorts import.** Only when you press it. The app loads your channel's Shorts page on the brand's session.
+- **Phone setup.** Only when you press Download and set up. The Android tools and system image come straight from Google. The phone itself is a normal Android phone and its apps go online like they would on any phone.
 - **Chat.** When you send a chat message, the agent you picked gets your message and works through its own provider, the same way it does in a terminal. What it can see through TrendDeck is below.
 
 The app never loads remote images or fonts for its own screens, has no crash reporter.

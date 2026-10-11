@@ -30,6 +30,7 @@ Working now:
 - **Media.** Every video, image and file you post, per brand. Drop them in or watch your exports folder, see what's been posted where, and pick which ones an agent may use.
 - **Shorts.** One vertical video out as a YouTube Short, an Instagram Reel and a TikTok, each with its own caption, spaced out so they don't all land at once. Posting pace keeps each site under a daily limit.
 - **Inbox.** Comments from YouTube, Instagram, TikTok, X and Reddit in one list when you press Refresh, with spam filters. A dot next to each site shows if you're still logged in.
+- **Phone.** A real Android phone per brand inside a tab, for the things Instagram and TikTok only do in their apps. Setup is one button, see [docs/EMULATOR.md](docs/EMULATOR.md).
 - **Links stay in the app.** A trend, an idea or any link opens in that brand's tab for the site, or in a temporary tab if you don't have one. Never your normal browser.
 - **Ad blocker.** On by default with the same filter lists as uBlock Origin, YouTube ads included. Turn it off per brand or allow a site in Settings.
 - **Search.** One box in the title bar for trends, sites, brands and ideas. Paste a link to open it. Ctrl+K gets you there.
@@ -40,10 +41,6 @@ Working now:
 - **Posting.** Write a post once and TrendDeck fills it in on YouTube, TikTok, Instagram, X or Reddit in your logged in session, then stops at Post so you can check it. It can press Post itself, run scheduled posts while the app is open, or go through the official APIs instead.
 
 Brand colors, type and logo rules are in [docs/BRAND.md](docs/BRAND.md).
-
-Coming next:
-
-- **Phone emulator** for app-only features
 
 ## Installation
 

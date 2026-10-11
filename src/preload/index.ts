@@ -6,6 +6,7 @@ import type { McpApi } from '@shared/mcp'
 import type { VaultApi } from '@shared/vault'
 import { chatApi } from './chat'
 import { inboxApi } from './inbox'
+import { emulatorApi } from './emulator'
 
 const api: TrendDeckApi = {
   platform: process.platform,
@@ -58,7 +59,8 @@ const api: TrendDeckApi = {
   setSiteHidden: (webContentsId: number, hidden: boolean) => ipcRenderer.send('site:hidden', webContentsId, hidden),
   voiceLoad: (brandId) => ipcRenderer.invoke('voice:load', brandId),
   voiceSave: (brandId, data) => ipcRenderer.invoke('voice:save', brandId, data),
-  voiceImport: (brandId, platforms) => ipcRenderer.invoke('voice:import', brandId, platforms)
+  voiceImport: (brandId, platforms) => ipcRenderer.invoke('voice:import', brandId, platforms),
+  emulator: emulatorApi
 }
 
 contextBridge.exposeInMainWorld('trenddeck', api)

@@ -2,6 +2,7 @@ import type { PostingApi } from './posting'
 import type { MediaApi } from './media'
 import type { VoiceApi } from './voice'
 import type { ReuseApi } from './reuse'
+import type { EmulatorApi } from './emulator'
 
 export interface Site {
   id: string
@@ -216,6 +217,8 @@ export interface TrendDeckApi extends VoiceApi {
   // a kept alive site tab went out of view or came back
   setSiteHidden(webContentsId: number, hidden: boolean): void
   media: MediaApi
+  // the built in android phone
+  emulator: EmulatorApi
 }
 
 // writer: drafts per idea, one file per brand in writer/

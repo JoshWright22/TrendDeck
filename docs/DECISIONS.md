@@ -102,7 +102,7 @@ Calls made while building, so nobody has to guess later.
 - Each feature kept its own rising line mark component instead of sharing the one in `Icons.tsx`. They draw the same mark, merging them can wait.
 - Media came in after posting. It sits between Ideas and Schedule like its branch had it, Posting stays last.
 - MCP and saved logins came last. Agent access and Saved logins sit at the bottom of Settings under the ad blocker. The branch's update switch is kept since main's updater already reads `settings.autoUpdate`. The share button sits next to the chat toggle in a site's toolbar.
-- The feature decisions stay in their own files: DECISIONS-ideas.md, DECISIONS-writer.md, DECISIONS-posting.md, DECISIONS-media.md, DECISIONS-mcp.md, DECISIONS-chat.md, DECISIONS-voice.md, DECISIONS-inbox.md and DECISIONS-reuse.md.
+- The feature decisions stay in their own files: DECISIONS-ideas.md, DECISIONS-writer.md, DECISIONS-posting.md, DECISIONS-media.md, DECISIONS-mcp.md, DECISIONS-chat.md, DECISIONS-voice.md, DECISIONS-inbox.md, DECISIONS-reuse.md and DECISIONS-emulator.md.
 - The newer shell from main came in after that: live tabs, first run setup and the Settings screen. The settings modal is gone. Agent access and Saved logins are sections on the Settings screen between Trends and About, they get the section title from the screen so their own headings went. The branch's own "Update automatically" switch is dropped, About already has one for the same setting.
 - With live tabs more than one site webview is mounted, so the agent tools can't take the first one anymore. The open tab is the one that told main it's on screen. A tab that's still mounting doesn't count until its page is up, and `waitForTab` already waits for that. With a page like Trends on screen there's no open tab, same as before.
 - An agent or the post check opening a site that's already loaded in the background sends that tab to the link, like any other link does. Before, it only set the start url, which a loaded tab never reads again.
@@ -112,6 +112,7 @@ Calls made while building, so nobody has to guess later.
 - Inbox came next and sits last in the sidebar, after Posting. The login dots from its account check show next to each site in the sidebar.
 - Shorts came next, between Posting and Inbox. It was built when posts still took a file path, so it picks its video with the Media picker now and its posts carry the media id. The length and size check reads the file in main from the id, the page never sees the path.
 - Posting pace is its own section on the Settings screen. The branch's "What TrendDeck stores" list was dropped, it was missing half the files. docs/PRIVACY.md has the full list and got the files from chat, voice, inbox, media, posting and Shorts.
+- The phone came last. Its Phone entry sits under the site list in the sidebar like its branch had it. The branch still had `adblockAttach` and `onAdblockCount` from the old ad blocker, those are gone again.
 
 ## One session per brand
 

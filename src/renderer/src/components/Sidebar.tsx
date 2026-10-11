@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Brand, Site } from '@shared/types'
 import SiteTabs from './SiteTabs'
+import PhoneTab from '../emulator/PhoneTab'
 import { PAGES, type Page } from './ComingSoon'
 import {
   AnalyticsIcon,
@@ -23,6 +24,7 @@ export type View =
   | { kind: 'site'; id: string }
   | { kind: 'settings' }
   | { kind: 'chat' }
+  | { kind: 'phone' }
 
 const NAV_ICONS: Record<Page, () => ReactNode> = {
   Trends: TrendsIcon,
@@ -113,6 +115,8 @@ export default function Sidebar(props: Props): ReactNode {
           health={inbox?.health}
         />
       )}
+
+      {brand && <PhoneTab active={view.kind === 'phone'} onClick={() => props.onView({ kind: 'phone' })} />}
 
       <button
         className={`side-item settings-btn${view.kind === 'settings' ? ' active' : ''}`}
