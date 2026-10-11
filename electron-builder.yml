@@ -11,9 +11,22 @@ win:
   target: nsis
   icon: resources/icon.ico
   artifactName: TrendDeck-Setup.${ext}
+# a classic setup wizard: licence, install for me or everyone, pick the folder, progress, finish and launch
 nsis:
-  oneClick: true
+  oneClick: false
   perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  license: LICENSE
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  installerSidebar: resources/installer/sidebar.bmp
+  uninstallerSidebar: resources/installer/sidebar.bmp
+  installerHeader: resources/installer/header.bmp
   createDesktopShortcut: true
+  createStartMenuShortcut: true
   shortcutName: TrendDeck
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  uninstallDisplayName: TrendDeck
 publish: null
