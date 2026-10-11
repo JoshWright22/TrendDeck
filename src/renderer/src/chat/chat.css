@@ -1779,12 +1779,31 @@
   max-width: 100%;
 }
 
-/* the side chat is too narrow for every control on one line, so they wrap */
-.cx.compact .cx-box-row {
-  flex-wrap: wrap;
-  row-gap: 6px;
+/* the side chat keeps every control on one line: the pickers shrink and cut their text */
+.cx-box-row .ui-dd {
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
-.cx.compact .cx-box-row .cx-send {
-  margin-left: auto;
+.cx-box-row .ui-dd-btn {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.cx-box-row .ui-dd-value {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cx-box-row .ui-dd-caret,
+.cx-box-row > .cx-send,
+.cx-box-row > .ui-menu,
+.cx-box-row > .ui-menu-btn {
+  flex: none;
+}
+
+.cx-box-row > .spacer {
+  min-width: 0;
 }

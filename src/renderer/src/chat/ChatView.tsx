@@ -981,7 +981,8 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
                   <StopIcon />
                 </button>
               )}
-              {(!busy || draft.trim()) && (
+              {/* one button in one spot: stop while a reply runs, send otherwise. enter still queues */}
+              {!busy && (
                 <button
                   type="submit"
                   className="cx-send"
