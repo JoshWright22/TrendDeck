@@ -24,6 +24,38 @@ export interface Idea {
   url: string
   source: TrendSource | 'manual'
   savedAt: number
+  // board fields, missing on ideas saved before the board existed
+  stage?: IdeaStage
+  notes?: string
+  tags?: string[]
+  postedAt?: number
+}
+
+export const IDEA_STAGES = ['idea', 'outline', 'recorded', 'edited', 'posted'] as const
+export type IdeaStage = (typeof IDEA_STAGES)[number]
+
+export const STAGE_NAMES: Record<IdeaStage, string> = {
+  idea: 'Idea',
+  outline: 'Outline',
+  recorded: 'Recorded',
+  edited: 'Edited',
+  posted: 'Posted'
+}
+
+export const PLATFORMS = ['YouTube', 'Shorts', 'TikTok', 'Instagram', 'X', 'Reddit', 'Other'] as const
+
+// one planned post on the schedule
+export interface ScheduleSlot {
+  id: string
+  // local time the post goes out, ms
+  at: number
+  platform: string
+  title: string
+  // '' when no idea is linked
+  ideaId: string
+  // the post text, caption or script notes for this slot
+  draft: string
+  done: boolean
 }
 
 export interface Brand {
@@ -39,6 +71,7 @@ export interface Brand {
   sites: Site[]
   threads: ChatThread[]
   ideas: Idea[]
+  schedule?: ScheduleSlot[]
 }
 
 export interface Settings {

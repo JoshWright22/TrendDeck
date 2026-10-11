@@ -16,6 +16,7 @@ import {
   type Site,
   TREND_SOURCES
 } from '@shared/types'
+import { cleanIdeaBoard, cleanSchedule } from './planner/clean'
 
 const FILE_NAME = 'trenddeck.json'
 
@@ -77,7 +78,14 @@ function cleanIdea(raw: unknown): Idea | null {
   const source = (TREND_SOURCES as readonly string[]).includes(i.source as string)
     ? (i.source as Idea['source'])
     : 'manual'
-  return { id: i.id, title: i.title.slice(0, 300), url: i.url, source, savedAt: Number(i.savedAt) || 0 }
+  return {
+    id: i.id,
+    title: i.title.slice(0, 300),
+    url: i.url,
+    source,
+    savedAt: Number(i.savedAt) || 0,
+    ...cleanIdeaBoard(i)
+  }
 }
 
 function strings(raw: unknown, max: number): string[] {
@@ -118,7 +126,8 @@ function cleanBrand(raw: unknown): Brand | null {
     adblockAllow,
     sites,
     threads,
-    ideas
+    ideas,
+    schedule: cleanSchedule(b.schedule)
   }
 }
 

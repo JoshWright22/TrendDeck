@@ -1,0 +1,293 @@
+/* ideas board */
+
+.ib-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.ib-board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  padding: 14px 18px 18px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.ib-col {
+  flex: 1 0 196px;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.ib-col.over {
+  border-color: rgba(0, 191, 156, 0.45);
+  background: #17191c;
+}
+
+.ib-col-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 8px 14px;
+}
+
+.ib-col-head h3 {
+  margin: 0;
+  font: 800 14px/1 var(--head);
+  letter-spacing: -0.03em;
+}
+
+.ib-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--smoke);
+}
+
+.ib-dot.st-outline {
+  background: var(--indigo);
+}
+
+.ib-dot.st-recorded {
+  background: var(--pink);
+}
+
+.ib-dot.st-edited {
+  background: var(--teal);
+}
+
+.ib-dot.st-posted {
+  background: var(--yellow);
+}
+
+.ib-cards {
+  flex: 1;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 10px 14px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.ib-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ib-drop-line {
+  height: 3px;
+  margin: -2px 6px;
+  border-radius: 999px;
+  background: var(--teal);
+  box-shadow: 0 0 10px rgba(0, 191, 156, 0.6);
+}
+
+.ib-empty {
+  margin: 6px 4px;
+  padding: 18px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--smoke);
+  font-size: 12px;
+  text-align: center;
+}
+
+.ib-quick input {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--teal);
+  border-radius: 10px;
+  background: var(--felt);
+  outline: none;
+  user-select: text;
+  animation: pl-fade-only 0.15s ease-out;
+}
+
+/* the card, 5:7 like everything you can pick */
+.ib-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  aspect-ratio: 5 / 7;
+  flex: none;
+  padding: 24px 14px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--raised);
+  cursor: grab;
+  outline-offset: 2px;
+  animation: pl-fade 0.2s ease-out both;
+  transition:
+    transform 0.15s ease-out,
+    border-color 0.15s,
+    opacity 0.15s;
+}
+
+.ib-card:hover {
+  transform: translateY(-2px);
+  border-color: #3a3a46;
+}
+
+.ib-card:active {
+  cursor: grabbing;
+}
+
+.ib-card.dragging {
+  opacity: 0.35;
+}
+
+.ib-card.posted {
+  border-color: rgba(255, 216, 20, 0.35);
+}
+
+.ib-title {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font: 800 15px/1.22 var(--head);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.ib-notes {
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--smoke);
+  font-size: 12px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.ib-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 44px;
+  overflow: hidden;
+}
+
+.ib-tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ib-tag:hover {
+  background: rgba(0, 191, 156, 0.24);
+}
+
+.ib-foot {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 14px;
+  min-height: 24px;
+}
+
+.ib-source {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--smoke);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ib-slots {
+  min-width: 18px;
+  height: 18px;
+  margin-right: 2px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--line);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.ib-del {
+  opacity: 0;
+}
+
+.ib-card:hover .ib-del,
+.ib-card:focus-within .ib-del {
+  opacity: 1;
+}
+
+/* the one loud moment: a card lands in posted */
+.ib-card.pop {
+  animation: ib-pop 0.45s var(--spring) both;
+}
+
+@keyframes ib-pop {
+  0% {
+    transform: scale(0.86);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+.ib-burst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.ib-burst i {
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--yellow);
+  box-shadow: 0 0 8px rgba(255, 216, 20, 0.7);
+  animation: ib-spark 0.6s ease-out both;
+}
+
+@keyframes ib-spark {
+  0% {
+    transform: rotate(var(--a)) translateY(0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--a)) translateY(-70px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+.ib-planned {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
+}
