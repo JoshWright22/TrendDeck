@@ -94,6 +94,8 @@ Brands and sites are in `trenddeck.json` in the app's user data folder:
 
 Logins live in the same folder under `Partitions`, one folder per brand. Deleting a brand wipes its logins too. Cached trends are in `trends`, the ad blocker's lists are in `adblock`, and each brand's media library is in `media`.
 
+Everything the app stores and every time it goes online is in [docs/PRIVACY.md](docs/PRIVACY.md).
+
 ## License
 
 MIT, see [LICENSE](LICENSE).

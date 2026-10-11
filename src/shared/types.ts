@@ -80,6 +80,8 @@ export interface Brand {
 export interface Settings {
   // optional, youtube search pages are used when it's empty
   youtubeApiKey: string
+  // checks github for new versions, on unless set to false
+  autoUpdate?: boolean
 }
 
 export interface AppData {

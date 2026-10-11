@@ -4,8 +4,11 @@ import Modal from './Modal'
 import { CloseIcon } from './Icons'
 
 type Adblock = Record<string, { on: boolean; allow: string[] }>
+import AgentAccess from './mcp/AgentAccess'
+import SavedLogins from './vault/SavedLogins'
 
 interface Props {
+  brandId?: string | null
   settings: Settings
   brands: Brand[]
   activeId: string | null
@@ -102,7 +105,7 @@ function BrandAdblock({
   )
 }
 
-export default function SettingsModal({ settings, brands, activeId, onSave, onClose }: Props): ReactNode {
+export default function SettingsModal({ brandId, settings, brands, activeId, onSave, onClose }: Props): ReactNode {
   const [key, setKey] = useState(settings.youtubeApiKey)
   const [adblock, setAdblock] = useState<Adblock>(() =>
     Object.fromEntries(brands.map((b) => [b.id, { on: b.adblock, allow: b.adblockAllow }]))
@@ -110,12 +113,13 @@ export default function SettingsModal({ settings, brands, activeId, onSave, onCl
   // the open brand first
   const ordered = [...brands].sort((a, b) => Number(b.id === activeId) - Number(a.id === activeId))
 
+  const [autoUpdate, setAutoUpdate] = useState(settings.autoUpdate !== false)
   return (
     <Modal title="Settings" onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          onSave({ ...settings, youtubeApiKey: key.trim() }, adblock)
+          onSave({ ...settings, youtubeApiKey: key.trim(), autoUpdate }, adblock)
         }}
       >
         <h3 className="modal-section">Trends</h3>
@@ -149,6 +153,21 @@ export default function SettingsModal({ settings, brands, activeId, onSave, onCl
           />
         ))}
 
+        <h3 className="modal-section">Updates</h3>
+        <label className="aa-site">
+          <span className="aa-site-name">Update automatically</span>
+          <input
+            type="checkbox"
+            className="aa-switch"
+            checked={autoUpdate}
+            onChange={() => setAutoUpdate(!autoUpdate)}
+          />
+        </label>
+        <p className="form-hint">
+          Asks GitHub for the latest version every few hours and installs it when you quit. Nothing
+          about you is sent.
+        </p>
+
         <div className="modal-actions">
           <span className="spacer" />
           <button type="button" className="btn ghost" onClick={onClose}>
@@ -159,6 +178,8 @@ export default function SettingsModal({ settings, brands, activeId, onSave, onCl
           </button>
         </div>
       </form>
+      <AgentAccess brandId={brandId ?? null} />
+      <SavedLogins brandId={brandId ?? null} />
     </Modal>
   )
 }

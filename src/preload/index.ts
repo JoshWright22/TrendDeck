@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { AppData, StatPlatform, TrendDeckApi, TrendFeed } from '@shared/types'
 import { postingApi } from './posting'
 import { mediaApi } from './media'
+import type { McpApi } from '@shared/mcp'
+import type { VaultApi } from '@shared/vault'
 
 const api: TrendDeckApi = {
   platform: process.platform,
@@ -48,3 +50,36 @@ const api: TrendDeckApi = {
 }
 
 contextBridge.exposeInMainWorld('trenddeck', api)
+
+// agent access, kept apart from the main api so it can grow on its own
+function listen<T>(channel: string, fn: (payload: T) => void): () => void {
+  const listener = (_event: unknown, payload: T): void => fn(payload)
+  ipcRenderer.on(channel, listener)
+  return () => ipcRenderer.removeListener(channel, listener)
+}
+
+const mcp: McpApi = {
+  getState: () => ipcRenderer.invoke('mcp:state'),
+  setGrant: (brandId, siteId, on) => ipcRenderer.invoke('mcp:grant', brandId, siteId, on),
+  clearLog: (brandId) => ipcRenderer.invoke('mcp:clear-log', brandId),
+  setPostStatus: (id, status) => ipcRenderer.invoke('mcp:post-status', id, status),
+  shareTabOnce: (brandId, siteId) => ipcRenderer.invoke('mcp:share-once', brandId, siteId),
+  sharedTab: () => ipcRenderer.invoke('mcp:shared'),
+  onChanged: (fn) => listen('mcp:changed', () => fn()),
+  onOpenSite: (fn) => listen('mcp:open-site', fn),
+  onIdea: (fn) => listen('mcp:idea', fn)
+}
+
+contextBridge.exposeInMainWorld('trenddeckMcp', mcp)
+
+// saved logins. there's no call that returns a password, main keeps those to itself
+const vault: VaultApi = {
+  getState: () => ipcRenderer.invoke('vault:state'),
+  save: (brandId, siteId, login) => ipcRenderer.invoke('vault:save', brandId, siteId, login),
+  remove: (brandId, siteId) => ipcRenderer.invoke('vault:remove', brandId, siteId),
+  onChanged: (fn) => listen('vault:changed', () => fn()),
+  onCodeRequest: (fn) => listen('vault:ask-code', fn),
+  answerCode: (id, code) => ipcRenderer.invoke('vault:code', id, code)
+}
+
+contextBridge.exposeInMainWorld('trenddeckVault', vault)

@@ -140,7 +140,8 @@ export function sanitize(raw: unknown): AppData {
     ? (d.activeBrandId as string)
     : (brands[0]?.id ?? null)
   const key = (d.settings as Partial<AppData['settings']> | undefined)?.youtubeApiKey
-  const settings = { youtubeApiKey: typeof key === 'string' ? key.trim().slice(0, 200) : '' }
+  const autoUpdate = (d.settings as Partial<AppData['settings']> | undefined)?.autoUpdate !== false
+  const settings = { youtubeApiKey: typeof key === 'string' ? key.trim().slice(0, 200) : '', autoUpdate }
   return { version: 1, activeBrandId: active, chatOpen: d.chatOpen === true, settings, brands }
 }
 

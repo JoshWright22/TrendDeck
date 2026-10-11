@@ -71,7 +71,8 @@ Calls made while building, so nobody has to guess later.
 - Posting is the sixth page in the sidebar, after Analytics.
 - Each feature kept its own rising line mark component instead of sharing the one in `Icons.tsx`. They draw the same mark, merging them can wait.
 - Media came in after posting. It sits between Ideas and Schedule like its branch had it, Posting stays last.
-- The feature decisions stay in their own files: DECISIONS-ideas.md, DECISIONS-writer.md, DECISIONS-posting.md and DECISIONS-media.md.
+- MCP and saved logins came last. Agent access and Saved logins sit at the bottom of Settings under the ad blocker. The branch's update switch is kept since main's updater already reads `settings.autoUpdate`. The share button sits next to the chat toggle in a site's toolbar.
+- The feature decisions stay in their own files: DECISIONS-ideas.md, DECISIONS-writer.md, DECISIONS-posting.md, DECISIONS-media.md and DECISIONS-mcp.md.
 
 ## One session per brand
 
