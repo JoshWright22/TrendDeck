@@ -22,6 +22,7 @@ function createWindow(): void {
     backgroundColor: '#17181c',
     autoHideMenuBar: true,
     title: 'TrendDeck',
+    icon: join(__dirname, '../../resources/icon.png'),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
