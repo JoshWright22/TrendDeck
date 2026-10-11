@@ -144,4 +144,98 @@ export interface TrendDeckApi {
   // tells the main process which brand and site a webview is showing
   adblockAttach(webContentsId: number, brandId: string, siteId: string): Promise<void>
   onAdblockCount(fn: (count: AdblockCount) => void): () => void
+  loadDrafts(brandId: string): Promise<WriterDoc>
+  saveDrafts(brandId: string, doc: WriterDoc): Promise<void>
+  loadAnalytics(brandId: string): Promise<AnalyticsDoc>
+  saveAnalyticsConfig(brandId: string, config: AnalyticsConfig): Promise<AnalyticsDoc>
+  // reads the logged in pages (or apis) for these platforms, one at a time
+  refreshAnalytics(brandId: string, platforms: StatPlatform[]): Promise<AnalyticsDoc>
+  clearAnalytics(brandId: string): Promise<AnalyticsDoc>
+  onAnalyticsProgress(fn: (brandId: string, platform: StatPlatform | null) => void): () => void
+}
+
+// writer: drafts per idea, one file per brand in writer/
+
+export const WRITER_PLATFORMS = ['youtube', 'tiktok', 'instagram', 'x', 'reddit'] as const
+export type WriterPlatform = (typeof WRITER_PLATFORMS)[number]
+
+export interface DraftVersion {
+  id: string
+  at: number
+  // 'generated' when it came back from the chat agent
+  kind: 'manual' | 'generated'
+  fields: Record<string, string>
+  thread: string[]
+}
+
+export interface PlatformDraft {
+  // youtube: title, description, tags. tiktok/instagram: caption, hashtags. reddit: title, body
+  fields: Record<string, string>
+  // x posts, one entry per post in the thread
+  thread: string[]
+  versions: DraftVersion[]
+}
+
+export interface Draft {
+  id: string
+  // null for a draft that isn't tied to a saved idea
+  ideaId: string | null
+  title: string
+  createdAt: number
+  updatedAt: number
+  platforms: Record<WriterPlatform, PlatformDraft>
+}
+
+export interface WriterDoc {
+  drafts: Draft[]
+}
+
+// analytics: the user's own numbers, one file per brand in analytics/
+
+export const STAT_PLATFORMS = ['youtube', 'tiktok', 'instagram'] as const
+export type StatPlatform = (typeof STAT_PLATFORMS)[number]
+
+export interface StatPost {
+  id: string
+  title: string
+  url: string
+  publishedAt: number | null
+  views: number | null
+  likes: number | null
+  comments: number | null
+}
+
+export interface StatSnapshot {
+  at: number
+  platform: StatPlatform
+  // 'page' when read from the logged in tab, 'api' from an official api key
+  via: 'page' | 'api'
+  account: string
+  followers: number | null
+  // lifetime views when the site shows them
+  views: number | null
+  likes: number | null
+  postCount: number | null
+  posts: StatPost[]
+}
+
+export interface AnalyticsConfig {
+  // which platforms refresh reads
+  enabled: Record<StatPlatform, boolean>
+  // youtube data api uses the key from settings plus a channel id or @handle
+  youtubeChannel: string
+  instagramToken: string
+  tiktokToken: string
+}
+
+export interface StatRun {
+  at: number
+  ok: boolean
+  message: string
+}
+
+export interface AnalyticsDoc {
+  config: AnalyticsConfig
+  snapshots: StatSnapshot[]
+  lastRun: Partial<Record<StatPlatform, StatRun>>
 }
