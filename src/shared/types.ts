@@ -1,4 +1,5 @@
 import type { PostingApi } from './posting'
+import type { ReuseApi } from './reuse'
 
 export interface Site {
   id: string
@@ -177,6 +178,7 @@ export type WindowAction = 'minimize' | 'maximize' | 'close' | 'state'
 
 export interface TrendDeckApi {
   platform: string
+  reuse: ReuseApi
   // resolves to whether the window is maximized after the action
   windowControl(action: WindowAction): Promise<boolean>
   onMaximized(fn: (maximized: boolean) => void): () => void

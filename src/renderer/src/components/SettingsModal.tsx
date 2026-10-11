@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { cleanDomain, hostOf, type Brand, type Settings } from '@shared/types'
 import Modal from './Modal'
 import { CloseIcon } from './Icons'
+import PacePanel from '../pages/reuse/PacePanel'
 
 type Adblock = Record<string, { on: boolean; allow: string[] }>
 
@@ -148,6 +149,8 @@ export default function SettingsModal({ settings, brands, activeId, onSave, onCl
             onChange={(v) => setAdblock((all) => ({ ...all, [b.id]: v }))}
           />
         ))}
+
+        <PacePanel />
 
         <div className="modal-actions">
           <span className="spacer" />

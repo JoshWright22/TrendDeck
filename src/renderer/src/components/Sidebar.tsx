@@ -12,6 +12,7 @@ import {
   WriterIcon
 } from './Icons'
 import { PostingIcon } from '../posting/bits'
+import { ShortsIcon } from '../pages/reuse/ShortsIcon'
 
 export type View = { kind: 'page'; page: Page } | { kind: 'site'; id: string }
 
@@ -21,7 +22,8 @@ const NAV_ICONS: Record<Page, () => ReactNode> = {
   Schedule: ScheduleIcon,
   Writer: WriterIcon,
   Analytics: AnalyticsIcon,
-  Posting: PostingIcon
+  Posting: PostingIcon,
+  Shorts: ShortsIcon
 }
 
 interface Props {

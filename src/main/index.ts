@@ -7,6 +7,7 @@ import { dropTrends, setupTrends } from './trends'
 import { attachBrand, blocksPopup, setupAdblock } from './adblock'
 import { dropAnalytics, setupAnalytics } from './analytics'
 import { dropPostingBrand, setupPosting } from './posting'
+import { setupReuse } from './reuse'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -158,6 +159,7 @@ void app.whenReady().then(() => {
   // net.fetch needs the app ready, so the blocker starts here
   setupAdblock()
   setupPosting()
+  setupReuse()
   createWindow()
   setupUpdater()
   app.on('activate', () => {
