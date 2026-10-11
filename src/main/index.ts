@@ -24,6 +24,9 @@ const PARTITION_PREFIX = 'persist:brand-'
 // test runs pass --mute-audio or set TRENDDECK_MUTE=1 so nothing ever makes a sound
 const MUTE_ALL = process.argv.includes('--mute-audio') || process.env.TRENDDECK_MUTE === '1'
 if (MUTE_ALL) app.commandLine.appendSwitch('mute-audio')
+// sites with a cast button make chromium look for tvs on the network, which opens a listening
+// socket and the windows firewall prompt. trenddeck never casts
+app.commandLine.appendSwitch('disable-features', 'MediaRouter,DialMediaRouteProvider,CastMediaRouteProvider,GlobalMediaControlsCastStartStop')
 
 // sites only play sound while you can see them
 function syncMute(win: BrowserWindow): void {
