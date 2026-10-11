@@ -11,12 +11,14 @@ import {
   TrendsIcon,
   WriterIcon
 } from './Icons'
+import { MediaIcon } from '../pages/media/MediaIcons'
 
 export type View = { kind: 'page'; page: Page } | { kind: 'site'; id: string }
 
 const NAV_ICONS: Record<Page, () => ReactNode> = {
   Trends: TrendsIcon,
   Ideas: IdeasIcon,
+  Media: MediaIcon,
   Schedule: ScheduleIcon,
   Writer: WriterIcon,
   Analytics: AnalyticsIcon

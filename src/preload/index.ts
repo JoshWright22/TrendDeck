@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AppData, TrendDeckApi, TrendFeed } from '@shared/types'
+import { mediaApi } from './media'
 
 const api: TrendDeckApi = {
   platform: process.platform,
@@ -28,7 +29,8 @@ const api: TrendDeckApi = {
     const listener = (_event: unknown, feed: TrendFeed): void => fn(feed)
     ipcRenderer.on('trends:update', listener)
     return () => ipcRenderer.removeListener('trends:update', listener)
-  }
+  },
+  media: mediaApi
 }
 
 contextBridge.exposeInMainWorld('trenddeck', api)

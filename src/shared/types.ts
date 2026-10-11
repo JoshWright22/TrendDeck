@@ -1,3 +1,5 @@
+import type { MediaApi } from './media'
+
 export interface Site {
   id: string
   name: string
@@ -156,4 +158,5 @@ export interface TrendDeckApi {
   getTrends(brandId: string): Promise<TrendFeed | null>
   refreshTrends(brandId: string): Promise<void>
   onTrends(fn: (feed: TrendFeed) => void): () => void
+  media: MediaApi
 }

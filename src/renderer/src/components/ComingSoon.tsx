@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react'
 
-export const PAGES = ['Trends', 'Ideas', 'Schedule', 'Writer', 'Analytics'] as const
+export const PAGES = ['Trends', 'Ideas', 'Media', 'Schedule', 'Writer', 'Analytics'] as const
 export type Page = (typeof PAGES)[number]
 
 const BLURBS: Record<Page, string> = {
   Trends: "What's picking up in this brand's niche, pulled from its keywords.",
   Ideas: 'Post and video ideas built from the trends you save.',
+  Media: 'Every video, image and file you post, in one place.',
   Schedule: 'A calendar of what goes out where and when.',
   Writer: 'Draft titles, captions and scripts for each site.',
   Analytics: 'How your posts did across every site, in one place.'

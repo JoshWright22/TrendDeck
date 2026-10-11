@@ -18,7 +18,7 @@ function buildCsp(): Plugin {
           attrs: {
             'http-equiv': 'Content-Security-Policy',
             content:
-              "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+              "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: td-media:; media-src 'self' td-media:"
           }
         }
       ]

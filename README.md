@@ -21,6 +21,7 @@ Working now:
 - **Site tabs.** Reddit, X, Instagram, TikTok, YouTube, YouTube Studio, vidIQ and 1of10 to start. Add any site with a name and a URL, drag to reorder.
 - **Trends.** One ranked feed of what's rising in your niche across Reddit, YouTube, Google Trends and TikTok, with today's top three up front.
 - **Ideas.** Save a trend as an idea in one click, or write your own down.
+- **Media.** Every video, image and file you post, per brand. Drop them in or watch your exports folder, see what's been posted where, and pick which ones an agent may use.
 - **Links stay in the app.** A trend, an idea or any link opens in that brand's tab for the site, or in a temporary tab if you don't have one. Never your normal browser.
 - **Ad blocker.** On by default with the same filter lists as uBlock Origin, YouTube ads included. Turn it off per brand or allow a site in Settings.
 - **Search.** One box in the title bar for trends, sites, brands and ideas. Paste a link to open it. Ctrl+K gets you there.
@@ -91,7 +92,7 @@ Brands and sites are in `trenddeck.json` in the app's user data folder:
 - macOS: `~/Library/Application Support/TrendDeck`
 - Linux: `~/.config/TrendDeck`
 
-Logins live in the same folder under `Partitions`, one folder per brand. Deleting a brand wipes its logins too. Cached trends are in `trends`, and the ad blocker's lists are in `adblock`.
+Logins live in the same folder under `Partitions`, one folder per brand. Deleting a brand wipes its logins too. Cached trends are in `trends`, the ad blocker's lists are in `adblock`, and each brand's media library is in `media`.
 
 ## License
 
