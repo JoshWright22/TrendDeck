@@ -6,11 +6,13 @@ import type { PageProps } from './types'
 const Stub = lazy(() => import('./Stub'))
 const Trends = lazy(() => import('./Trends'))
 const Ideas = lazy(() => import('./Ideas'))
+const Posting = lazy(() => import('../posting/PostingPage'))
 
 export const PAGE_VIEWS: Record<Page, LazyExoticComponent<ComponentType<PageProps>>> = {
   Trends,
   Ideas,
   Schedule: Stub,
   Writer: Stub,
-  Analytics: Stub
+  Analytics: Stub,
+  Posting
 }

@@ -20,6 +20,7 @@ Working now:
 - **Every account at once.** Each brand gets its own browser session, so two brands can be logged into two different accounts on the same site and they never mix.
 - **Site tabs.** Reddit, X, Instagram, TikTok, YouTube, YouTube Studio, vidIQ and 1of10 to start. Add any site with a name and a URL, drag to reorder.
 - **Local first.** Everything is saved on your computer. No account, no server.
+- **Posting.** Write a post once and TrendDeck fills it in on YouTube, TikTok, Instagram, X or Reddit in your logged in session, then stops at Post so you can check it. It can press Post itself, run scheduled posts while the app is open, or go through the official APIs instead.
 
 Brand colors, type and logo rules are in [docs/BRAND.md](docs/BRAND.md).
 
@@ -30,7 +31,6 @@ Coming next:
 - **Ideas and Schedule**: a board from idea to posted, and a calendar of what goes out where
 - **Writer**: drafts for every platform from one idea
 - **Analytics**: how your posts did, pulled from your own logged-in accounts
-- **Posting**: TrendDeck posts for you through your logged-in tabs, or through official APIs if you'd rather
 - **Ad blocker** built in, and a **phone emulator** for app-only features
 
 ## Installation

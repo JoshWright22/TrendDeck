@@ -1,3 +1,5 @@
+import type { PostingApi } from './posting'
+
 export interface Site {
   id: string
   name: string
@@ -144,4 +146,5 @@ export interface TrendDeckApi {
   // tells the main process which brand and site a webview is showing
   adblockAttach(webContentsId: number, brandId: string, siteId: string): Promise<void>
   onAdblockCount(fn: (count: AdblockCount) => void): () => void
+  posting: PostingApi
 }

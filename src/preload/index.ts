@@ -1,7 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { AdblockCount, AppData, TrendDeckApi, TrendFeed } from '@shared/types'
+import { postingApi } from './posting'
 
 const api: TrendDeckApi = {
+  platform: process.platform,
+  windowControl: (action) => ipcRenderer.invoke('window:control', action),
+  onMaximized: (fn) => {
+    const listener = (_event: unknown, maximized: boolean): void => fn(maximized)
+    ipcRenderer.on('window:maximized', listener)
+    return () => ipcRenderer.removeListener('window:maximized', listener)
+  },
+  posting: postingApi,
   loadData: () => ipcRenderer.invoke('data:load'),
   saveData: (data: AppData) => ipcRenderer.invoke('data:save', data),
   clearBrandSession: (brandId: string) => ipcRenderer.invoke('brand:clear-session', brandId),
