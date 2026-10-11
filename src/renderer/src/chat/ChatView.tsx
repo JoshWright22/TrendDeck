@@ -21,7 +21,8 @@ import QuestionDeck, { questionsIn, readAnswers } from './Questions'
 import UsagePopover from './UsagePopover'
 import { RisingMark } from './Marks'
 import { Dropdown, Menu } from './ui'
-import { fileSize, onAttach, toAttachment } from './attachments'
+import { fileSize, fromMedia, onAttach } from './attachments'
+import MediaPicker from '../pages/media/MediaPicker'
 import { chat, newId, when } from './api'
 import { onDraft } from '../pages/voice/chatDraft'
 import './chat.css'
@@ -163,7 +164,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
   const [dragging, setDragging] = useState(false)
   const listEnd = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)
-  const filePicker = useRef<HTMLInputElement>(null)
+  const [picking, setPicking] = useState(false)
   const openRef = useRef<string | null>(null)
   openRef.current = openId
 
@@ -427,13 +428,30 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
     if (title.trim()) await chat().renameThread(brandId, id, title)
   }
 
-  const addFiles = (list: FileList | null): void => {
-    if (!list) return
-    const added = Array.from(list).flatMap((f) => {
-      const a = toAttachment({ id: newId(), name: f.name, type: f.type, size: f.size })
-      return a ? [a] : []
-    })
-    setFiles((f) => [...f, ...added].slice(0, 20))
+  const attach = (list: Attachment[]): void =>
+    setFiles((f) => [...f, ...list.filter((a) => !f.some((x) => x.id === a.id))].slice(0, 20))
+
+  // dropped or pasted files go into the brand's media library first, then get attached from there
+  const addFiles = async (list: FileList | null): Promise<void> => {
+    if (!list?.length) return
+    const media = window.trenddeck.media
+    const paths = Array.from(list).map((f) => media.pathForFile(f)).filter(Boolean)
+    if (!paths.length) {
+      setError("That isn't a file on your computer. Save it first, then drop it in.")
+      return
+    }
+    const { ids } = await media.addPaths(brandId, paths)
+    const all = await media.list(brandId, {})
+    const found = all.filter((m) => ids.includes(m.id))
+    const allowed = found.filter((m) => m.agentAllowed && !m.missing)
+    if (allowed.length < paths.length) {
+      setError(
+        found.length > allowed.length
+          ? 'Some of those are in Media with agents switched off, so they were left out.'
+          : "Some of those couldn't be added to Media."
+      )
+    }
+    attach(allowed.map(fromMedia))
   }
 
   const visible = useMemo(
@@ -792,7 +810,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
                 <p className="cx-home-brand">{brand.name}</p>
                 <p className="cx-hello">Deal yourself in. What are we making today?</p>
                 <p className="muted">
-                  Your agent gets this brand's keywords, top trends and saved ideas. Never your logins or what's in your
+                  Your agent gets this brand's voice, keywords, top trends and saved ideas. Never your logins or what's in your
                   tabs.
                 </p>
                 <div className="cx-starters">
@@ -832,7 +850,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
           onDrop={(e) => {
             e.preventDefault()
             setDragging(false)
-            addFiles(e.dataTransfer.files)
+            void addFiles(e.dataTransfer.files)
           }}
         >
           {error && <p className="cx-error">{error}</p>}
@@ -896,7 +914,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
               onPaste={(e) => {
                 if (e.clipboardData.files.length) {
                   e.preventDefault()
-                  addFiles(e.clipboardData.files)
+                  void addFiles(e.clipboardData.files)
                 }
               }}
             />
@@ -926,22 +944,12 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
               <button
                 type="button"
                 className="ui-menu-btn"
-                title="Attach files"
-                aria-label="Attach files"
-                onClick={() => filePicker.current?.click()}
+                title="Attach from Media"
+                aria-label="Attach from Media"
+                onClick={() => setPicking(true)}
               >
                 <ClipIcon />
               </button>
-              <input
-                ref={filePicker}
-                type="file"
-                multiple
-                hidden
-                onChange={(e) => {
-                  addFiles(e.target.files)
-                  e.target.value = ''
-                }}
-              />
               <span className="spacer" />
               <UsagePopover agents={agents ?? []} thread={thread} />
               {busy && thread && (
@@ -964,6 +972,18 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
           </div>
         </form>
       </div>
+
+      {picking && (
+        <MediaPicker
+          brandId={brandId}
+          agentOnly
+          onClose={() => setPicking(false)}
+          onPick={(items) => {
+            setPicking(false)
+            attach(items.map(fromMedia))
+          }}
+        />
+      )}
 
       {manage && (
         <AgentSettings

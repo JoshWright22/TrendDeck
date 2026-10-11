@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { Dropdown } from '../../chat/ui'
 import { IDEA_STAGES, isHttpUrl, STAGE_NAMES, type Idea, type IdeaStage, type ScheduleSlot } from '@shared/types'
 import Modal from '../../components/Modal'
 import { parseTags, stageOf } from './board'
@@ -79,13 +80,13 @@ export default function IdeaEditor({ idea, slots, onSave, onDelete, onClose }: P
           </label>
           <label>
             Column
-            <select value={stage} onChange={(e) => setStage(e.target.value as IdeaStage)}>
-              {IDEA_STAGES.map((s) => (
-                <option key={s} value={s}>
-                  {STAGE_NAMES[s]}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              className="block"
+              label="Column"
+              value={stage}
+              options={IDEA_STAGES.map((s) => ({ value: s, label: STAGE_NAMES[s] }))}
+              onChange={setStage}
+            />
           </label>
         </div>
         {slots.length > 0 && (

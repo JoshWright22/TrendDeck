@@ -1,34 +1,12 @@
 import type { Brand, Draft, Idea, PlatformDraft } from '@shared/types'
 import type { PlatformSpec } from './platforms'
+import { draftChat } from '../voice/chatDraft'
 
-// the chat feature plugs its agent in here. until it does, the writer is manual only.
-// generation only ever runs when the user presses send on a prompt they can read and edit
-export interface DraftGenerator {
-  // short name shown on the send button, e.g. the agent's name
-  name: string
-  generateDraft(prompt: string): Promise<string>
-}
-
-let current: DraftGenerator | null = null
-const listeners = new Set<() => void>()
-
-export function provideDraftGenerator(gen: DraftGenerator | null): void {
-  current = gen
-  for (const fn of listeners) fn()
-}
-
-export function draftGenerator(): DraftGenerator | null {
-  return current
-}
-
-export function onDraftGenerator(fn: () => void): () => void {
-  listeners.add(fn)
-  return () => listeners.delete(fn)
-}
-
-export async function generateDraft(prompt: string): Promise<string> {
-  if (!current) throw new Error('no agent is connected yet')
-  return current.generateDraft(prompt)
+// puts the prompt in the chat box and opens the chat. you read it and send it yourself,
+// the writer never starts an agent
+export function generateDraft(prompt: string, openChat: () => void): void {
+  draftChat(prompt)
+  openChat()
 }
 
 function shape(spec: PlatformSpec): string {

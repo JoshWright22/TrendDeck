@@ -29,8 +29,19 @@ Calls made while building the chat, so nobody has to guess later.
 ## What the agent sees
 
 - Brand name, keywords, subreddits, site tab names, the top 12 trends from the trends cache (title, source, score, one line of detail) and up to 15 saved idea titles.
+- The brand voice pack from `getBrandContext`, in every prompt. It gets the size set on the Voice page.
+- The whole prompt stays under 30000 characters, since Windows caps a command line near 32k and some clis take the prompt as an argument. The brand part and the new message always go in. The voice pack gets its own size or what's left after those with 2000 kept for the chat so far, whichever is smaller. Earlier turns get the rest, up to the old 14k.
+- Claude resumes its session, so it already has the voice from the first message. A resumed message only carries the pack again when it changed since that session last got it. A hash per agent sits on the thread for that and gets cleared with the session on retry and edit.
 - Never cookies, logins or anything from inside a site tab. The trends come from the cached file, building the prompt never fetches anything.
 - Nothing runs in the background. An agent only starts when you send a message.
+
+## Agent tools
+
+- Right before an agent process starts, the chat opens a turn on the app's agent server with `beginAgentTurn` and adds the args and env it hands back to the process. When the process exits the turn ends and its token stops working. See DECISIONS-mcp.md for what the tools can do.
+- Claude, Codex and OpenCode get their own config. Every other cli and custom command agents get the generic env (`TRENDDECK_MCP_URL`, `TRENDDECK_MCP_TOKEN`, `TRENDDECK_MCP_CONFIG`, `TRENDDECK_MCP_STDIO`) and can use it or not.
+- Claude already had `--allowedTools WebSearch,WebFetch`. The turn's `mcp__trenddeck` gets added to that same flag instead of a second one, so both lists count. `--strict-mcp-config` stays, so only the app's server comes along.
+- A retry after a lost session reuses the same turn, it's still the same message.
+- API agents don't get a turn. They're one request with no process and the chat doesn't do tool calls for them, so there's nothing that could use it.
 
 ## History
 
@@ -73,7 +84,10 @@ Calls made while building the chat, so nobody has to guess later.
 
 ## Themed controls
 
-- `chat/ui/` has `Dropdown` and `Menu` plus `usePopover`. No native selects or menus are left in the chat. Arrows, Home/End, Enter, Escape and type to jump all work. Import from `chat/ui` anywhere in the app.
+- `chat/ui/` has `Dropdown` and `Menu` plus `usePopover`. Arrows, Home/End, Enter, Escape and type to jump all work.
+- Every select in the app uses them now, not just the chat. `className="block"` gives a full width one that lines up with the text boxes in a form.
+- A dropdown inside a `<label>` used to open again right after you picked, the label passed the click back to the button. Picking an option cancels that click now.
+- The post composer's subreddit box had a native suggestion list. It's a "Yours" menu next to the box now with the brand's subreddits.
 
 ## Usage
 
@@ -90,7 +104,9 @@ Calls made while building the chat, so nobody has to guess later.
 - Rename (F2), archive and delete (with a confirm) from the menu on each chat. Archived chats sit behind an "Archived" button at the bottom of the list. Sending in an archived chat brings it back.
 - Search looks in titles and message text.
 - Sessions: Claude keeps a session per thread now (no more `--no-session-persistence`) and later messages resume it with only the new message. Retry and edit clear it since the history changed. If resuming fails it starts over with the full prompt. Other clis still get the full chat every time.
-- Attachments: anything with id, name, type and size. Paperclip, drag and drop, paste or `attachToChat()` from `chat/attachments.ts` for the media library. The agent only gets names, types and sizes for now, it can't open the files.
+- Attachments come from the brand's media library. The paperclip opens the Media picker with only the files agents may use. Dropped or pasted files get added to Media first, then attached from there, so a file with its agent switch off in Media gets left out with a note. Something pasted that isn't a file on disk, like a copied image, gets a note to save it first.
+- The agent gets the name, type, size and media id of each one. It still can't open them, but it can put one on a page with `upload_file`, which only takes files agents may use.
+- `attachToChat()` from `chat/attachments.ts` still works for anything that wants to hand files over.
 - Shortcuts: Ctrl+Shift+N new chat (Ctrl+N felt too likely to clash later), Ctrl+L type, Esc stop, Alt+Up/Down next or previous chat. They're listed under the chat list.
 
 ## Approvals

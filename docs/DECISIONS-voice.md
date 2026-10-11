@@ -46,6 +46,7 @@ Calls made while building the Brand voice page.
 - Example posts are ranked by starred first, then same site as the one you're writing for, then how well they did, then how recent. Each one is cut at 800 characters.
 - The size limit is in characters, 6000 by default, with a rough token count next to it (characters / 4).
 - Switches for profile, summary and examples are saved per brand and used by default.
+- The chat puts the pack in every prompt, right after the brand, trends and ideas. It's the same text the preview shows unless the whole prompt would go past 30000 characters, then the pack gets cut to what fits. That only happens with a big size set here and a long message.
 
 ## Learn my voice
 
@@ -56,4 +57,3 @@ Calls made while building the Brand voice page.
 
 - No automatic re-import or schedule, on purpose.
 - Instagram likes and views aren't on the grid page, so they're empty.
-- The chat doesn't call `getBrandContext` yet, that's for the chat branch to wire in.

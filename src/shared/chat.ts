@@ -56,6 +56,8 @@ export interface Attachment {
   name: string
   type: string
   size: number
+  // id is a media library id the agent can hand to upload_file
+  media?: boolean
 }
 
 export type StepStatus = 'running' | 'done' | 'error'
@@ -104,6 +106,8 @@ export interface Thread {
   models?: Record<string, string>
   // agent session to resume, per agent id
   sessions?: Record<string, string>
+  // hash of the brand voice pack each agent's session last got, it's sent again when it changes
+  voiceSent?: Record<string, string>
   archived?: boolean
   messages: ThreadMessage[]
 }

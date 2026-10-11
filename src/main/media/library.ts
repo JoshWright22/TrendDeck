@@ -299,13 +299,16 @@ interface AddOpts {
 export async function addFiles(brandId: string, paths: string[], opts: AddOpts = {}): Promise<AddResult> {
   const lib = await getLib(brandId)
   const files = await expandPaths(paths)
-  const have = new Set(lib.items.map((i) => pathKey(i.path)))
+  const have = new Map(lib.items.map((i) => [pathKey(i.path), i.id]))
   const ignored = new Set(lib.ignored)
   let added = 0
   let skipped = 0
+  const ids: string[] = []
   for (const file of files) {
     const key = pathKey(file)
-    if (have.has(key) || (opts.watch && ignored.has(key))) {
+    const known = have.get(key)
+    if (known || (opts.watch && ignored.has(key))) {
+      if (known) ids.push(known)
       skipped++
       continue
     }
@@ -349,11 +352,12 @@ export async function addFiles(brandId: string, paths: string[], opts: AddOpts =
       }
     }
     lib.items.unshift(item)
-    have.add(key)
+    have.set(key, item.id)
+    ids.push(item.id)
     added++
   }
   if (added) await saveLib(lib)
-  return { added, skipped }
+  return { added, skipped, ids }
 }
 
 export async function editItems(brandId: string, ids: string[], edit: MediaEdit): Promise<void> {

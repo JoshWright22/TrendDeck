@@ -8,6 +8,39 @@ const CODE_FIELD = `/otp|one.?time|2fa|two.?factor|verification.?code|security.?
 // page scripts run in their own world so the site can't see or mess with them
 const WORLD_ID = 1717
 
+// a site's own post, publish or send control. agents can't press these, posts go through
+// request_post so the user checks them first. errs on the safe side like the sign-in guard
+const PUBLISH_FN = `((el) => {
+  if (!el || el.nodeType !== 1) return false
+  const tag = el.tagName.toLowerCase()
+  const role = (el.getAttribute('role') || '').toLowerCase()
+  const type = (el.getAttribute('type') || '').toLowerCase()
+  const clickable = tag === 'button' || tag === 'a' || role === 'button' || role === 'menuitem' || role === 'link' ||
+    (tag === 'input' && ['submit', 'button', 'image'].includes(type))
+  if (!clickable) return false
+  const testId = (el.getAttribute('data-testid') || '').toLowerCase()
+  if (['tweetbutton', 'tweetbuttoninline', 'dmcomposersendbutton', 'sendbutton', 'post-button'].includes(testId)) return true
+  const words = (el.getAttribute('aria-label') || (tag === 'input' ? el.value : el.innerText) || el.getAttribute('title') || '')
+    .toLowerCase().replace(/[^a-z ]+/g, ' ').split(' ').filter(Boolean)
+  const verbs = ['post', 'publish', 'send', 'share', 'tweet', 'reply', 'repost', 'retweet', 'comment', 'submit', 'schedule', 'upload']
+  if (words.length > 0 && words.length <= 4 && verbs.includes(words[0])) return true
+  // a submit button for a form you write in: comment boxes, replies, messages
+  const submits = (tag === 'button' && (type === '' || type === 'submit')) || (tag === 'input' && type === 'submit')
+  const form = submits ? el.form : null
+  return !!form && !!form.querySelector('textarea,[contenteditable=""],[contenteditable=true]') && !form.querySelector('input[type=password]')
+})`
+
+// the element itself, the one really under its middle, and the clickable thing that one sits in
+const PUBLISH_AT = `((el, x, y) => {
+  const isPublish = ${PUBLISH_FN}
+  if (isPublish(el)) return true
+  const hit = document.elementFromPoint(x, y)
+  if (!hit) return false
+  if (isPublish(hit)) return true
+  const host = hit.closest('a,button,input,[role=button],[role=menuitem],[role=link]')
+  return !!host && isPublish(host)
+})`
+
 function bareHost(url: string): string {
   try {
     return new URL(url).hostname.toLowerCase().replace(/^www\./, '')
@@ -95,6 +128,7 @@ const SNAPSHOT = `(() => {
     clip(el.getAttribute('aria-label') || el.getAttribute('title') || el.getAttribute('placeholder') ||
       el.getAttribute('alt') || el.innerText || '', 120)
   const pick = 'a[href],button,input,textarea,select,summary,[role=button],[role=link],[role=tab],[role=menuitem],[role=checkbox],[role=switch],[role=textbox],[contenteditable=""],[contenteditable=true]'
+  const isPublish = ${PUBLISH_FN}
   const items = []
   for (const el of document.querySelectorAll(pick)) {
     const isFile = el.tagName === 'INPUT' && el.type === 'file'
@@ -113,6 +147,7 @@ const SNAPSHOT = `(() => {
     if (v) parts.push(v)
     if (tag === 'a') parts.push('-> ' + clip(el.href, 160))
     if (secret(el)) parts.push('(private field, agents cannot type here)')
+    if (isPublish(el)) parts.push('(posts or sends on the site, agents cannot press it, use request_post)')
     if (el.disabled) parts.push('disabled')
     items.push(parts.join(' '))
   }
@@ -151,6 +186,12 @@ export interface RefInfo {
   type?: string
   editable?: boolean
   secret?: boolean
+  // the site's own post, publish or send control is at that spot
+  publish?: boolean
+  // a text area or rich editor, Enter there can send
+  multiline?: boolean
+  // Enter in this box submits a form whose button posts or sends
+  formPublishes?: boolean
 }
 
 export function locate(wc: WebContents, ref: number): Promise<RefInfo> {
@@ -162,11 +203,19 @@ export function locate(wc: WebContents, ref: number): Promise<RefInfo> {
       el.scrollIntoView({ block: 'center', inline: 'center' })
       const r = el.getBoundingClientRect()
       const tag = el.tagName.toLowerCase()
+      const x = Math.round(r.left + r.width / 2)
+      const y = Math.round(r.top + r.height / 2)
+      const isPublish = ${PUBLISH_FN}
+      const form = el.form || el.closest('form')
+      const formPublishes = !!form && [...form.querySelectorAll('button,input[type=submit]')].some((b) => isPublish(b))
       return {
         ok: true,
-        x: Math.round(r.left + r.width / 2),
-        y: Math.round(r.top + r.height / 2),
+        x,
+        y,
         tag,
+        publish: ${PUBLISH_AT}(el, x, y),
+        multiline: tag === 'textarea' || el.isContentEditable,
+        formPublishes,
         type: tag === 'input' ? el.type : '',
         secret: /password|hidden/.test(el.type || '') || /cc-|password|one-time-code/.test(el.getAttribute('autocomplete') || '') || ${CODE_FIELD},
         editable: tag === 'textarea' || el.isContentEditable || (tag === 'input' && !['button','submit','checkbox','radio','file','image','reset'].includes(el.type))

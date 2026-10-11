@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Dropdown } from '../chat/ui'
 import { SOURCE_NAMES, TREND_SOURCES, type TrendFeed, type TrendItem, type TrendSource } from '@shared/types'
 import PageHeader from '../components/PageHeader'
 import { age, HeroCard, TrendCard } from '../components/TrendBits'
@@ -148,11 +149,16 @@ export default function Trends(props: PageProps): ReactNode {
               </button>
             </span>
           )}
-          <select value={sort} aria-label="Sort" onChange={(e) => setSort(e.target.value as Sort)}>
-            <option value="score">Top score</option>
-            <option value="newest">Newest</option>
-            <option value="source">By source</option>
-          </select>
+          <Dropdown<Sort>
+            label="Sort"
+            value={sort}
+            options={[
+              { value: 'score', label: 'Top score' },
+              { value: 'newest', label: 'Newest' },
+              { value: 'source', label: 'By source' }
+            ]}
+            onChange={setSort}
+          />
         </div>
 
         {errors.length > 0 && (

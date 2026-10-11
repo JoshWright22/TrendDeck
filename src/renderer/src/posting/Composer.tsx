@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Dropdown, Menu } from '../chat/ui'
 import type { Brand } from '@shared/types'
 import {
   PLATFORMS,
@@ -185,29 +186,38 @@ export default function Composer({ brand, settings, post, onClose }: Props): Rea
         {has('reddit') && (
           <label>
             Subreddit
-            <input
-              value={subreddit}
-              list="posting-subs"
-              placeholder="without the r/"
-              spellCheck={false}
-              onChange={(e) => setSubreddit(e.target.value.replace(/[^A-Za-z0-9_/]/g, ''))}
-            />
-            <datalist id="posting-subs">
-              {brand.subreddits.map((s) => (
-                <option key={s} value={s} />
-              ))}
-            </datalist>
+            <span className="sub-pick">
+              <input
+                value={subreddit}
+                placeholder="without the r/"
+                spellCheck={false}
+                onChange={(e) => setSubreddit(e.target.value.replace(/[^A-Za-z0-9_/]/g, ''))}
+              />
+              {brand.subreddits.length > 0 && (
+                <Menu
+                  label="Your subreddits"
+                  trigger={<span className="sub-pick-btn">Yours</span>}
+                  items={brand.subreddits.map((s) => ({ label: `r/${s}`, onSelect: () => setSubreddit(s) }))}
+                />
+              )}
+            </span>
           </label>
         )}
 
         {(has('youtube') || has('tiktok')) && (
           <label>
             Who can see it on {has('youtube') ? 'YouTube' : 'TikTok'}
-            <select value={visibility} onChange={(e) => setVisibility(e.target.value as Visibility)}>
-              <option value="public">Public</option>
-              {has('youtube') && <option value="unlisted">Unlisted</option>}
-              <option value="private">Private</option>
-            </select>
+            <Dropdown<Visibility>
+              className="block"
+              label="Who can see it"
+              value={visibility}
+              options={[
+                { value: 'public', label: 'Public' },
+                ...(has('youtube') ? [{ value: 'unlisted' as const, label: 'Unlisted' }] : []),
+                { value: 'private', label: 'Private' }
+              ]}
+              onChange={setVisibility}
+            />
           </label>
         )}
 

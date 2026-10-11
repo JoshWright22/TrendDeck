@@ -15,6 +15,14 @@ export interface CliOptions {
   session?: string
 }
 
+// what the app's agent server hands back for one turn: extra args and env for the process
+export interface TurnAttach {
+  args: string[]
+  env: Record<string, string>
+}
+
+const NO_ATTACH: TurnAttach = { args: [], env: {} }
+
 const isWin = process.platform === 'win32'
 // a reply that takes longer than this is stuck
 const MAX_RUN_MS = 10 * 60_000
@@ -29,12 +37,27 @@ async function workDir(): Promise<string> {
   return path
 }
 
-// the agent gets the user's normal environment, minus electron's own switches
-function agentEnv(): NodeJS.ProcessEnv {
+// the agent gets the user's normal environment, minus electron's own switches, plus the turn's
+function agentEnv(extra: Record<string, string>): NodeJS.ProcessEnv {
   const env: Record<string, string | undefined> = { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' }
   delete env.ELECTRON_RUN_AS_NODE
   delete env.ELECTRON_RENDERER_URL
-  return env
+  return { ...env, ...extra }
+}
+
+// a flag given twice only keeps one value, so the turn's allowed tools join the ones already there
+function mergeArgs(base: string[], extra: string[]): { base: string[]; extra: string[] } {
+  const out = [...base]
+  const rest: string[] = []
+  for (let i = 0; i < extra.length; i++) {
+    const flag = extra[i]
+    const at = flag === '--allowedTools' ? out.indexOf(flag) : -1
+    if (at >= 0 && at + 1 < out.length && i + 1 < extra.length) {
+      out[at + 1] = `${out[at + 1]},${extra[i + 1]}`
+      i++
+    } else rest.push(flag)
+  }
+  return { base: out, extra: rest }
 }
 
 function killTree(child: ChildProcess): void {
@@ -53,9 +76,10 @@ interface SpawnPlan {
   shell: boolean
   stdin: string | null
   output: CliSpec['output']
+  env: Record<string, string>
 }
 
-async function planCli(spec: CliSpec, prompt: string, opts: CliOptions): Promise<SpawnPlan> {
+async function planCli(spec: CliSpec, prompt: string, opts: CliOptions, turn: TurnAttach): Promise<SpawnPlan> {
   let path: string | null = null
   for (const bin of spec.bins) {
     path = await which(bin)
@@ -63,10 +87,11 @@ async function planCli(spec: CliSpec, prompt: string, opts: CliOptions): Promise
   }
   if (!path) throw new Error(`${spec.name} isn't installed or isn't on PATH`)
   const launch = await resolveLaunch(path)
-  const extra: string[] = []
+  const merged = mergeArgs(spec.args, turn.args)
+  const extra: string[] = [...merged.extra]
   if (opts.session && spec.resume) extra.push(...spec.resume(opts.session))
   if (opts.model && spec.modelFlag) extra.push(spec.modelFlag, opts.model)
-  const base = spec.args.map((a) => (a === '{prompt}' ? prompt : a))
+  const base = merged.base.map((a) => (a === '{prompt}' ? prompt : a))
   // codex reads `-` as the prompt marker, so the extra flags go before the last arg there
   const args = spec.id === 'codex' ? [...base.slice(0, -1), ...extra, ...base.slice(-1)] : [...extra, ...base]
   if (launch.shell && spec.prompt === 'arg') {
@@ -79,7 +104,8 @@ async function planCli(spec: CliSpec, prompt: string, opts: CliOptions): Promise
     args: [...launch.prefix, ...safeArgs],
     shell: launch.shell,
     stdin: spec.prompt === 'stdin' ? prompt : null,
-    output: spec.output
+    output: spec.output,
+    env: turn.env
   }
 }
 
@@ -95,7 +121,7 @@ function dropEmptyFlags(args: string[]): string[] {
   return out
 }
 
-async function planCommand(command: string, prompt: string): Promise<SpawnPlan> {
+async function planCommand(command: string, prompt: string, turn: TurnAttach): Promise<SpawnPlan> {
   const parts = splitCommand(command)
   if (parts.length === 0) throw new Error('This agent has no command set')
   const path = await which(parts[0])
@@ -108,10 +134,11 @@ async function planCommand(command: string, prompt: string): Promise<SpawnPlan> 
   const args = parts.slice(1).map((p) => p.split('{prompt}').join(prompt))
   return {
     file: launch.file,
-    args: [...launch.prefix, ...args],
+    args: [...launch.prefix, ...args, ...turn.args],
     shell: launch.shell,
     stdin: usesArg ? null : prompt,
-    output: 'text'
+    output: 'text',
+    env: turn.env
   }
 }
 
@@ -125,7 +152,7 @@ async function runPlan(plan: SpawnPlan, hooks: RunHooks): Promise<void> {
       cwd,
       shell: plan.shell,
       windowsHide: true,
-      env: agentEnv(),
+      env: agentEnv(plan.env),
       stdio: ['pipe', 'pipe', 'pipe']
     })
     let stderr = ''
@@ -190,12 +217,23 @@ async function runPlan(plan: SpawnPlan, hooks: RunHooks): Promise<void> {
   })
 }
 
-export async function runCli(spec: CliSpec, prompt: string, opts: CliOptions, hooks: RunHooks): Promise<void> {
-  await runPlan(await planCli(spec, prompt, opts), hooks)
+export async function runCli(
+  spec: CliSpec,
+  prompt: string,
+  opts: CliOptions,
+  hooks: RunHooks,
+  turn: TurnAttach = NO_ATTACH
+): Promise<void> {
+  await runPlan(await planCli(spec, prompt, opts, turn), hooks)
 }
 
-export async function runCommand(command: string, prompt: string, hooks: RunHooks): Promise<void> {
-  await runPlan(await planCommand(command, prompt), hooks)
+export async function runCommand(
+  command: string,
+  prompt: string,
+  hooks: RunHooks,
+  turn: TurnAttach = NO_ATTACH
+): Promise<void> {
+  await runPlan(await planCommand(command, prompt, turn), hooks)
 }
 
 export interface ApiTarget {

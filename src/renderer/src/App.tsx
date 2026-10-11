@@ -268,7 +268,8 @@ export default function App(): ReactNode {
           onSettings={() => setView({ kind: 'settings' })}
         />
 
-        <main className="main">
+        {/* home is the chat, it sits on the same surface as the sidebar */}
+        <main className={`main${brand && view.kind === 'chat' ? ' home' : ''}`}>
           {!brand && (
             <div className="empty">
               <p>No brands yet</p>

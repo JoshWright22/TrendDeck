@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { Dropdown } from '../chat/ui'
 import type { Brand } from '@shared/types'
 import {
   API_FIELDS,
@@ -73,16 +74,15 @@ function PlatformRow({ platform, brand, settings }: Props & { platform: Platform
       <header>
         <h3>{PLATFORM_NAMES[platform]}</h3>
         {fields.length > 0 ? (
-          <select
+          <Dropdown
+            label={`${PLATFORM_NAMES[platform]} posting mode`}
             value={mode}
-            aria-label={`${PLATFORM_NAMES[platform]} posting mode`}
-            onChange={(e) =>
-              void api.setBrand(brand.id, { modes: { ...settings.modes, [platform]: e.target.value } })
-            }
-          >
-            <option value="tabs">Logged in tab</option>
-            <option value="api">Official API</option>
-          </select>
+            options={[
+              { value: 'tabs', label: 'Logged in tab' },
+              { value: 'api', label: 'Official API' }
+            ]}
+            onChange={(next) => void api.setBrand(brand.id, { modes: { ...settings.modes, [platform]: next } })}
+          />
         ) : (
           <span className="muted small">Logged in tab only</span>
         )}

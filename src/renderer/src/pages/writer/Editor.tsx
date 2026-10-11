@@ -12,7 +12,7 @@ import {
   xLength,
   type PlatformSpec
 } from './platforms'
-import { buildPrompt, draftGenerator, generateDraft, onDraftGenerator, parseReply } from './generate'
+import { buildPrompt, generateDraft, parseReply } from './generate'
 
 const MAX_VERSIONS = 30
 const MAX_POSTS = 25
@@ -25,6 +25,8 @@ interface Props {
   idea: Idea | undefined
   spec: PlatformSpec
   onChange: (fn: (d: PlatformDraft) => PlatformDraft) => void
+  // opens the chat pane if it's closed
+  onOpenChat: () => void
 }
 
 function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }): ReactNode {
@@ -214,68 +216,53 @@ function Thread({
   )
 }
 
-function useGenerator(): ReturnType<typeof draftGenerator> {
-  const [gen, setGen] = useState(draftGenerator)
-  useEffect(() => onDraftGenerator(() => setGen(draftGenerator())), [])
-  return gen
-}
-
-function Generate({ brand, draft, idea, spec, onChange }: Props): ReactNode {
-  const gen = useGenerator()
-  const [open, setOpen] = useState(false)
+function Generate({ brand, draft, idea, spec, onChange, onOpenChat }: Props): ReactNode {
+  // idle, editing the prompt, or waiting for the reply to be pasted back
+  const [step, setStep] = useState<'idle' | 'prompt' | 'reply'>('idle')
   const [prompt, setPrompt] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const [reply, setReply] = useState('')
 
   const start = (): void => {
     setPrompt(buildPrompt(brand, draft, idea, spec))
-    setError('')
-    setOpen(true)
+    setStep('prompt')
   }
 
-  const send = async (): Promise<void> => {
-    setBusy(true)
-    setError('')
-    try {
-      const reply = await generateDraft(prompt)
-      const got = parseReply(spec, reply)
-      onChange((p) => {
-        // keep what was there before the agent wrote over it
-        const kept = withVersion(p, 'manual')
-        const next: PlatformDraft = {
-          ...kept,
-          fields: { ...kept.fields, ...got.fields },
-          thread: got.thread.length ? got.thread : kept.thread
-        }
-        return { ...next, versions: [snapshot(next, 'generated'), ...next.versions].slice(0, MAX_VERSIONS) }
-      })
-      setOpen(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setBusy(false)
-    }
+  const toChat = (): void => {
+    generateDraft(prompt, onOpenChat)
+    setReply('')
+    setStep('reply')
+  }
+
+  const useReply = (): void => {
+    const got = parseReply(spec, reply)
+    onChange((p) => {
+      // keep what was there before the reply wrote over it
+      const kept = withVersion(p, 'manual')
+      const next: PlatformDraft = {
+        ...kept,
+        fields: { ...kept.fields, ...got.fields },
+        thread: got.thread.length ? got.thread : kept.thread
+      }
+      return { ...next, versions: [snapshot(next, 'generated'), ...next.versions].slice(0, MAX_VERSIONS) }
+    })
+    setStep('idle')
   }
 
   return (
     <div className="wr-side-box">
       <h4>Write with your agent</h4>
-      {!gen ? (
-        <p className="muted small">
-          No agent is connected to the writer yet. Writing by hand works the same, and versions and copy work
-          either way.
-        </p>
-      ) : !open ? (
+      {step === 'idle' && (
         <>
           <p className="muted small">
-            You see the prompt first and nothing is sent until you press send. Your text so far is kept as a
-            version.
+            Puts a prompt in the chat box for you to read and send. Paste the reply back here and your text so
+            far is kept as a version.
           </p>
           <button className="pill teal" onClick={start}>
-            Draft {spec.name} with {gen.name}
+            Draft {spec.name} in chat
           </button>
         </>
-      ) : (
+      )}
+      {step === 'prompt' && (
         <>
           <textarea
             className="wr-input wr-prompt"
@@ -284,14 +271,35 @@ function Generate({ brand, draft, idea, spec, onChange }: Props): ReactNode {
             onChange={(e) => setPrompt(e.target.value)}
             aria-label="Prompt"
           />
-          {error && <p className="form-error">{error}</p>}
           <div className="wr-row">
-            <button className="btn ghost" onClick={() => setOpen(false)} disabled={busy}>
+            <button className="btn ghost" onClick={() => setStep('idle')}>
               Cancel
             </button>
             <span className="spacer" />
-            <button className="pill teal" onClick={() => void send()} disabled={busy || !prompt.trim()}>
-              {busy ? 'Writing...' : 'Send'}
+            <button className="pill teal" onClick={toChat} disabled={!prompt.trim()}>
+              Put it in the chat
+            </button>
+          </div>
+        </>
+      )}
+      {step === 'reply' && (
+        <>
+          <p className="muted small">It's in the chat box, nothing is sent until you send it there.</p>
+          <textarea
+            className="wr-input wr-prompt"
+            rows={6}
+            value={reply}
+            placeholder="Paste the reply here"
+            onChange={(e) => setReply(e.target.value)}
+            aria-label="Reply"
+          />
+          <div className="wr-row">
+            <button className="btn ghost" onClick={() => setStep('idle')}>
+              Done
+            </button>
+            <span className="spacer" />
+            <button className="pill teal" onClick={useReply} disabled={!reply.trim()}>
+              Use reply
             </button>
           </div>
         </>

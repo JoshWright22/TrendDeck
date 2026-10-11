@@ -202,7 +202,6 @@
 /* composer */
 
 .composer textarea,
-.composer select,
 .key-fields input {
   display: block;
   width: 100%;
@@ -216,8 +215,20 @@
   user-select: text;
 }
 
-.composer select {
-  height: auto;
+.sub-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sub-pick input {
+  flex: 1;
+}
+
+.sub-pick .ui-menu-btn {
+  width: auto;
+  margin-top: 5px;
+  padding: 0 10px;
 }
 
 .composer textarea {

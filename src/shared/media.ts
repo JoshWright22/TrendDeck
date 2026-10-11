@@ -89,6 +89,8 @@ export interface MediaProbe {
 export interface AddResult {
   added: number
   skipped: number
+  // library ids for the files, including ones that were already in the library
+  ids: string[]
 }
 
 // what the ui can call, there is no way to get a file's contents through here

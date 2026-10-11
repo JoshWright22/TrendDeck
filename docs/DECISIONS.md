@@ -14,6 +14,7 @@ Calls made while building, so nobody has to guess later.
 - Switching back to a site went from about 580 ms before anything showed and 8 s until the page finished loading, to about 25 ms with nothing to load. Four sites open went from 1.4 GB to 1.9 GB of memory, that's the trade.
 - Ctrl+1..9 (Cmd on macOS) picks the brand in rail order. When a site has focus the main process catches the keys first, otherwise the site would eat them.
 - Chat is the home screen and the first item in the sidebar. On every other page it can sit on the right too, toggled from the top right. See DECISIONS-chat.md.
+- On the chat the main area drops its panel box, so the sidebar, the chat list and the conversation sit on one felt with one spotlight. Every other page keeps the raised panel, that's how you can tell you left home.
 - Pages and the chat pane are lazy loaded, each one is its own chunk.
 - Fonts (Inter, Inter Tight) come from @fontsource and get bundled, latin subset only to keep the build small.
 
@@ -113,6 +114,10 @@ Calls made while building, so nobody has to guess later.
 - Shorts came next, between Posting and Inbox. It was built when posts still took a file path, so it picks its video with the Media picker now and its posts carry the media id. The length and size check reads the file in main from the id, the page never sees the path.
 - Posting pace is its own section on the Settings screen. The branch's "What TrendDeck stores" list was dropped, it was missing half the files. docs/PRIVACY.md has the full list and got the files from chat, voice, inbox, media, posting and Shorts.
 - The phone came last. Its Phone entry sits under the site list in the sidebar like its branch had it. The branch still had `adblockAttach` and `onAdblockCount` from the old ad blocker, those are gone again.
+- Hooking the chat to the agent server: every cli and command agent run is one turn, opened right before the process starts and ended when it exits. Tested with a small command agent that reads its env, lists the tools with the token, and the same token gets a 401 once it's done. The real clis weren't run for this.
+- Every place you pick a file now goes through the Media picker: the post composer and Shorts already did, the chat composer does too. Chat attachments are media ids, see DECISIONS-chat.md.
+- The writer's agent button drafts a chat message now instead of calling an agent. The old hook the chat was meant to plug into is gone. See DECISIONS-writer.md.
+- No native selects or menus are left. Every page uses the themed `Dropdown` and `Menu` from `chat/ui`, and the css that only styled the old selects is gone.
 
 ## One session per brand
 
@@ -131,4 +136,4 @@ Calls made while building, so nobody has to guess later.
 - Post audit is the default for every post, yours or an agent's. The app switches to the brand and its tab for the site, fills the post in there and waits at Post. Leaving the tab counts as closing the review.
 - Skipping the audit is the per brand "Press Post for me" setting from posting, renamed "Skip the post check", still off by default. With it on posts run in a background window like before so they don't take over your tab.
 - If the brand has no tab for the site, or the tab doesn't come up in 15 seconds, the audit falls back to the separate posting window on the same session. It still stops at Post.
-- An agent with a site allowed can still click around that site's own tab, including a site's Post button. The audit covers posts that go through `request_post` and the queue, not clicks in a shared tab.
+- Agents can't press a site's own post, publish or send button through the page tools anymore, so every post an agent makes goes through `request_post` and the post check. See DECISIONS-mcp.md.

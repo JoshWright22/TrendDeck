@@ -12,6 +12,22 @@
   inset: 0;
 }
 
+/* home: no panel box, the chat is part of the same felt as the sidebar */
+.main.home {
+  background: transparent;
+  border-color: transparent;
+  border-radius: 0;
+}
+
+.main.home .cx-side {
+  padding-left: 0;
+  border-right: 0;
+}
+
+.main.home .cx-head {
+  border-bottom-color: transparent;
+}
+
 /* the side pane version sits where the old chat pane did */
 .cx.compact {
   flex: none;

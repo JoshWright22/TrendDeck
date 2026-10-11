@@ -54,14 +54,15 @@ The app never loads remote images or fonts for its own screens, has no crash rep
 
 Agents only run when you send a chat message, and only for the brand that chat is for.
 
-- **Always:** the brand's name, keywords, subreddits and site list, its trends, ideas, drafts and post requests.
+- **Always:** the brand's name, keywords, subreddits and site list, its trends, ideas, drafts and post requests, and its brand voice: the profile and some past posts, the same text the Voice page previews.
 - **Only on sites you allowed:** the open tab's url, title, visible text and a list of buttons, links and text boxes. What's typed in a text box is never shown, only that it has something in it. A site is allowed when you turn it on in Settings > Agent access, or share the tab for one message with the share button in the toolbar. You can turn it off any time and every action shows in the activity log.
+- **Files you attach:** their name, type, size and media library id. Agents can't open them, they can only put one on a page with `upload_file`, and only files you allowed for agents in Media.
 - **Never:** cookies, local or session storage, your saved logins, password, card and code fields, other brands, or anything on a site you didn't allow.
 - **On sign-in pages:** nothing. While a tab is on a login, sign-up, password or two-factor page, agents only get told it's a sign-in page and can't click or type there.
 
 Anything an agent reads goes to that agent's provider as part of answering you. If a page shows something private, like DMs or an email, and you allowed that site, the agent can read it. Allow only the sites you want it working in.
 
-Agents can't post for you. `request_post` puts a post in "Waiting for you" in Settings > Agent access and you post it yourself.
+Agents can't press a site's own post, publish or send button. `request_post` puts the post in the Posting queue, TrendDeck fills it in on the site and you check it and press Post yourself, unless you turned that check off for the brand.
 
 ## Saved logins
 

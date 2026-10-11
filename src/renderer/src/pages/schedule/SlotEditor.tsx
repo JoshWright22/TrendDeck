@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { Dropdown } from '../../chat/ui'
 import { PLATFORMS, STAGE_NAMES, type Idea, type ScheduleSlot } from '@shared/types'
 import Modal from '../../components/Modal'
 import { stageOf } from '../ideas/board'
@@ -57,26 +58,32 @@ export default function SlotEditor({ slot, isNew, ideas, onSave, onDelete, onClo
           </label>
           <label>
             Platform
-            <select value={platform} onChange={(e) => setPlatform(e.target.value)}>
-              {platforms.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              className="block"
+              label="Platform"
+              value={platform}
+              options={platforms.map((p) => ({ value: p, label: p }))}
+              onChange={setPlatform}
+            />
           </label>
         </div>
         <label>
           Idea
-          <select value={ideaId} onChange={(e) => setIdeaId(e.target.value)}>
-            <option value="">No idea linked</option>
-            {options.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.title.length > 60 ? `${i.title.slice(0, 60)}...` : i.title} ({STAGE_NAMES[stageOf(i)]})
-              </option>
-            ))}
-            {ideaId && !idea && <option value={ideaId}>Deleted idea</option>}
-          </select>
+          <Dropdown
+            className="block"
+            label="Idea"
+            value={ideaId}
+            options={[
+              { value: '', label: 'No idea linked' },
+              ...options.map((i) => ({
+                value: i.id,
+                label: i.title.length > 60 ? `${i.title.slice(0, 60)}...` : i.title,
+                hint: STAGE_NAMES[stageOf(i)]
+              })),
+              ...(ideaId && !idea ? [{ value: ideaId, label: 'Deleted idea' }] : [])
+            ]}
+            onChange={setIdeaId}
+          />
         </label>
         <label>
           Title

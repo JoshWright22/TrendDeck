@@ -31,14 +31,6 @@
   margin-bottom: 14px;
 }
 
-.inbox-bar select {
-  background: var(--panel);
-  color: var(--chalk);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 5px 8px;
-}
-
 .inbox-note {
   color: var(--smoke);
   font-size: 12px;

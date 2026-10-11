@@ -16,9 +16,11 @@ import { getData } from '../store'
 import { CLIS } from './catalog'
 import { which } from './detect'
 import { getConfig, getCustom, removeCustom, saveCustom, setDefault } from './config'
-import { brandContext, flatPrompt, history, turnText } from './context'
+import { brandContext, flatPrompt, history, historyRoom, turnText, voiceHash, voiceRoom } from './context'
+import { getBrandContext } from '../voice'
 import { addThread, cleanAttachments, dropChats, findThread, persist, removeThread, threadsFor } from './history'
 import { runApi, runCli, runCommand, type RunHooks } from './run'
+import { beginAgentTurn, type AgentKind, type AgentSession } from '../mcp'
 import { recordLimits, usageFor } from './usage'
 
 export { dropChats }
@@ -91,6 +93,11 @@ function validId(v: unknown): v is string {
   return typeof v === 'string' && ID_PATTERN.test(v)
 }
 
+// which config the agent server writes for this agent, the rest read the generic env and file
+function attachKind(agentId: string): AgentKind {
+  return agentId === 'claude' || agentId === 'codex' || agentId === 'opencode' ? agentId : 'generic'
+}
+
 function startRun(brandId: string, thread: Thread, reply: ThreadMessage, agentId: string): void {
   const ctl = new AbortController()
   runs.set(runKey(brandId, thread.id), ctl)
@@ -161,35 +168,55 @@ async function runReply(
     send({ type: 'threads', brandId })
   }
 
+  // the agent server only lets an agent in while its turn is open, the turn ends when the agent exits
+  let turn: AgentSession | null = null
+  const openTurn = async (): Promise<AgentSession> => (turn ??= await beginAgentTurn(brandId, attachKind(agentId)))
+
   try {
     const brand = getData()?.brands.find((b) => b.id === brandId)
     if (!brand) throw new Error('That brand is gone')
-    const context = await brandContext(brand)
+    const base = await brandContext(brand)
     // the user message and the empty reply are the last two
-    const past = history(thread, 2)
     const userMsg = thread.messages[thread.messages.length - 2]
     const message = userMsg ? turnText(userMsg) : ''
+    // every prompt carries the brand voice pack, cut to the brand's own size or to what still fits
+    let voice = await getBrandContext(brandId)
+    const room = voiceRoom(base.length + message.length)
+    if (voice.chars > room) voice = await getBrandContext(brandId, undefined, room)
+    const context = `${base}\n\n${voice.text}`
+    const past = history(thread, 2, historyRoom(context.length + message.length))
+    const sentVoice = voiceHash(voice.text)
     const model = thread.models?.[agentId] || undefined
 
     const cli = CLIS.find((c) => c.id === agentId)
     if (cli) {
       const session = cli.resume ? thread.sessions?.[agentId] : undefined
-      // a resumed session already has the brand and the chat so far, it only needs the new message
-      const prompt = session ? message : flatPrompt(context, past, message)
+      // a resumed session already has the brand, the voice and the chat so far. it gets the new
+      // message, plus the voice pack again only when it changed since the session last got it
+      const voiceChanged = thread.voiceSent?.[agentId] !== sentVoice
+      const prompt = !session
+        ? flatPrompt(context, past, message)
+        : voiceChanged
+          ? `${voice.text}\n\n## New message from the user\n${message}`
+          : message
+      thread.voiceSent = { ...thread.voiceSent, [agentId]: sentVoice }
+      const { attach } = await openTurn()
       try {
-        await runCli(cli, prompt, { model, session }, hooks)
+        await runCli(cli, prompt, { model, session }, hooks, attach)
       } catch (err) {
         // the agent lost the session (cleared, other machine), start over with the full prompt
         if (!session || ctl.signal.aborted || reply.text) throw err
         if (thread.sessions) delete thread.sessions[agentId]
-        await runCli(cli, flatPrompt(context, past, message), { model }, hooks)
+        await runCli(cli, flatPrompt(context, past, message), { model }, hooks, attach)
       }
     } else {
       const custom = await getCustom(agentId)
       if (!custom) throw new Error('That agent was removed. Pick another one.')
       if (custom.kind === 'command') {
-        await runCommand(custom.command, flatPrompt(context, past, message), hooks)
+        const { attach } = await openTurn()
+        await runCommand(custom.command, flatPrompt(context, past, message), hooks, attach)
       } else {
+        // an api agent is one plain request with no process and no tool calls, so it gets no turn
         await runApi(
           { baseUrl: custom.baseUrl, apiKey: custom.apiKey, model: model || custom.model },
           [
@@ -207,6 +234,9 @@ async function runReply(
   } catch (err) {
     if (ctl.signal.aborted) finish('stopped')
     else finish('error', err instanceof Error ? err.message : String(err))
+  } finally {
+    // the process has exited by now, its token dies with the turn
+    await (turn as AgentSession | null)?.end()
   }
 }
 
@@ -314,6 +344,7 @@ export function setupAgents(): void {
   // retry and edit both change what came before, so the agent's own session can't be reused
   const rerun = async (brandId: string, thread: Thread, agentId: string): Promise<SendResult> => {
     thread.sessions = {}
+    thread.voiceSent = {}
     thread.agentId = agentId
     const reply = newReply(agentId, thread.models?.[agentId] || undefined)
     thread.messages.push(reply)

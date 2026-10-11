@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { Dropdown } from '../../chat/ui'
 import {
   filterMedia,
   formatDuration,
@@ -190,14 +191,13 @@ export default function MediaPage({ brand, chatOpen, onToggleChat }: PageProps):
           {kinds.map((k) => sideBtn({ kind: 'type', type: k }, KIND_NAMES[k]))}
           {sideBtn({ kind: 'unposted' }, 'Not posted yet', unpostedCount)}
           {side.kind === 'unposted' && (
-            <select className="media-select" value={notOn} onChange={(e) => setNotOn(e.target.value)}>
-              <option value="">Anywhere</option>
-              {platforms.map((p) => (
-                <option key={p} value={p}>
-                  Not on {p}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              className="media-select"
+              label="Not posted on"
+              value={notOn}
+              options={[{ value: '', label: 'Anywhere' }, ...platforms.map((p) => ({ value: p, label: `Not on ${p}` }))]}
+              onChange={setNotOn}
+            />
           )}
           {sideBtn({ kind: 'agent' }, 'Agents can use')}
           {missingCount > 0 && sideBtn({ kind: 'missing' }, 'Missing', missingCount)}
@@ -637,13 +637,13 @@ function Details({ brandId, items, collections, platforms, onRemove, onClose }: 
               setPostUrl('')
             }}
           >
-            <select className="media-select" value={platform} onChange={(e) => setPlatform(e.target.value)}>
-              {platforms.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              className="media-select"
+              label="Posted on"
+              value={platform}
+              options={platforms.map((p) => ({ value: p, label: p }))}
+              onChange={setPlatform}
+            />
             <input value={postUrl} placeholder="Link (optional)" onChange={(e) => setPostUrl(e.target.value)} />
             <button className="pill" type="submit" disabled={!platform}>
               Mark posted

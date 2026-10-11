@@ -1302,14 +1302,6 @@ select:focus-visible,
   user-select: text;
 }
 
-select {
-  height: 30px;
-  padding: 0 10px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: var(--felt);
-}
-
 .errors {
   margin: 0 0 12px;
   color: var(--pink);

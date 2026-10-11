@@ -23,8 +23,9 @@ Calls made while building these two pages. Same idea as DECISIONS.md.
 
 ## Writer and the agent
 
-- Generation goes through `generateDraft(prompt)` in `pages/writer/generate.ts`. The chat feature calls `provideDraftGenerator({ name, generateDraft })` once an agent is set up. Until then the button is replaced by a note and writing by hand is the whole feature.
-- Agents only run when the user sends something, so the writer never calls the agent by itself. Pressing the button shows the full prompt in a box you can edit, and nothing goes out until you press Send. I'm counting that as the user sending a message.
+- `generateDraft(prompt, openChat)` in `pages/writer/generate.ts` never runs an agent. It puts the prompt in the chat box and opens the chat pane. You send it there like any other message, with whatever agent and model the chat has picked.
+- Pressing the button shows the full prompt in a box you can edit first, then "Put it in the chat" hands it over.
+- The reply comes back by pasting it into the box that shows after that, then Use reply. It's one more step than before, but it means the writer has no second way to start an agent.
 - The prompt asks for json with the same field names as the editor. If the reply has no json the whole reply goes in the main field.
 - Before a reply replaces your text, your text is saved as a version. The reply is saved as a version too, tagged "agent".
 

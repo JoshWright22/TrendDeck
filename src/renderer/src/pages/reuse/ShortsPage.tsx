@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Dropdown } from '../../chat/ui'
 import type { ScheduleSlot } from '@shared/types'
 import type { PostItem, Visibility } from '@shared/posting'
 import {
@@ -267,14 +268,16 @@ export default function ShortsPage({
                 </label>
                 <label className="field">
                   <span className="field-name">Visibility</span>
-                  <select
+                  <Dropdown<Visibility>
+                    label="Visibility"
                     value={visibility}
-                    onChange={(e) => setVisibility(e.target.value as Visibility)}
-                  >
-                    <option value="public">Public</option>
-                    <option value="unlisted">Unlisted</option>
-                    <option value="private">Private</option>
-                  </select>
+                    options={[
+                      { value: 'public', label: 'Public' },
+                      { value: 'unlisted', label: 'Unlisted' },
+                      { value: 'private', label: 'Private' }
+                    ]}
+                    onChange={setVisibility}
+                  />
                 </label>
                 <button
                   type="button"

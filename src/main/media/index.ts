@@ -77,7 +77,7 @@ export function setupMedia(): void {
       properties: folders ? ['openDirectory', 'multiSelections'] : ['openFile', 'multiSelections']
     }
     const res = w ? await dialog.showOpenDialog(w, opts) : await dialog.showOpenDialog(opts)
-    if (res.canceled) return { added: 0, skipped: 0 }
+    if (res.canceled) return { added: 0, skipped: 0, ids: [] }
     return addFiles(brandId, res.filePaths)
   })
   handle('media:add-paths', (brandId, paths) =>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Dropdown } from '../../chat/ui'
 import {
   analyze,
   buildContext,
@@ -99,14 +100,12 @@ function Context(props: {
         ))}
         <label className="muted small">
           Writing for{' '}
-          <select value={platform} onChange={(e) => setPlatform(e.target.value as VoicePlatform | '')}>
-            <option value="">Any site</option>
-            {VOICE_PLATFORMS.map((p) => (
-              <option key={p} value={p}>
-                {PLATFORM_NAMES[p]}
-              </option>
-            ))}
-          </select>
+          <Dropdown<VoicePlatform | ''>
+            label="Writing for"
+            value={platform}
+            options={[{ value: '', label: 'Any site' }, ...VOICE_PLATFORMS.map((p) => ({ value: p, label: PLATFORM_NAMES[p] }))]}
+            onChange={setPlatform}
+          />
         </label>
         <label className="muted small">
           Size limit{' '}

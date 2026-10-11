@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { Dropdown } from '../../chat/ui'
 import { hostOf } from '@shared/types'
 import {
   blockKey,
@@ -176,22 +177,18 @@ function Comments(props: {
         <button className="pill teal" disabled={props.busy} onClick={props.onRefresh}>
           {props.busy ? 'Refreshing' : 'Refresh'}
         </button>
-        <select value={site} onChange={(e) => setSite(e.target.value as InboxSite | '')} aria-label="Site">
-          <option value="">All sites</option>
-          {INBOX_SITES.map((s) => (
-            <option key={s} value={s}>
-              {SITE_NAMES[s]}
-            </option>
-          ))}
-        </select>
-        <select value={account} onChange={(e) => setAccount(e.target.value)} aria-label="Account">
-          <option value="">All accounts</option>
-          {accounts.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
+        <Dropdown<InboxSite | ''>
+          label="Site"
+          value={site}
+          options={[{ value: '', label: 'All sites' }, ...INBOX_SITES.map((s) => ({ value: s, label: SITE_NAMES[s] }))]}
+          onChange={setSite}
+        />
+        <Dropdown
+          label="Account"
+          value={account}
+          options={[{ value: '', label: 'All accounts' }, ...accounts.map((a) => ({ value: a, label: a }))]}
+          onChange={setAccount}
+        />
         <button className={`filter-chip${onlyUnread ? ' on' : ''}`} onClick={() => setOnlyUnread(!onlyUnread)}>
           Unread
         </button>

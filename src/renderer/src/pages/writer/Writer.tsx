@@ -208,6 +208,7 @@ export default function Writer({ brand, chatOpen, onToggleChat }: PageProps): Re
               draft={draft}
               idea={idea}
               spec={SPEC[platform]}
+              onOpenChat={() => !chatOpen && onToggleChat()}
               onChange={(fn) =>
                 editDraft((d) => ({
                   ...d,

@@ -74,6 +74,10 @@ async function access(turn: Turn, site: Site | null): Promise<boolean> {
 const DENIED =
   "the user hasn't let agents use this site. ask them to allow it in Settings > Agent access, or to share the tab with their next message"
 
+// agents never press a site's own post or send control, so every post goes past the user's post check
+const PUBLISH_BLOCKED =
+  "that's the site's own post, publish or send button and agents can't press it. use request_post instead: TrendDeck fills the post in on this site and the user checks it and presses Post themselves"
+
 // the open tab, only if the site it's on is allowed for this turn
 async function allowedTab(turn: Turn): Promise<{ wc: WebContents; site: Site }> {
   const brand = brandOf(turn)
@@ -201,6 +205,11 @@ export const TOOLS: Tool[] = [
       if (!info.ok) throw new ToolError(info.error ?? 'not found')
       await new Promise((r) => setTimeout(r, 150))
       const again = await locate(wc, Number(args.ref))
+      // checked on both reads, the page can move between them
+      if (info.publish || again.publish) {
+        await addLog({ brandId: turn.brandId, siteId: site.id, kind: 'denied', detail: `post button [${args.ref}]` })
+        throw new ToolError(PUBLISH_BLOCKED)
+      }
       await click(wc, again.x ?? info.x!, again.y ?? info.y!)
       await addLog({ brandId: turn.brandId, siteId: site.id, kind: 'click', detail: `${info.tag} [${args.ref}]` })
       await new Promise((r) => setTimeout(r, 600))
@@ -228,6 +237,13 @@ export const TOOLS: Tool[] = [
       if (!info.ok) throw new ToolError(info.error ?? 'not found')
       if (info.secret) throw new ToolError("agents can't type into password, card or code fields")
       if (!info.editable) throw new ToolError(`[${args.ref}] is a ${info.tag}, not a text box`)
+      // Enter in a compose box or a form that posts would send it without the post check
+      if (args.submit === true && (info.multiline || info.formPublishes)) {
+        await addLog({ brandId: turn.brandId, siteId: site.id, kind: 'denied', detail: `Enter in [${args.ref}]` })
+        throw new ToolError(
+          "submit would send this on the site and agents can't do that. type without submit, then use request_post for anything that should go out"
+        )
+      }
       // a real click first so sites that wake their editor on click get it
       await click(wc, info.x!, info.y!)
       await focusRef(wc, Number(args.ref), args.clear === true)

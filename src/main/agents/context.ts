@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { SOURCE_NAMES, type Brand, type TrendFeed } from '@shared/types'
@@ -13,6 +14,25 @@ const MAX_IDEAS = 15
 // the windows command line limit for agents that take it as an argument
 const MAX_HISTORY_CHARS = 14_000
 const MAX_TURN_CHARS = 4_000
+// the whole prompt. windows caps a command line near 32k and some clis take the prompt as an argument
+export const PROMPT_MAX = 30_000
+// the chat so far always keeps at least this much room next to the voice pack
+const MIN_HISTORY_CHARS = 2_000
+// headings and line breaks between the parts
+const GLUE = 200
+
+// the voice pack gets the size the brand set on the Voice page, unless the rest of the prompt
+// leaves less room than that
+export function voiceRoom(fixedChars: number): number {
+  return Math.max(500, PROMPT_MAX - fixedChars - MIN_HISTORY_CHARS - GLUE)
+}
+
+// what's left for earlier turns once everything else is in
+export function historyRoom(fixedChars: number): number {
+  return Math.max(0, Math.min(MAX_HISTORY_CHARS, PROMPT_MAX - fixedChars - GLUE))
+}
+
+export const voiceHash = (text: string): string => createHash('sha1').update(text).digest('hex').slice(0, 16)
 
 // read straight from the trends cache, never kicks off a fetch
 async function cachedTrends(brandId: string): Promise<TrendFeed | null> {
@@ -101,9 +121,20 @@ function size(n: number): string {
 
 export function attachmentNote(files: Attachment[] | undefined): string {
   if (!files?.length) return ''
-  return `\n\nAttached by the user (names only, you can't open them):\n${files
-    .map((f) => `- ${oneLine(f.name, 120)} (${f.type || 'file'}, ${size(f.size)})`)
-    .join('\n')}`
+  const media = files.filter((f) => f.media)
+  const other = files.filter((f) => !f.media)
+  let note = ''
+  if (media.length) {
+    note += `\n\nAttached by the user from their media library. You can't open them, but you can put one on a page with the TrendDeck upload_file tool using its media id:\n${media
+      .map((f) => `- ${oneLine(f.name, 120)} (${f.type || 'file'}, ${size(f.size)}), media id ${f.id}`)
+      .join('\n')}`
+  }
+  if (other.length) {
+    note += `\n\nAttached by the user (names only, you can't open them):\n${other
+      .map((f) => `- ${oneLine(f.name, 120)} (${f.type || 'file'}, ${size(f.size)})`)
+      .join('\n')}`
+  }
+  return note
 }
 
 // what the agent should know about a past message besides its text
@@ -115,7 +146,11 @@ export function turnText(m: ThreadMessage): string {
 }
 
 // earlier turns of the thread, newest kept first when it gets long
-export function history(thread: Thread, skipLast: number): { role: 'user' | 'agent'; text: string }[] {
+export function history(
+  thread: Thread,
+  skipLast: number,
+  maxChars = MAX_HISTORY_CHARS
+): { role: 'user' | 'agent'; text: string }[] {
   const msgs = thread.messages
     .slice(0, thread.messages.length - skipLast)
     .filter((m) => m.text.trim() && (m.role === 'user' || m.status !== 'error'))
@@ -123,7 +158,7 @@ export function history(thread: Thread, skipLast: number): { role: 'user' | 'age
   let used = 0
   for (let i = msgs.length - 1; i >= 0; i--) {
     const text = turnText(msgs[i]).slice(0, MAX_TURN_CHARS)
-    if (used + text.length > MAX_HISTORY_CHARS) break
+    if (used + text.length > maxChars) break
     used += text.length
     out.unshift({ role: msgs[i].role, text })
   }

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Dropdown } from '../../chat/ui'
 import { PLATFORMS, type Brand, type ScheduleSlot } from '@shared/types'
 import PageHeader from '../../components/PageHeader'
 import { BackIcon, ForwardIcon, PlusIcon } from '../../components/Icons'
@@ -155,14 +156,12 @@ export default function SchedulePage({ brand, editBrand, chatOpen, onToggleChat 
             <span className="sc-label">{label}</span>
           </div>
         )}
-        <select value={platform} aria-label="Platform" onChange={(e) => setPlatform(e.target.value)}>
-          <option value="all">All platforms</option>
-          {platforms.map((p) => (
-            <option key={p} value={p}>
-              {p}
-            </option>
-          ))}
-        </select>
+        <Dropdown
+          label="Platform"
+          value={platform}
+          options={[{ value: 'all', label: 'All platforms' }, ...platforms.map((p) => ({ value: p, label: p }))]}
+          onChange={setPlatform}
+        />
         <button className="pill teal" onClick={() => create(atTime(cursor, DEFAULT_MINUTES))}>
           <PlusIcon />
           Plan a post

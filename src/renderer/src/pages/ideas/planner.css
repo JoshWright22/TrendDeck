@@ -92,8 +92,7 @@
   height: 12px;
 }
 
-.pl-form textarea,
-.pl-form select {
+.pl-form textarea {
   display: block;
   width: 100%;
   margin-top: 5px;
@@ -105,10 +104,6 @@
   font-size: 13px;
 }
 
-.pl-form select {
-  height: 35px;
-}
-
 .pl-form textarea {
   resize: vertical;
   min-height: 70px;
@@ -116,8 +111,7 @@
   user-select: text;
 }
 
-.pl-form textarea:focus,
-.pl-form select:focus {
+.pl-form textarea:focus {
   outline: none;
   border-color: var(--teal);
 }

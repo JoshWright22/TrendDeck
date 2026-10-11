@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { Dropdown } from '../../chat/ui'
 import {
   IMPORT_PLATFORMS,
   mergePosts,
@@ -204,13 +205,12 @@ export default function Posts({ posts, onChange, onImport }: Props): ReactNode {
         <div className="v-row">
           <label className="muted small">
             Site{' '}
-            <select value={platform} onChange={(e) => setPlatform(e.target.value as VoicePlatform)}>
-              {VOICE_PLATFORMS.map((p) => (
-                <option key={p} value={p}>
-                  {PLATFORM_NAMES[p]}
-                </option>
-              ))}
-            </select>
+            <Dropdown<VoicePlatform>
+              label="Site"
+              value={platform}
+              options={VOICE_PLATFORMS.map((p) => ({ value: p, label: PLATFORM_NAMES[p] }))}
+              onChange={setPlatform}
+            />
           </label>
           <button className="pill teal" disabled={!draft.trim()} onClick={paste}>
             <PlusIcon />
@@ -273,17 +273,18 @@ export default function Posts({ posts, onChange, onImport }: Props): ReactNode {
       {note && <p className={`v-note${note.bad ? ' bad' : ''}`}>{note.text}</p>}
 
       <div className="filters">
-        <select value={filter} onChange={(e) => setFilter(e.target.value as VoicePlatform | 'all')}>
-          <option value="all">All sites ({posts.length})</option>
-          {VOICE_PLATFORMS.map((p) => {
-            const n = posts.filter((x) => x.platform === p).length
-            return n ? (
-              <option key={p} value={p}>
-                {PLATFORM_NAMES[p]} ({n})
-              </option>
-            ) : null
-          })}
-        </select>
+        <Dropdown<VoicePlatform | 'all'>
+          label="Site"
+          value={filter}
+          options={[
+            { value: 'all', label: `All sites (${posts.length})` },
+            ...VOICE_PLATFORMS.flatMap((p) => {
+              const n = posts.filter((x) => x.platform === p).length
+              return n ? [{ value: p, label: `${PLATFORM_NAMES[p]} (${n})` }] : []
+            })
+          ]}
+          onChange={setFilter}
+        />
         <button
           className={`filter-chip${starredOnly ? ' on' : ''}`}
           aria-pressed={starredOnly}
@@ -291,10 +292,15 @@ export default function Posts({ posts, onChange, onImport }: Props): ReactNode {
         >
           Starred
         </button>
-        <select value={sort} onChange={(e) => setSort(e.target.value as 'new' | 'best')}>
-          <option value="new">Newest</option>
-          <option value="best">Best performing</option>
-        </select>
+        <Dropdown<'new' | 'best'>
+          label="Sort"
+          value={sort}
+          options={[
+            { value: 'new', label: 'Newest' },
+            { value: 'best', label: 'Best performing' }
+          ]}
+          onChange={setSort}
+        />
         <input
           className="v-search"
           value={query}

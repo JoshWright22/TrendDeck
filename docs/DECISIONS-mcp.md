@@ -21,7 +21,7 @@ Calls made while building the local MCP server, so nobody has to guess later.
   - opencode: `OPENCODE_CONFIG` pointing at a config with a remote server, token read from `{env:TRENDDECK_MCP_TOKEN}`.
   - anything else: `TRENDDECK_MCP_URL`, `TRENDDECK_MCP_TOKEN`, `TRENDDECK_MCP_STDIO` (the bridge command) and `TRENDDECK_MCP_CONFIG`, a standard `mcpServers` json with both stdio and http entries.
 - Config files are written per turn, removed when it ends, and any leftovers are swept on startup.
-- Run the app from source with `--mcp-dev` to open one turn for the open brand and print the url, token and config path. It only works when the app isn't packaged. It's there to try the tools by hand before the chat is wired up.
+- Run the app from source with `--mcp-dev` to open one turn for the open brand and print the url, token and config path. It only works when the app isn't packaged. It's for trying the tools by hand without an agent.
 
 ## Permissions
 
@@ -41,6 +41,16 @@ Calls made while building the local MCP server, so nobody has to guess later.
 - `open_site` only works on the brand that's on screen. If you switched brands mid answer it says so instead of pulling you back.
 - `upload_file` takes media library ids from `list_media`, only files allowed for agents. See DECISIONS.md. It sets the files with the devtools protocol, so the file input has to be on the page (they show in `read_page` even when hidden).
 - No cookie, storage, password or script tool. There is no way for an agent to run its own code in a page.
+
+## Post buttons
+
+- `click` refuses a site's own post, publish or send control and tells the agent to use `request_post`, which goes through the post check. `read_page` marks those controls so the agent knows up front.
+- What counts: a button, link or menu item whose label starts with post, publish, send, share, tweet, reply, repost, retweet, comment, submit, schedule or upload and is four words or less. X's own post and send buttons by their test ids. A submit button in a form that has a text area or a rich text box, like a comment or message form.
+- It checks the element you asked for, the element really under its middle, and the button or link that one sits in. So clicking a wrapper around a Send button is blocked too.
+- `type` with `submit` refuses to press Enter in a text area or rich text box, or in a form whose submit is one of those buttons. Typing without Enter still works, and Enter in a plain search box still works.
+- Every refusal goes in the activity log as denied.
+- It errs on the safe side. "Share" that only opens a share menu and "Reply" that only opens a reply box are blocked too. YouTube's last upload button says "Save" for private videos, that one isn't caught by the words, but uploads go through `request_post` anyway.
+- Tried on a local test page with a plain Post button, a Send button inside a clickable wrapper, an X style post button, a comment form and a search form. Only Load more, the search and Find went through.
 
 ## Ideas, drafts and posts
 

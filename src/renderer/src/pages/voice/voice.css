@@ -105,7 +105,7 @@
   margin: 10px 0 0;
 }
 
-.v-row select {
+.v-row .ui-dd {
   margin-left: 4px;
 }
 

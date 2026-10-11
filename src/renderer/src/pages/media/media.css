@@ -146,10 +146,6 @@
 
 .media-select {
   margin: 2px 0 4px 10px;
-  padding: 4px 6px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--felt);
 }
 
 .media-tags {
@@ -637,6 +633,7 @@
   padding: 30px 0;
   text-align: center;
 }
-.media-select {
+.media-select .ui-dd-value,
+.media-select .ui-item-label {
   text-transform: capitalize;
 }

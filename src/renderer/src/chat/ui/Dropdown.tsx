@@ -137,7 +137,11 @@ export function Dropdown<T extends string>({
               className={`ui-item${i === active ? ' active' : ''}${r.action ? ' action' : ''}${r.key === `o:${value}` ? ' chosen' : ''}`}
               onMouseEnter={() => setActive(i)}
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => choose(i)}
+              onClick={(e) => {
+                // inside a <label> the click would reach the button again and reopen the list
+                e.preventDefault()
+                choose(i)
+              }}
             >
               <span className="ui-item-label">{r.label}</span>
               {r.hint && <span className="ui-item-hint">{r.hint}</span>}

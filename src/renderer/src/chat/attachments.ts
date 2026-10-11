@@ -1,4 +1,5 @@
 import type { Attachment } from '@shared/chat'
+import type { MediaInfo } from '@shared/media'
 
 // other parts of the app (like the media library) hand files to the chat composer with
 // attachToChat. anything with an id, name, type and size works, the rest gets dropped
@@ -8,12 +9,19 @@ const EVENT = 'trenddeck:chat-attach'
 export function toAttachment(raw: unknown): Attachment | null {
   const o = raw as Partial<Attachment> | null
   if (!o || typeof o.name !== 'string' || !o.name) return null
-  return {
+  const a: Attachment = {
     id: typeof o.id === 'string' && o.id ? o.id : crypto.randomUUID(),
     name: o.name.slice(0, 200),
     type: typeof o.type === 'string' ? o.type.slice(0, 100) : '',
     size: typeof o.size === 'number' && o.size >= 0 ? o.size : 0
   }
+  if (o.media === true) a.media = true
+  return a
+}
+
+// a media library file as a chat attachment, the id is what the agent's upload_file takes
+export function fromMedia(m: MediaInfo): Attachment {
+  return { id: m.id, name: `${m.name}${m.ext ? `.${m.ext}` : ''}`, type: m.ext ? `${m.kind}/${m.ext}` : m.kind, size: m.size, media: true }
 }
 
 export function attachToChat(items: unknown[]): void {

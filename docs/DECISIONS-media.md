@@ -44,4 +44,5 @@ Calls made while building the media library. Merge into DECISIONS.md once it lan
 ## Picker
 
 - `<MediaPicker brandId onPick onClose multiple kind agentOnly />` from `src/renderer/src/pages/media/MediaPicker.tsx`. It hands back `MediaInfo` (no paths). The chat composer should pass `agentOnly` so it only offers files agents may use, the post composer leaves it off.
-- Not dropped into a composer yet, those are on other branches.
+- The post composer, Shorts and the chat composer all use it. The chat passes `agentOnly`.
+- `addPaths` hands back the library ids of the files too, new or already there, so the chat can attach a dropped file right after adding it.

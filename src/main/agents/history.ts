@@ -17,7 +17,14 @@ export function cleanAttachments(raw: unknown): Attachment[] {
   return raw.slice(0, 20).flatMap((a): Attachment[] => {
     const o = a as Partial<Attachment> | null
     if (!o || typeof o.name !== 'string') return []
-    return [{ id: str(o.id, 120) || o.name.slice(0, 120), name: o.name.slice(0, 200), type: str(o.type, 100), size: Number(o.size) || 0 }]
+    const file: Attachment = {
+      id: str(o.id, 120) || o.name.slice(0, 120),
+      name: o.name.slice(0, 200),
+      type: str(o.type, 100),
+      size: Number(o.size) || 0
+    }
+    if (o.media === true) file.media = true
+    return [file]
   })
 }
 
@@ -99,6 +106,7 @@ function cleanThread(raw: unknown): Thread | null {
     agentId: typeof t.agentId === 'string' ? t.agentId.slice(0, 80) : null,
     models: cleanMap(t.models, isStr),
     sessions: cleanMap(t.sessions, isStr),
+    voiceSent: cleanMap(t.voiceSent, isStr),
     archived: t.archived === true,
     messages
   }
