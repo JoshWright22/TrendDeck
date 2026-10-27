@@ -218,4 +218,20 @@ describe('OBS agent tools', () => {
     }
     expect(OBS_TOOLS.filter((t) => t.risk === 'read').map((t) => t.name).sort()).toEqual(['obs_scenes', 'obs_screenshot', 'obs_show', 'obs_status', 'obs_takes'])
   })
+
+  it('imports the password from local OBS only after asking, and never hands it back', async () => {
+    vi.doMock('../cards/store', () => ({ addCard: vi.fn(), newCardId: () => 'card' }))
+    vi.doMock('../store', () => ({ getData: () => null }))
+    const prefs = await import('./preferences')
+    vi.mocked(prefs.saveObsPreferences).mockResolvedValue({ endpoint: 'ws://127.0.0.1:4455/', hasPassword: true, recording: {} as never })
+    const { OBS_TOOLS } = await import('./tools')
+    const tool = OBS_TOOLS.find((t) => t.name === 'obs_import_password')!
+    expect(tool.risk).toBe('edit')
+    expect(tool.alwaysAsk).toBe(true)
+    expect(await tool.mustAsk!({} as never, {})).toMatch(/never sees it/)
+    const out = await tool.run({ brandId: 'brand-a', threadId: null } as never, {})
+    expect(prefs.saveObsPreferences).toHaveBeenCalledWith('brand-a', { endpoint: 'ws://127.0.0.1:4455/', importLocalPassword: true })
+    expect(out).toMatchObject({ passwordImported: true, endpoint: 'ws://127.0.0.1:4455/' })
+    expect(JSON.stringify(out)).not.toMatch(/"password"/i)
+  })
 })

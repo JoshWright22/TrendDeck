@@ -10,6 +10,7 @@ import { cachedTools, pickFile, saveSession, sessionCall, sessionFor, withSessio
 import { connectError, connectionFor } from './connection'
 import { countsAsEdit } from '@shared/craft-embed'
 import { APPS, spec } from './catalog'
+import { installLatest } from './install'
 import type { McpCallResult, McpContent } from './mcp'
 import { appFiles, findProject, projectFolder } from './paths'
 import {
@@ -228,6 +229,34 @@ export function craftTools(open: (turn: Turn, appId: string, projectId: string, 
           }
         })
         return { apps, projects: brand.projects.map((p) => ({ id: p.id, name: p.name })) }
+      }
+    },
+    {
+      name: 'craft_install',
+      title: 'Install or update a craft app',
+      description:
+        'Installs a Craft app from its GitHub release, or updates it to the latest. An app that is open gets the update when it closes. Asks the user first. To open it in the chat afterwards use craft_open or craft_embed (they install too when needed).',
+      inputSchema: obj({ app: APP_ARG }, ['app']),
+      risk: 'edit',
+      alwaysAsk: true,
+      summarize: (_turn, args) => {
+        const s = status(String(args.app))
+        return s.install.kind === 'installed' ? `Update ${s.app.name} to the latest version from GitHub` : `Install ${s.app.name} from GitHub (about 100 MB)`
+      },
+      run: async (_turn, args) => {
+        const appId = String(args.app)
+        try {
+          await installLatest(appId)
+        } catch (err) {
+          throw new ToolError(`${spec(appId).name} didn't install: ${err instanceof Error ? err.message : String(err)}`)
+        }
+        const s = status(appId)
+        return {
+          app: s.app.name,
+          installed: s.install.kind === 'installed' ? s.install.version : false,
+          updateReady: s.updateReady ? `${s.updateReady}, goes in when the app closes` : null,
+          next: webSpec(appId) ? `craft_open or craft_embed shows ${s.app.name} in the chat` : `craft_open opens ${s.app.name} in its own window`
+        }
       }
     },
     {

@@ -4,8 +4,9 @@ import { addCard, newCardId } from '../cards/store'
 import { ImageResult, ToolError, type GatewayTool, type Turn } from '../gateway/types'
 import { bool, int, obj, str } from '../gateway/validate'
 import { getData } from '../store'
+import { obsPreferences } from './preferences'
 import {
-  isStreaming, obsScenes, obsStatus, recentTakes, screenshot, setInputMute, setupRecording, startRecording, startStream,
+  configureObs, isStreaming, obsScenes, obsStatus, recentTakes, screenshot, setInputMute, setupRecording, startRecording, startStream,
   stopRecording, stopStream, switchScene
 } from './service'
 
@@ -109,6 +110,20 @@ export const OBS_TOOLS: GatewayTool[] = [
     mustAsk: (turn) => liveWhy(turn, 'hear the change'),
     summarize: (_turn, args) => `${args.muted ? 'Mute' : 'Unmute'} "${args.input}" in OBS`,
     run: (turn, args) => plain(() => setInputMute(turn.brandId, String(args.input), args.muted === true))
+  },
+  {
+    name: 'obs_import_password', title: 'Connect to OBS', risk: 'edit', alwaysAsk: true,
+    mustAsk: async () => "TrendDeck reads the WebSocket password from this computer's OBS settings and keeps it encrypted. Your agent never sees it",
+    description:
+      "Connects TrendDeck to the OBS on this computer, end to end: once the user approves, TrendDeck reads the WebSocket password from OBS's own settings, keeps it encrypted and checks the connection. You never see the password. OBS has to be running with Tools, WebSocket Server Settings: server on and authentication on. If it fails, tell the user what to turn on, or post open_settings with section OBS.",
+    inputSchema: obj({ endpoint: str('the OBS WebSocket address, like ws://127.0.0.1:4455. leave it out for the one in Settings, OBS', 200, 1) }),
+    summarize: (_turn, args) => `Import the OBS WebSocket password from this computer's OBS${typeof args.endpoint === 'string' ? ` for ${args.endpoint}` : ''} and connect`,
+    run: (turn, args) => plain(async () => {
+      const endpoint = typeof args.endpoint === 'string' ? args.endpoint : (await obsPreferences(turn.brandId)).endpoint
+      const prefs = await configureObs(turn.brandId, { endpoint, importLocalPassword: true })
+      const status = await obsStatus(turn.brandId).catch((err: unknown) => ({ connected: false, error: err instanceof Error ? err.message : String(err) }))
+      return { passwordImported: prefs.hasPassword, endpoint: prefs.endpoint, status }
+    })
   },
   {
     name: 'obs_setup_recording', title: 'Set up OBS recording', risk: 'edit', alwaysAsk: true,
