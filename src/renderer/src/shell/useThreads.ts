@@ -1,15 +1,20 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ThreadSummary } from '@shared/chat'
 import { chat } from '../chat/api'
 
 // the brand's chats for the sidebar, kept fresh from the chat events
 export function useThreads(brandId: string | null): { threads: ThreadSummary[]; reload: () => void } {
   const [threads, setThreads] = useState<ThreadSummary[]>([])
+  const currentBrand = useRef(brandId)
+  const sequence = useRef(0)
+  currentBrand.current = brandId
   const reload = useCallback(() => {
     if (!brandId) return
+    const request = ++sequence.current
     void chat()
       .listThreads(brandId)
-      .then((list) => setThreads(list))
+      .then((list) => { if (currentBrand.current === brandId && sequence.current === request) setThreads(list) })
+      .catch(() => {})
   }, [brandId])
 
   useEffect(() => {
@@ -18,19 +23,17 @@ export function useThreads(brandId: string | null): { threads: ThreadSummary[]; 
   }, [reload])
 
   useEffect(() => {
-    // a reply starting sends no threads event, so the first word of one marks it busy
-    const live = new Set<string>()
-    return chat().onEvent((ev) => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const off = chat().onEvent((ev) => {
       if (ev.brandId !== brandId) return
-      if (ev.type === 'threads') return reload()
-      if (ev.type === 'done') {
-        live.delete(ev.threadId)
+      if (ev.type === 'threads' || ev.type === 'done') {
+        if (timer) clearTimeout(timer)
+        timer = null
         return reload()
       }
-      if (live.has(ev.threadId)) return
-      live.add(ev.threadId)
-      reload()
+      if (!timer) timer = setTimeout(() => { timer = null; reload() }, 350)
     })
+    return () => { off(); if (timer) clearTimeout(timer) }
   }, [brandId, reload])
 
   return { threads, reload }

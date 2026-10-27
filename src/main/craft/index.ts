@@ -1,4 +1,4 @@
-import { app, ipcMain, type BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
+import { app, dialog, ipcMain, type BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import type { CraftAppStatus, CraftDock, CraftOpenRequest } from '@shared/craft'
 import { registerToolSource } from '../gateway/call'
 import { registerSecretSource } from '../gateway/secrets'
@@ -135,6 +135,13 @@ export function setupCraft(): void {
     if (!anyOpen) return
     e.preventDefault()
     quitting = true
-    void Promise.allSettled([closeAllForQuit(), stopAllSessions()]).finally(() => app.quit())
+    void stopAllSessions().then(async () => {
+      await closeAllForQuit()
+      app.quit()
+    }).catch((error) => {
+      quitting = false
+      console.error('craft: quitting cancelled because editor changes could not be saved', error)
+      void dialog.showMessageBox({ type: 'error', title: 'Editor changes are not saved', message: 'TrendDeck stayed open to protect your editor changes. Save or recover the project, then try closing or updating again.' })
+    })
   })
 }

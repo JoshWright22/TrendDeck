@@ -19,6 +19,7 @@ const TYPES: Record<string, string> = {
   m4v: 'video/mp4',
   mov: 'video/quicktime',
   webm: 'video/webm',
+  weba: 'audio/webm',
   mkv: 'video/x-matroska',
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',

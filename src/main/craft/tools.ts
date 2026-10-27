@@ -213,6 +213,6 @@ export function setupCraftTurns(): void {
   onTurnClosed((turn) => {
     for (const ac of turnCalls.get(turn.id) ?? []) ac.abort('the chat turn ended')
     turnCalls.delete(turn.id)
-    for (const a of APPS) void saveSession(a.id)
+    for (const a of APPS) void saveSession(a.id).catch((error) => console.error(`craft: ${a.id} changes are still unsaved`, error))
   })
 }

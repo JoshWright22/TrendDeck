@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { Brand } from '@shared/types'
 import type { ThreadSummary } from '@shared/chat'
 import { GENERAL_PROJECT_ID, PROJECT_STATUSES, projectIdForThread, type Project, type ProjectStatus } from '@shared/workspace'
@@ -7,6 +7,7 @@ import { chat, newId, when } from '../chat/api'
 import { PlusIcon, SettingsIcon } from '../components/Icons'
 import JobsStrip from './JobsStrip'
 import { isUnread, usePendingState, waitingThreads } from '../chat/pending'
+import { useLoginRequests } from '../chat/useLoginRequests'
 
 interface Props {
   brands: Brand[]
@@ -75,12 +76,19 @@ export default function Sidebar(props: Props): ReactNode {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [showArchived, setShowArchived] = useState<string | null>(null)
   const [naming, setNaming] = useState(false)
+  const [width, setWidth] = useState(() => {
+    try { return Math.max(280, Math.min(480, Number(localStorage.getItem('trenddeck.sidebar-width')) || 330)) } catch { return 330 }
+  })
+  useEffect(() => () => document.body.classList.remove('resizing'), [])
 
   const projects = brand?.projects ?? []
   const brandId = brand?.id ?? ''
   const pend = usePendingState()
   // chats with an approval or a question waiting
-  const waiting = waitingThreads(pend, brandId)
+  const loginRequests = useLoginRequests(brandId)
+  const waiting = new Set([...waitingThreads(pend, brandId), ...loginRequests.flatMap((request) => request.threadId ? [request.threadId] : [])])
+  const working = threads.filter((thread) => thread.busy && !thread.archived)
+  const needsYou = threads.filter((thread) => waiting.has(thread.id) && !thread.archived)
   const isOpen = (id: string): boolean => open[id] ?? id === projectId
 
   const threadsOf = (p: Project): ThreadSummary[] =>
@@ -180,8 +188,15 @@ export default function Sidebar(props: Props): ReactNode {
         </span>
       ) : (
         <>
-          <span className="tree-name">{t.title}</span>
-          <span className="tree-meta">{when(t.updatedAt)}</span>
+          <span className="tree-chat-info">
+            <span className="tree-chat-title">{t.title}</span>
+            <span className="tree-chat-details">
+              <span className={waiting.has(t.id) ? 'tree-needs-you' : t.busy ? 'tree-working' : ''}>{waiting.has(t.id) ? 'Needs you' : t.busy ? 'Working' : isUnread(pend, brandId, t.id) ? 'New reply' : 'Idle'}</span>
+              {t.agentName && <span>{t.agentName}</span>}
+              <time dateTime={new Date(t.updatedAt).toISOString()}>{when(t.updatedAt)}</time>
+            </span>
+            <span className="tree-chat-preview" title={t.activity || t.preview || t.model || ''}>{t.activity || t.preview || t.model || 'Ready for your next message'}</span>
+          </span>
           <Menu
             label="Chat options"
             className="tree-menu"
@@ -287,7 +302,22 @@ export default function Sidebar(props: Props): ReactNode {
   }
 
   return (
-    <aside className="sb" aria-label="Brands and projects">
+    <aside className="sb" style={{ width }} aria-label="Brands and projects">
+      <div className="sb-overview">
+        <strong>{brand?.name ?? 'Your workspace'}</strong>
+        <span>{working.length} working / {needsYou.length} need you</span>
+      </div>
+      {(working.length > 0 || needsYou.length > 0) && <div className="sb-attention">
+        {([{ title: 'Needs you', list: needsYou }, { title: 'Working', list: working.filter((thread) => !waiting.has(thread.id)) }]).map((group) => group.list.length > 0 && (
+          <section key={group.title} aria-label={`${group.title} chats`}>
+            <h3>{group.title} <span>{group.list.length}</span></h3>
+            {group.list.map((thread) => <button key={thread.id} className="sb-attention-chat" onClick={() => props.onOpenThread(thread.id)}>
+              <StatusDot status={waiting.has(thread.id) ? 'waiting' : 'running'} />
+              <span><strong>{thread.title}</strong><small>{thread.activity || projects.find((project) => project.id === projectIdForThread(projects, thread.id))?.name || 'General'}</small></span>
+            </button>)}
+          </section>
+        ))}
+      </div>}
       <div className="sb-scroll" role="tree">
         {props.brands.map((b, i) => {
           const active = b.id === brand?.id
@@ -318,7 +348,7 @@ export default function Sidebar(props: Props): ReactNode {
                       <circle cx="9.5" cy="6" r="1.6" fill="none" stroke="currentColor" />
                       <path d="M4.2 6h3.6" stroke="currentColor" />
                     </svg>
-                    <span className="tree-name">Pipeline</span>
+                    <span className="tree-name">Ask agent to set up workflow</span>
                   </button>
                   {projects.map(projectNode)}
                   {naming ? (
@@ -348,6 +378,23 @@ export default function Sidebar(props: Props): ReactNode {
         <SettingsIcon />
         Settings
       </button>
+      <div className="sb-resize" role="separator" aria-label="Resize sidebar" aria-orientation="vertical" tabIndex={0}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+          event.preventDefault()
+          const next = Math.max(280, Math.min(480, width + (event.key === 'ArrowRight' ? 20 : -20)))
+          setWidth(next)
+          try { localStorage.setItem('trenddeck.sidebar-width', String(next)) } catch {}
+        }}
+        onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); document.body.classList.add('resizing') }}
+        onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) setWidth(Math.max(280, Math.min(480, event.clientX))) }}
+        onPointerUp={(event) => {
+          event.currentTarget.releasePointerCapture(event.pointerId)
+          document.body.classList.remove('resizing')
+          try { localStorage.setItem('trenddeck.sidebar-width', String(width)) } catch {}
+        }}
+        onPointerCancel={() => document.body.classList.remove('resizing')}
+      />
     </aside>
   )
 }

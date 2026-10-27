@@ -1,5 +1,8 @@
 import { app, BrowserWindow, ipcMain, session, webContents, type WebContents } from 'electron'
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { setupDictation } from './dictation'
+import { setupObs } from './obs'
 import { ID_PATTERN, isHttpUrl, partitionFor, type AppData } from '@shared/types'
 import { styleSite } from './site-style'
 import { setupUpdater } from './updater'
@@ -25,6 +28,7 @@ import { craftHost, setupCraft } from './craft'
 import { setupQc } from './qc'
 
 const PARTITION_PREFIX = 'persist:brand-'
+if (process.platform === 'win32') app.setAppUserModelId('com.joshwright.trenddeck')
 
 // test runs pass --mute-audio or set TRENDDECK_MUTE=1 so nothing ever makes a sound
 const MUTE_ALL = process.argv.includes('--mute-audio') || process.env.TRENDDECK_MUTE === '1'
@@ -125,10 +129,16 @@ function createWindow(): void {
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
+    setupDictation(win, process.env.ELECTRON_RENDERER_URL)
     void win.loadURL(process.env.ELECTRON_RENDERER_URL)
   } else {
+    setupDictation(win, pathToFileURL(join(__dirname, '../renderer/index.html')).href)
     void win.loadFile(join(__dirname, '../renderer/index.html'))
   }
+  win.webContents.session.setPermissionRequestHandler((contents, permission, callback, details) => {
+    callback(contents === win.webContents && permission === 'media' && details.isMainFrame)
+  })
+  win.webContents.session.setPermissionCheckHandler((contents, permission) => contents === win.webContents && permission === 'media')
 }
 
 app.on('web-contents-created', (_event, contents) => {
@@ -194,6 +204,7 @@ setupAnalytics()
 setupMcp()
 setupGateway()
 setupVault()
+setupObs()
 setupAgents()
 setupVoice()
 setupHiddenSites(syncMute)

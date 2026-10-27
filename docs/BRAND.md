@@ -29,7 +29,7 @@ The app, its icon, the installer and the landing page are black, white and grays
 
 ## Type
 
-- Headlines: Inter Tight, ExtraBold or Black, tight (-0.04em), huge on landing pages.
+- Headlines: Inter Tight, sized for the content hierarchy rather than oversized by default. Avoid dramatic typography that pushes useful content below the fold.
 - Body and UI: Inter, Regular and Medium.
 - Numbers (scores, counts): Inter with tabular figures.
 - Fonts are bundled, never loaded from a CDN in the app.
@@ -37,7 +37,7 @@ The app, its icon, the installer and the landing page are black, white and grays
 ## Look
 
 - **Plain surfaces.** Flat panels on black, separated by hairlines, not shadows or tinted cards. Rounded 8 px corners.
-- **Status as small dots.** Gray for idle, white for running or done, red only for errors and recording.
+- **Status with meaning.** Label running, recording, waiting and error states in words. Dots may reinforce a real state, never substitute for the label or serve as decoration.
 - **Work collapses.** Agent tool calls fold into one "Worked · N steps" row that opens on click.
 - **Light primary buttons.** One light button per view for the main action; everything else is a quiet hairline button.
 - **No decoration.** No glows, gradients, textures, sparkles or mascots.
@@ -49,3 +49,14 @@ Quiet. A short fade and slide with a plain ease-out: panels slide in about 12 px
 ## Voice
 
 Plain and direct. Short sentences. Talk to one creator, say "you". Say what happened and what's next ("Cut 14 filler words. Record the intro again?"), no puns or hype.
+
+## Product and website checklist
+
+- Lead with what creators can do, not "I built" or vague promises about the future of work. Use real screenshots and specific workflows.
+- Do not repeat an uppercase eyebrow, enormous headline and empty one-line summary in every section. Use descriptive headings and enough detail to make a decision.
+- Navigation communicates location and available actions. Avoid decorative colored rails, meaningless separators and ornamental badges.
+- Use plain buttons with explicit verbs. No gradient pills or colored-border pills for decoration.
+- Keep controls readable and keyboard accessible. Do not use fashionable serif display fonts, tiny labels or low-contrast text at the expense of comprehension.
+- Avoid blur reveals, scroll choreography and effects that delay reading or interaction. Respect reduced motion and prioritize responsiveness.
+- Chat is the production workspace. Show previews, review requests, progress and private input where the conversation happens. The agent manages the pipeline; an optional tool pane is not the primary workflow.
+- Distinguish working features from planned capabilities. A dock placeholder is not an editor, a pending suggestion is not an applied edit, and a cloud destination is not a completed upload.

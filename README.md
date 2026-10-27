@@ -2,7 +2,9 @@
 
 # TrendDeck
 
-TrendDeck is a marketing desktop for creators. Every brand you run gets its own workspace: every account logged in at once, what's trending in your niche, and a chat pane that turns trends into posts.
+TrendDeck is an open-source, chat-first desktop workspace for creators. Bring your own AI agents to plan videos, work in local Craft editors, and manage content, media, and logged-in accounts across brands. Each brand has its own projects, conversations, files, and browser sessions.
+
+Website: [trenddeck.app](https://trenddeck.app).
 
 Works with the AI subscriptions you already have: Claude Code, Codex, Cursor, Grok Build, OpenCode, Google Antigravity, Qwen Code and Kimi. If one is set up on your computer, TrendDeck can use it. Anything else plugs in too: any command line agent, or any OpenAI-compatible API (DeepSeek, GLM, OpenRouter, a local Ollama model).
 
@@ -17,7 +19,7 @@ I wanted one app that's fast on a cheap laptop, keeps everything on your machine
 Working now:
 
 - **Chat.** The home screen. Ask your agent (any of the ones above, or your own) for ideas, outlines, titles and posts, with your brand and trends as context. Agents only ever run when you send a message.
-- **Brands.** Your brands sit as small cards in the title bar. Each one has its own logins, niche keywords and recommendations, and switching is one click or Ctrl+1 to 9.
+- **Brands and projects.** A sidebar organizes brands, projects, and chats, with working and needs-you states, agent details, and conversation previews. Each brand has its own logins and context; switch with one click or Ctrl+1 to 9.
 - **Every account at once.** Each brand gets its own browser session, so two brands can be logged into two different accounts on the same site and they never mix.
 - **Site tabs.** Reddit, X, Instagram, TikTok, YouTube, YouTube Studio, vidIQ and 1of10 to start. Add any site with a name and a URL, drag to reorder.
 - **Instant switching.** Sites you've opened stay loaded in the background, so going back to one doesn't reload it. Your first few sites load while the app sits idle. How many stay open per brand is up to you in Settings.
@@ -33,7 +35,9 @@ Working now:
 - **Phone.** A real Android phone per brand inside a tab, for the things Instagram and TikTok only do in their apps. Setup is one button, see [docs/EMULATOR.md](docs/EMULATOR.md).
 - **Links stay in the app.** A trend, an idea or any link opens in that brand's tab for the site, or in a temporary tab if you don't have one. Never your normal browser.
 - **Ad blocker.** On by default with the same filter lists as uBlock Origin, YouTube ads included. Turn it off per brand or allow a site in Settings.
-- **Search.** One box in the title bar for trends, sites, brands and ideas. Paste a link to open it. Ctrl+K gets you there.
+- **Craft editors in chat.** Open any of the Craft suite's editors from the conversation and work manually alongside your agent. Native in-chat docking currently uses Windows.
+- **Agent-managed workflows.** The agent plans and updates your production stages; progress is explained in chat instead of making you configure a pipeline in a side panel.
+- **Private sign-in requests.** An agent can request a website login through a private form inside chat. Credentials go directly to encrypted local storage, never into the conversation or tool results.
 - **Quick on a cheap laptop.** The ad blocker loads after the window is up, sites you leave go quiet until you come back, and nothing heavy loads before you need it.
 - **First run setup.** Name your brand and niche, pick your sites, done. Or skip it.
 - **Settings.** One screen for the brand, its sites, the ad blocker, tabs, agents and updates.

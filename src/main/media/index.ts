@@ -1,7 +1,12 @@
 import { BrowserWindow, dialog, ipcMain, shell, webContents, type IpcMainInvokeEvent } from 'electron'
+import { randomUUID } from 'node:crypto'
+import { promises as fs } from 'node:fs'
+import { join } from 'node:path'
+import { getData } from '../store'
 import { filterMedia, type MediaEdit, type MediaFilter, type MediaProbe } from '@shared/media'
 import {
   addFiles,
+  brandDir,
   checkMissing,
   copyItemsIn,
   dropLib,
@@ -17,6 +22,7 @@ import {
   setCollections,
   setCopyByDefault,
   setProbe,
+  saveLib,
   toInfo,
   undoRemove,
   unmarkPosted,
@@ -83,6 +89,56 @@ export function setupMedia(): void {
   handle('media:add-paths', (brandId, paths) =>
     addFiles(brandId, Array.isArray(paths) ? paths.filter((p): p is string => typeof p === 'string') : [])
   )
+  handle('media:save-recording', async (brandId, name, mimeType, bytes) => {
+    const assertBrand = (): void => {
+      const data = getData()
+      if (data?.activeBrandId !== brandId || !data.brands.some((brand) => brand.id === brandId)) {
+        throw new Error('Recording brand is no longer active')
+      }
+    }
+    assertBrand()
+    const extensions: Record<string, string> = {
+      'audio/webm': 'weba', 'video/webm': 'webm',
+      'audio/mp4': 'm4a', 'video/mp4': 'mp4', 'audio/ogg': 'ogg'
+    }
+    const type = typeof mimeType === 'string' ? mimeType.split(';')[0].trim().toLowerCase() : ''
+    const ext = Object.hasOwn(extensions, type) ? extensions[type] : undefined
+    if (!ext) throw new Error('Unsupported recording type')
+    if (!(bytes instanceof ArrayBuffer) || !bytes.byteLength || bytes.byteLength > 250_000_000) {
+      throw new Error('Recording must be between 1 byte and 250 MB')
+    }
+    if (typeof name !== 'string' || !name.trim() || name.length > 200) throw new Error('Invalid recording name')
+    const id = randomUUID()
+    const dir = join(brandDir(brandId), 'files')
+    const path = join(dir, `${id}.${ext}`)
+    const lib = await getLib(brandId)
+    let created = false
+    try {
+      await fs.mkdir(dir, { recursive: true })
+      assertBrand()
+      const file = await fs.open(path, 'wx')
+      created = true
+      try {
+        await file.writeFile(Buffer.from(bytes))
+      } finally {
+        await file.close()
+      }
+      assertBrand()
+      lib.items.unshift({
+        id, brandId, name: name.trim().replace(/[\x00-\x1f\x7f/\\]/g, '-'),
+        kind: type.startsWith('audio/') ? 'audio' : 'video', ext, size: bytes.byteLength,
+        duration: null, width: null, height: null, tags: [], collections: [], addedAt: Date.now(),
+        posts: [], agentAllowed: true, missing: false, path, copied: true, watchId: '',
+        hasThumb: false, probed: false
+      })
+      await saveLib(lib)
+      return { added: 1, skipped: 0, ids: [id] }
+    } catch (error) {
+      lib.items = lib.items.filter((item) => item.id !== id)
+      if (created) await fs.unlink(path)
+      throw error
+    }
+  })
   handle('media:edit', (brandId, list, edit) => editItems(brandId, ids(list), (edit ?? {}) as MediaEdit))
   handle('media:remove', (brandId, list) => removeItems(brandId, ids(list)))
   handle('media:undo-remove', (brandId, list) => undoRemove(brandId, ids(list)))

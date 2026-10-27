@@ -476,7 +476,11 @@ export function setupAgents(): void {
         title: t.title,
         updatedAt: t.updatedAt,
         busy: runs.has(runKey(brandId, t.id)),
-        archived: t.archived === true
+        archived: t.archived === true,
+        agentName: t.agentId ? agentName(t.agentId) : '',
+        model: t.agentId ? t.models?.[t.agentId] ?? '' : '',
+        activity: [...(t.messages.at(-1)?.steps ?? [])].reverse().find((step) => step.status === 'running')?.label ?? '',
+        preview: t.messages.at(-1)?.text.replace(/\s+/g, ' ').slice(0, 140) ?? ''
       }))
       .sort((a, b) => b.updatedAt - a.updatedAt)
   })

@@ -1,4 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { dictationBridge } from '../main/dictation/preload'
+import { OBS_CHANNELS, type ObsApi } from '@shared/obs'
+
+contextBridge.exposeInMainWorld('trenddeckDictation', dictationBridge(ipcRenderer))
+contextBridge.exposeInMainWorld('trenddeckObs', {
+  preferences: (brandId) => ipcRenderer.invoke(OBS_CHANNELS.preferences, brandId),
+  configure: (brandId, input) => ipcRenderer.invoke(OBS_CHANNELS.configure, brandId, input),
+  status: (brandId) => ipcRenderer.invoke(OBS_CHANNELS.status, brandId)
+} satisfies ObsApi)
 import type { AppData, StatPlatform, TrendDeckApi, TrendFeed } from '@shared/types'
 import { postingApi } from './posting'
 import { mediaApi } from './media'
@@ -100,6 +109,9 @@ contextBridge.exposeInMainWorld('trenddeckMcp', mcp)
 
 // saved logins. there's no call that returns a password, main keeps those to itself
 const vault: VaultApi = {
+  loginRequests: () => ipcRenderer.invoke('vault:login-requests'),
+  onLoginRequestsChanged: (fn) => listen('vault:login-requests-changed', fn),
+  answerLogin: (id, input) => ipcRenderer.invoke('vault:answer-login', id, input),
   getState: () => ipcRenderer.invoke('vault:state'),
   save: (brandId, siteId, login) => ipcRenderer.invoke('vault:save', brandId, siteId, login),
   remove: (brandId, siteId) => ipcRenderer.invoke('vault:remove', brandId, siteId),

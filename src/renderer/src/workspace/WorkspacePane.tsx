@@ -3,8 +3,6 @@ import type { PipelineStage } from '@shared/workspace'
 import type { Run } from '@shared/pipeline'
 import { Menu } from '../chat/ui'
 import { CloseIcon } from '../components/Icons'
-import StageStrip from './StageStrip'
-import PipelineEditor from './PipelineEditor'
 import Placeholder from './Placeholder'
 import { toolWorkspaces, workspaceFor, type WorkspaceProps } from './registry'
 import { PaneContext } from './pane'
@@ -61,13 +59,13 @@ function Resizer({ width, onWidth }: Pick<Props, 'width' | 'onWidth'>): ReactNod
 }
 
 // the project's newest open run, kept current from run:changed
-function useRun(brandId: string, projectId: string): Run | null {
+export function useRun(brandId: string, projectId: string): Run | null {
   const [run, setRun] = useState<Run | null>(null)
   useEffect(() => {
     let alive = true
     const api = window.trenddeckPipeline
     const load = (): void => {
-      void api.listRuns(brandId, { projectId, archived: false }).then((list) => alive && setRun(list[0] ?? null))
+      void api.listRuns(brandId, { projectId, archived: false }).then((list) => alive && setRun(list[0] ?? null)).catch(() => alive && setRun(null))
     }
     setRun(null)
     load()
@@ -84,7 +82,7 @@ function useRun(brandId: string, projectId: string): Run | null {
       offPipe()
     }
   }, [brandId, projectId])
-  return run
+  return run?.brandId === brandId && run.projectId === projectId ? run : null
 }
 
 export default function WorkspacePane(props: Props): ReactNode {
@@ -93,31 +91,14 @@ export default function WorkspacePane(props: Props): ReactNode {
   const stage = view.kind === 'stage' ? (stages.find((s) => s.id === view.stageId) ?? null) : null
   const key = view.kind === 'stage' ? stage?.workspace : view.kind === 'tool' ? view.key : null
   const def = key ? workspaceFor(key) : undefined
-  const View = def?.component
+  const View = view.kind === 'stage' ? undefined : def?.component
   const site = view.kind === 'site' ? brand.sites.find((s) => s.id === view.id) : undefined
 
   const crumb =
     view.kind === 'stage' ? (stage?.label ?? 'Stage') : view.kind === 'tool' ? (def?.label ?? 'Tool') : (site?.name ?? 'Site')
   const tools = toolWorkspaces()
   const craft = useCraftApps() ?? []
-  const run = useRun(brand.id, project.id)
-  const [editing, setEditing] = useState(false)
   const paneValue = useMemo(() => ({ collapsed }), [collapsed])
-  const [runError, setRunError] = useState('')
-  const here = run?.currentStageId ?? project.stageId
-
-  const startRun = (): void => {
-    setRunError('')
-    void window.trenddeckPipeline
-      .createRun(brand.id, { projectId: project.id, title: project.name })
-      .catch((err: unknown) => setRunError(err instanceof Error ? err.message : String(err)))
-  }
-
-  // the project and its run move together
-  const setStage = (stageId: string): void => {
-    props.onSetStage(stageId)
-    if (run) void window.trenddeckPipeline.updateRun(brand.id, run.id, { currentStageId: stageId })
-  }
 
   return (
     <aside className={`ws${collapsed ? ' collapsed' : ''}`} style={{ width: props.width }} aria-label="Workspace" aria-hidden={collapsed}>
@@ -130,11 +111,6 @@ export default function WorkspacePane(props: Props): ReactNode {
           </span>
           <span className="ws-crumb-here">{crumb}</span>
         </span>
-        {stage && stage.id !== here && (
-          <button className="ws-head-btn" title={`Move ${project.name} to ${stage.label}`} onClick={() => setStage(stage.id)}>
-            Move here
-          </button>
-        )}
         <span className="spacer" />
         <Menu
           label="Tools"
@@ -156,16 +132,6 @@ export default function WorkspacePane(props: Props): ReactNode {
           <CloseIcon />
         </button>
       </header>
-      <StageStrip
-        stages={stages}
-        currentId={project.stageId}
-        openId={stage?.id ?? null}
-        onOpen={(id) => onView({ kind: 'stage', stageId: id })}
-        run={run}
-        onEdit={() => setEditing(true)}
-        onStartRun={startRun}
-      />
-      {runError && <p className="cx-error ws-run-error">{runError}</p>}
       {view.kind === 'site' && props.siteStrip}
       <div className="ws-body">
         {view.kind !== 'site' &&
@@ -186,10 +152,9 @@ export default function WorkspacePane(props: Props): ReactNode {
               </PaneContext.Provider>
             </Suspense>
           ) : (
-            <Placeholder title={crumb} text="Nothing to edit by hand here yet. The agent handles this step." />
+            <Placeholder title="Your workflow is managed in chat" text="Ask your agent to plan the stages and explain the next step. Use this pane only when you want to open a tool or website." />
           ))}
         <div className={`ws-sites${view.kind === 'site' ? ' on' : ''}`}>{props.sites}</div>
-        {editing && <PipelineEditor brandId={brand.id} stages={stages} onClose={() => setEditing(false)} />}
       </div>
     </aside>
   )

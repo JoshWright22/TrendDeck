@@ -209,6 +209,27 @@
   padding: 22px 24px 12px;
 }
 
+.cx-secure-login label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.cx-project-progress { display: flex; flex-wrap: wrap; flex: none; align-items: center; gap: 6px 12px; padding: 12px 16px; border-bottom: 1px solid var(--hair); font-size: 12px; }
+.cx-project-progress > div { display: grid; gap: 4px; flex: 1; }
+.cx-project-progress strong { color: var(--chalk); font-weight: 500; }
+.cx-project-progress span, .cx-project-progress p { color: var(--smoke); }
+.cx-project-progress p { margin: 0; flex-basis: 100%; }
+
+.cx-secure-login input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--chalk);
+  background: var(--panel);
+}
+
 .cx.compact .cx-column {
   padding: 14px;
 }
@@ -2404,3 +2425,6 @@
 .cx-pending-q {
   margin-top: -6px;
 }
+.cx-media-review { min-width: 0; margin: 12px 0; }
+.cx-media-review audio { width: 100%; }
+.cx-media-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }

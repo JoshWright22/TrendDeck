@@ -2,6 +2,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode
 import type { Brand, TrendItem, TrendSource } from '@shared/types'
 import type { Project } from '@shared/workspace'
 import CraftChat from './CraftChat'
+import LoginRequests from './LoginRequests'
+import ProjectProgress from './ProjectProgress'
 import type {
   AgentConfig,
   AgentInfo,
@@ -23,6 +25,8 @@ import {
 import { CloseIcon, SendIcon } from '../components/Icons'
 import Markdown from './Markdown'
 import { EmbedCard, type EmbedActions } from './Embeds'
+import MediaReview from './MediaReview'
+import { Dictation } from './Dictation'
 import AgentSettings from './AgentSettings'
 import SetupSteps from './SetupSteps'
 import WorkLog from './WorkLog'
@@ -651,6 +655,7 @@ export default function ChatView({
   const embedFor = (m: ThreadMessage): EmbedFn => {
     const actions: EmbedActions = {
       ...baseActions,
+      onMediaFeedback: (text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); input.current?.focus() },
       decision: (card) => m.decisions?.[card],
       // nothing can be approved while the reply is still coming in
       onDecide:
@@ -809,6 +814,10 @@ export default function ChatView({
             </div>
           ) : null}
         </div>
+        {m.attachments?.filter((file) => file.media).map((file) => (
+          <MediaReview key={`${brandId}:${file.id}`} brandId={brandId} mediaId={file.id}
+            onFeedback={(text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); input.current?.focus() }} />
+        ))}
         {!busy && (
           <button className="cx-tool cx-edit-btn" onClick={() => setEditing({ id: m.id, text: m.text })}>
             Edit
@@ -836,9 +845,11 @@ export default function ChatView({
           {headerRight}
         </header>
 
+        {project && <ProjectProgress key={`progress:${brand.id}:${project.id}`} brand={brand} project={project} />}
         {project && <CraftChat key={`${brand.id}:${project.id}`} brand={brand} project={project} onActivate={onInlineCraft} />}
         <div className="cx-messages" ref={scroller} onScroll={onScroll}>
           <div className="cx-column">
+            <LoginRequests brandId={brand.id} threadId={openId} onOpenSite={onOpenSite} />
             {thread && thread.messages.length > 0 ? (
               thread.messages.map((m, i) => (m.role === 'user' ? userMessage(m) : agentMessage(m, i)))
             ) : noAgents ? (
@@ -940,6 +951,8 @@ export default function ChatView({
               ))}
             </ul>
           )}
+          <Dictation key={`dictation:${brandId}:${openId ?? 'new'}`} api={window.trenddeckDictation}
+            onTranscript={(text) => { setDraft((current) => current ? `${current}\n${text}` : text); input.current?.focus() }} />
           <div className={`cx-box${approval ? ' approving' : ''}`}>
             {approval && (
               <ApprovalPanel

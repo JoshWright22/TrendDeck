@@ -6,6 +6,8 @@ export const mediaApi: MediaApi = {
   list: (brandId, filter) => ipcRenderer.invoke('media:list', brandId, filter),
   pickAndAdd: (brandId, folders) => ipcRenderer.invoke('media:pick-add', brandId, folders),
   addPaths: (brandId, paths) => ipcRenderer.invoke('media:add-paths', brandId, paths),
+  saveRecording: (brandId, name, mimeType, bytes) =>
+    ipcRenderer.invoke('media:save-recording', brandId, name, mimeType, bytes),
   pathForFile: (file) => webUtils.getPathForFile(file),
   edit: (brandId, ids, edit) => ipcRenderer.invoke('media:edit', brandId, ids, edit),
   remove: (brandId, ids) => ipcRenderer.invoke('media:remove', brandId, ids),

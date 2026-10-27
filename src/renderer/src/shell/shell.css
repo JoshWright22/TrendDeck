@@ -141,10 +141,11 @@ body.resizing webview {
 /* sidebar */
 
 .sb {
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: none;
-  width: 248px;
+  width: 330px;
   min-height: 0;
   border-right: 1px solid var(--hair);
   background: var(--felt);
@@ -202,9 +203,33 @@ body.resizing webview {
 }
 
 .tree-row.thread {
-  height: 26px;
+  height: 76px;
+  align-items: flex-start;
+  padding-top: 10px;
   font-size: 12.5px;
 }
+
+.sb-overview { display: grid; gap: 5px; padding: 18px 16px 14px; border-bottom: 1px solid var(--hair); }
+.sb-overview strong { color: var(--chalk); font-size: 14px; }
+.sb-overview > span { color: var(--smoke); font-size: 12px; }
+.sb-attention { max-height: 30%; overflow: auto; padding: 4px 10px 10px; border-bottom: 1px solid var(--hair); }
+.sb-attention h3 { margin: 12px 6px 6px; font-size: 11px; color: var(--smoke); text-transform: uppercase; letter-spacing: .06em; }
+.sb-attention h3 span { margin-left: 6px; color: var(--faint); }
+.sb-attention-chat { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px; border-radius: 6px; text-align: left; }
+.sb-attention-chat:hover { background: var(--hover); }
+.sb-attention-chat > span:last-child { display: grid; gap: 4px; min-width: 0; }
+.sb-attention-chat strong { color: var(--chalk); font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-attention-chat small { color: var(--smoke); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-chat-info { display: grid; flex: 1; gap: 5px; min-width: 0; }
+.tree-chat-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: var(--chalk); }
+.tree-chat-details { display: flex; gap: 8px; font-size: 10.5px; color: var(--faint); overflow: hidden; white-space: nowrap; }
+.tree-chat-details time { margin-left: auto; }
+.tree-chat-preview { color: var(--smoke); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-chat-details .tree-needs-you { color: var(--pink); }
+.tree-chat-details .tree-working { color: var(--accent); }
+.tree-row.thread > .dot, .tree-row.thread > .dot-space { margin-top: 4px; }
+.sb-resize { position: absolute; top: 0; right: -3px; bottom: 0; width: 6px; z-index: 4; cursor: col-resize; touch-action: none; }
+.sb-resize:hover, .sb-resize:focus-visible { background: var(--accent); }
 
 .tree-row.thread.archived .tree-name {
   color: var(--faint);

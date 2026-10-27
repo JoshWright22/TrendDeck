@@ -4,11 +4,13 @@ import { ExternalIcon } from '../components/Icons'
 import { CardCorners } from './Marks'
 import { safeHref } from './api'
 import type { Decision } from '@shared/chat'
+import MediaReview from './MediaReview'
 
 // cards the agent can drop into a reply. it writes a fenced block with the
 // language "trenddeck" and one json object inside, see EMBED_GUIDE in the main process
 
 export type Embed =
+  | { type: 'video'; mediaId: string; revision?: string }
   | { type: 'trend'; id?: string; title?: string; url?: string; source?: string; score?: number }
   | { type: 'idea'; title: string; notes?: string }
   | { type: 'draft'; platform?: string; title?: string; body: string }
@@ -56,6 +58,8 @@ export function parseEmbed(raw: string): Embed | null {
   }
   if (!j || typeof j !== 'object') return null
   switch (j.type) {
+    case 'video':
+      return str(j.mediaId, 100) ? { type: 'video', mediaId: str(j.mediaId, 100), revision: str(j.revision, 200) || undefined } : null
     case 'trend':
       if (!str(j.id) && !str(j.title)) return null
       return {
@@ -99,6 +103,7 @@ export function parseEmbed(raw: string): Embed | null {
 }
 
 export interface EmbedActions {
+  onMediaFeedback: (text: string) => void
   brand: Brand
   trends: Map<string, TrendItem>
   savedTitles: Set<string>
@@ -389,6 +394,8 @@ export function EmbedCard({
     )
   }
   switch (e.type) {
+    case 'video':
+      return <MediaReview key={`${actions.brand.id}:${e.mediaId}:${e.revision ?? ''}`} brandId={actions.brand.id} mediaId={e.mediaId} revision={e.revision} onFeedback={actions.onMediaFeedback} />
     case 'trend':
       return <TrendEmbed e={e} a={actions} />
     case 'idea':

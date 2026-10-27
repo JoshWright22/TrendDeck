@@ -1,0 +1,15 @@
+# Dictation integration
+
+These files intentionally do not register themselves or change existing application APIs.
+
+1. After Electron is ready, call `setupDictation(mainWindow, trustedRendererUrl)` from `src/main/dictation/index.ts` once per main window lifecycle. Pass the exact trusted renderer entry URL (development HTTP URL or packaged `file:` URL), not an arbitrary current/navigation URL. Hash routing is allowed. The return value disposes handlers; window closure also disposes them. Only one main window owns these IPC channels at a time.
+2. In the application preload, import `dictationBridge` from `../main/dictation/preload` and expose `contextBridge.exposeInMainWorld('trenddeckDictation', dictationBridge(ipcRenderer))`. This helper imports no main-process runtime code.
+3. Add `trenddeckDictation: DictationApi` to the parent's existing `Window` declaration, importing the type from `@shared/dictation`. Alternatively expose it as a nested API property; the component accepts an explicit bridge prop and requires no global declaration of its own.
+4. Render `<Dictation api={window.trenddeckDictation} onTranscript={(text) => setDraft((draft) => draft ? `${draft}\n${text}` : text)} />`. The callback must append to the draft, never submit/send it. Key the component by thread/draft identity so switching chats unmounts and cancels an in-progress recording/transcription. Pass `disabled` when draft editing is unavailable.
+5. Ensure the application's existing Electron media-permission policy permits microphone access only for the trusted main frame. The component requests audio only after clicking **Dictate command**, stops tracks on stop/cancel/unmount, and caps recordings at two minutes / 25 MiB. It does not alter session-wide permission policies.
+
+The base URL includes the server's API prefix, typically `http://127.0.0.1:8080/v1` locally or a provider's HTTPS `/v1` URL. Main appends `/audio/transcriptions` and uploads multipart `file`, `model`, and `response_format=json`. The server must return `{ "text": "..." }`. No model is installed or speech fabricated. API mode requires an OS-encrypted saved key; `saveApiKey('')` removes it. Changing mode or endpoint clears the saved key to avoid credential leakage to another server. Config responses contain only options and `hasKey`.
+
+Local mode accepts loopback addresses only; `localhost` is pinned to `127.0.0.1`. Redirects are rejected for both modes. There is no remote fallback. A user-operated local server can itself forward audio; TrendDeck cannot control that server's behavior. Audio remains in memory; only config and encrypted key material are persisted in `userData/dictation/config.json`. Uploads require a separate click after stopping, API upload destination is disclosed inline, and transcripts require explicit review/append before editing the chat draft. Requests time out after 120 seconds, cancellation aborts fetch, and server responses are capped at 1 MiB.
+
+Validation: `npx vitest run src/main/dictation` and `npm run typecheck`.

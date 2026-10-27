@@ -1,0 +1,13 @@
+.take-recorder { padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--chalk); font-size: 12px; }
+.take-recorder-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.take-recorder label { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--smoke); }
+.take-recorder select, .take-recorder input { min-width: 0; max-width: 100%; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--raised); color: var(--chalk); font: inherit; }
+.take-recorder input { flex: 1; }
+.take-recorder :is(button, input, select):focus-visible { outline: 2px solid var(--chalk); outline-offset: 2px; }
+.take-recorder :disabled { opacity: .55; }
+.take-recorder-live { color: #f08b8b; font-weight: 600; }
+.take-recorder time { font-variant-numeric: tabular-nums; }
+.take-recorder-preview { display: grid; gap: 10px; margin-top: 10px; }
+.take-recorder audio { width: 100%; }
+.take-recorder-video { display: block; width: 100%; max-height: 240px; margin-top: 10px; border-radius: 8px; background: #000; object-fit: contain; }
+.take-recorder-error { margin: 8px 0 0; color: #f08b8b; overflow-wrap: anywhere; }

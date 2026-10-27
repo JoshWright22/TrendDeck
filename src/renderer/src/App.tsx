@@ -16,6 +16,7 @@ import WorkspacePane, { MAX_WS, MIN_WS, type WsView } from './workspace/Workspac
 import SiteStrip from './workspace/SiteStrip'
 import { useInbox } from './pages/inbox/useInbox'
 import { setNames, syncThread } from './chat/pending'
+import { draftChat } from './pages/voice/chatDraft'
 
 const ChatView = lazy(() => import('./chat/ChatView'))
 const Settings = lazy(() => import('./components/Settings'))
@@ -44,10 +45,10 @@ function loadPane(): { width: number; collapsed: boolean } {
     const width = Number(raw.width)
     return {
       width: width >= MIN_WS && width <= MAX_WS ? width : Math.round(window.innerWidth * 0.42),
-      collapsed: raw.collapsed === true
+      collapsed: true
     }
   } catch {
-    return { width: Math.round(window.innerWidth * 0.42), collapsed: false }
+    return { width: Math.round(window.innerWidth * 0.42), collapsed: true }
   }
 }
 
@@ -393,7 +394,7 @@ export default function App(): ReactNode {
           onOpenProject={openProject}
           onOpenThread={openThread}
           onNewThread={(pid) => brand && setPlace(brand.id, (p) => ({ ...p, projectId: pid, threadId: null }))}
-          onOpenPipeline={() => project && openWs({ kind: 'stage', stageId: project.stageId })}
+          onOpenPipeline={() => project && draftChat(`Set up and manage the workflow for ${project.name}. Inspect the existing pipeline and use your pipeline tools to adapt it to this video. Ask me only for missing creative decisions, then explain the next step in plain language.`)}
           onSettings={() => setModal({ kind: 'settings' })}
         />
 

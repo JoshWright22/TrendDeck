@@ -100,6 +100,7 @@ export interface MediaApi {
   list(brandId: string, filter: MediaFilter): Promise<MediaInfo[]>
   pickAndAdd(brandId: string, folders: boolean): Promise<AddResult>
   addPaths(brandId: string, paths: string[]): Promise<AddResult>
+  saveRecording(brandId: string, name: string, mimeType: string, bytes: ArrayBuffer): Promise<AddResult>
   // path of a dropped File, the renderer can't read it on its own
   pathForFile(file: File): string
   edit(brandId: string, ids: string[], edit: MediaEdit): Promise<void>
@@ -129,7 +130,7 @@ export function mediaUrl(brandId: string, id: string, thumb = false): string {
 const KINDS: Record<string, MediaKind> = {}
 for (const e of ['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi', 'wmv']) KINDS[e] = 'video'
 for (const e of ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif', 'heic', 'svg']) KINDS[e] = 'image'
-for (const e of ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'opus']) KINDS[e] = 'audio'
+for (const e of ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'opus', 'weba']) KINDS[e] = 'audio'
 
 export function kindOf(ext: string): MediaKind {
   return KINDS[ext.toLowerCase()] ?? 'file'

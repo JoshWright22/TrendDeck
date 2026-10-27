@@ -3,6 +3,7 @@ import { ID_PATTERN } from '@shared/types'
 import type { LoginInput, VaultState } from '@shared/vault'
 import { getData } from '../store'
 import { setupCodePrompt } from './login'
+import { setupLoginRequests } from './requests'
 import { listAttempts, listLogins, removeLogin, saveLogin, unavailableReason } from './store'
 
 export { authGuard } from './guard'
@@ -20,6 +21,7 @@ function siteExists(brandId: string, siteId: string): boolean {
 
 export function setupVault(): void {
   setupCodePrompt()
+  setupLoginRequests()
 
   ipcMain.handle('vault:state', async (e): Promise<VaultState | null> => {
     if (!fromApp(e)) return null

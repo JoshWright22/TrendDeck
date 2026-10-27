@@ -54,7 +54,20 @@ export interface CodeRequest {
   siteName: string
 }
 
+export interface LoginRequest {
+  id: string
+  brandId: string
+  threadId: string | null
+  siteId: string
+  siteName: string
+  siteUrl: string
+  expiresAt: number
+}
+
 export interface VaultApi {
+  loginRequests(): Promise<LoginRequest[]>
+  onLoginRequestsChanged(fn: () => void): () => void
+  answerLogin(id: string, input: LoginInput | null): Promise<string>
   getState(): Promise<VaultState>
   // resolves to an error message, or '' when saved
   save(brandId: string, siteId: string, login: LoginInput): Promise<string>

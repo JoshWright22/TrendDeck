@@ -34,14 +34,7 @@ export function bootInfo(): BootInfo | undefined {
   return (globalThis as { __trenddeckBoot?: BootInfo }).__trenddeckBoot
 }
 
-export function newer(a: string, b: string): boolean {
-  const pa = a.split(/[.-]/).map((n) => parseInt(n, 10) || 0)
-  const pb = b.split(/[.-]/).map((n) => parseInt(n, 10) || 0)
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) > (pb[i] ?? 0)
-  }
-  return false
-}
+export { newer } from './versions'
 
 export function readState(): BootState | null {
   try {

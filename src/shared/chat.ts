@@ -150,6 +150,10 @@ export interface ThreadSummary {
   updatedAt: number
   busy: boolean
   archived: boolean
+  agentName?: string
+  model?: string
+  activity?: string
+  preview?: string
 }
 
 // what's known about an agent's limits. null fields are unknown
