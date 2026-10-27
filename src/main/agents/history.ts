@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { ID_PATTERN } from '@shared/types'
 import type { Attachment, Decision, Thread, ThreadMessage, WorkStep } from '@shared/chat'
+import { isPermissionMode, type ApprovalRecord, type PlanStep, type QueuedMessage } from '@shared/providers'
 import { getData } from '../store'
 
 // one json per brand in chats/, the main process owns it so a reply that's still
@@ -48,6 +49,48 @@ function cleanSteps(raw: unknown): WorkStep[] {
   })
 }
 
+function cleanApprovals(raw: unknown): ApprovalRecord[] {
+  if (!Array.isArray(raw)) return []
+  const kinds = ['command', 'file-change', 'tool', 'web', 'other']
+  return raw.slice(0, 100).flatMap((a): ApprovalRecord[] => {
+    const o = a as Partial<ApprovalRecord> | null
+    if (!o || typeof o.requestId !== 'string') return []
+    const rec: ApprovalRecord = {
+      requestId: o.requestId.slice(0, 120),
+      kind: kinds.includes(o.kind as string) ? (o.kind as ApprovalRecord['kind']) : 'other',
+      title: str(o.title, 200),
+      detail: str(o.detail, 2100),
+      canRemember: o.canRemember === true,
+      at: Number(o.at) || 0,
+      // a request still open when the app closed can't be answered anymore
+      status: o.status === 'allowed' || o.status === 'denied' ? o.status : 'expired'
+    }
+    if (o.tool) rec.tool = str(o.tool, 200)
+    if (o.reason) rec.reason = str(o.reason, 700)
+    if (o.feedback) rec.feedback = str(o.feedback, 2000)
+    return [rec]
+  })
+}
+
+function cleanPlan(raw: unknown): PlanStep[] {
+  if (!Array.isArray(raw)) return []
+  return raw.slice(0, 50).flatMap((p): PlanStep[] => {
+    const o = p as Partial<PlanStep> | null
+    if (!o || typeof o.text !== 'string') return []
+    const status = o.status === 'done' || o.status === 'in-progress' ? o.status : 'pending'
+    return [{ text: o.text.slice(0, 500), status }]
+  })
+}
+
+function cleanQueue(raw: unknown): QueuedMessage[] {
+  if (!Array.isArray(raw)) return []
+  return raw.slice(0, 20).flatMap((q): QueuedMessage[] => {
+    const o = q as Partial<QueuedMessage> | null
+    if (!o || typeof o.id !== 'string' || typeof o.text !== 'string' || typeof o.agentId !== 'string') return []
+    return [{ id: o.id.slice(0, 120), text: o.text.slice(0, 8000), agentId: o.agentId.slice(0, 80), at: Number(o.at) || 0 }]
+  })
+}
+
 function cleanMap<T extends string>(raw: unknown, ok: (v: unknown) => v is T): Record<string, T> {
   const out: Record<string, T> = {}
   if (!raw || typeof raw !== 'object') return out
@@ -76,7 +119,13 @@ function cleanMessage(raw: unknown): ThreadMessage | null {
   const msg: ThreadMessage = { id: m.id, role: m.role, text: m.text.slice(0, MAX_TEXT), at: Number(m.at) || 0 }
   const files = cleanAttachments(m.attachments)
   if (files.length) msg.attachments = files
+  if (m.role === 'user' && m.steer === true) msg.steer = true
   if (m.role === 'agent') {
+    const approvals = cleanApprovals(m.approvals)
+    if (approvals.length) msg.approvals = approvals
+    const plan = cleanPlan(m.plan)
+    if (plan.length) msg.plan = plan
+    if (Array.isArray(m.handoffFrom)) msg.handoffFrom = m.handoffFrom.filter(isStr).slice(0, 10)
     if (m.model) msg.model = str(m.model, 120)
     if (m.thinking) msg.thinking = str(m.thinking, MAX_TEXT)
     if (m.thinkingTokens) msg.thinkingTokens = Number(m.thinkingTokens) || 0
@@ -109,6 +158,9 @@ function cleanThread(raw: unknown): Thread | null {
     sessions: cleanMap(t.sessions, isStr),
     voiceSent: cleanMap(t.voiceSent, isStr),
     archived: t.archived === true,
+    permissionMode: isPermissionMode(t.permissionMode) ? t.permissionMode : undefined,
+    queued: cleanQueue(t.queued),
+    seen: cleanMap(t.seen, isStr),
     messages
   }
 }

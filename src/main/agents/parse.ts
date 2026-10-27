@@ -18,6 +18,11 @@ export interface Parser {
   error: () => string
 }
 
+// the claude parser also takes already parsed events, the agent sdk hands those over
+export interface ClaudeParser extends Parser {
+  event: (ev: Record<string, unknown>) => void
+}
+
 type Json = Record<string, unknown>
 const obj = (v: unknown): Json => (v && typeof v === 'object' ? (v as Json) : {})
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
@@ -52,7 +57,7 @@ export function describeTool(name: string, input: Json): Pick<WorkStep, 'kind' |
   return { kind: 'tool', label: name || 'Tool call', detail: short(JSON.stringify(input)) }
 }
 
-class Steps {
+export class Steps {
   private open = new Map<string, WorkStep>()
   constructor(private sink: Sink) {}
   start(id: string, name: string, input: Json): void {
@@ -104,17 +109,19 @@ function windowsFrom(info: Json): UsageWindow[] {
 }
 
 // claude's stream-json with partial messages
-export function claudeParser(sink: Sink): Parser {
+export function claudeParser(sink: Sink): ClaudeParser {
   // set once partial messages show up, then whole messages are only read for tool inputs
   let partial = false
   let error = ''
   const steps = new Steps(sink)
   // content block index -> tool being streamed in
   const blocks = new Map<number, { id: string; name: string; json: string }>()
-  return {
+  const parser: ClaudeParser = {
     line(l) {
       const ev = parse(l)
-      if (!ev) return
+      if (ev) parser.event(ev)
+    },
+    event(ev) {
       if (ev.session_id && ev.type === 'system' && ev.subtype === 'init') sink.session(str(ev.session_id))
       if (ev.type === 'stream_event') {
         partial = true
@@ -170,11 +177,15 @@ export function claudeParser(sink: Sink): Parser {
         if (w.length) sink.limits(w)
       } else if (ev.type === 'result') {
         steps.close()
-        if (ev.is_error) error = str(ev.result) || 'The agent returned an error'
+        if (ev.is_error) {
+          const errors = Array.isArray(ev.errors) ? ev.errors.filter((e) => typeof e === 'string').join('\n') : ''
+          error = str(ev.result) || errors || 'The agent returned an error'
+        }
       }
     },
     error: () => error
   }
+  return parser
 }
 
 // codex exec --json: thread.started, item.started / item.completed, turn.completed

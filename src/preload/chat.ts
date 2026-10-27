@@ -1,8 +1,9 @@
 import { ipcRenderer } from 'electron'
 import type { ChatApi, ChatEvent } from '@shared/chat'
+import type { ProviderChatApi, ProviderChatEvent } from '@shared/providers'
 
 // the chat's half of the preload, exposed as window.trenddeckChat
-export const chatApi: ChatApi = {
+export const chatApi: ChatApi & ProviderChatApi = {
   listAgents: (rescan) => ipcRenderer.invoke('chat:agents', rescan === true),
   getAgentConfig: () => ipcRenderer.invoke('chat:config'),
   saveCustomAgent: (agent) => ipcRenderer.invoke('chat:save-agent', agent),
@@ -30,5 +31,24 @@ export const chatApi: ChatApi = {
     const listener = (_event: unknown, ev: ChatEvent): void => fn(ev)
     ipcRenderer.on('chat:event', listener)
     return () => ipcRenderer.removeListener('chat:event', listener)
+  },
+  // provider layer: approvals, questions, steer and queue, permission modes
+  providers: () => ipcRenderer.invoke('chat:providers'),
+  respondApproval: (brandId, threadId, requestId, decision, opts) =>
+    ipcRenderer.invoke('chat:approval', brandId, threadId, requestId, decision, opts ?? {}),
+  respondUserInput: (brandId, threadId, requestId, answers) =>
+    ipcRenderer.invoke('chat:user-input', brandId, threadId, requestId, answers),
+  steer: (brandId, threadId, text, agentId) => ipcRenderer.invoke('chat:steer', brandId, threadId, text, agentId),
+  queue: (brandId, threadId, text, agentId) => ipcRenderer.invoke('chat:queue', brandId, threadId, text, agentId),
+  unqueue: (brandId, threadId, queueId) => ipcRenderer.invoke('chat:unqueue', brandId, threadId, queueId),
+  steerQueued: (brandId, threadId, queueId) => ipcRenderer.invoke('chat:queue-steer', brandId, threadId, queueId),
+  listQueue: (brandId, threadId) => ipcRenderer.invoke('chat:queue-list', brandId, threadId),
+  getPermissionMode: (brandId, threadId) => ipcRenderer.invoke('chat:permission-mode', brandId, threadId),
+  setPermissionMode: (brandId, threadId, mode) => ipcRenderer.invoke('chat:set-permission-mode', brandId, threadId, mode),
+  pending: (brandId, threadId) => ipcRenderer.invoke('chat:pending', brandId, threadId),
+  onProviderEvent: (fn) => {
+    const listener = (_event: unknown, ev: ProviderChatEvent): void => fn(ev)
+    ipcRenderer.on('chat:provider-event', listener)
+    return () => ipcRenderer.removeListener('chat:provider-event', listener)
   }
 }

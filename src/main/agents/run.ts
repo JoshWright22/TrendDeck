@@ -26,20 +26,20 @@ const NO_ATTACH: TurnAttach = { args: [], env: {} }
 
 const isWin = process.platform === 'win32'
 // a reply that takes longer than this is stuck
-const MAX_RUN_MS = 10 * 60_000
+export const MAX_RUN_MS = 10 * 60_000
 
 // strips colors and cursor moves some clis print even when piped
 const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07]*\x07/g
 
 // agents run in an empty folder so they don't go reading your files
-async function workDir(): Promise<string> {
+export async function workDir(): Promise<string> {
   const path = join(app.getPath('userData'), 'agent-room')
   await fs.mkdir(path, { recursive: true })
   return path
 }
 
 // the agent gets the user's normal environment, minus electron's own switches, plus the turn's
-function agentEnv(extra: Record<string, string>): NodeJS.ProcessEnv {
+export function agentEnv(extra: Record<string, string>): NodeJS.ProcessEnv {
   const env: Record<string, string | undefined> = { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' }
   delete env.ELECTRON_RUN_AS_NODE
   delete env.ELECTRON_RENDERER_URL
@@ -61,7 +61,7 @@ function mergeArgs(base: string[], extra: string[]): { base: string[]; extra: st
   return { base: out, extra: rest }
 }
 
-function killTree(child: ChildProcess): void {
+export function killTree(child: ChildProcess): void {
   if (child.exitCode !== null || !child.pid) return
   if (isWin) {
     // child.kill only gets the top process on windows, the agent's own children keep going

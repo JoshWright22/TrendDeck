@@ -1,5 +1,14 @@
 // chat types used by the main process, the preload and the chat view
 
+import type {
+  ApprovalRecord,
+  PermissionMode,
+  PlanStep,
+  ProviderCapabilities,
+  ProviderKind,
+  QueuedMessage
+} from './providers'
+
 export type AgentKind = 'cli' | 'command' | 'api'
 
 export interface AgentInfo {
@@ -18,12 +27,17 @@ export interface AgentInfo {
   models?: ModelOption[]
   // how hard it thinks, empty means the agent's own default
   efforts?: string[]
+  // which adapter runs it and what that adapter can do
+  provider?: ProviderKind
+  capabilities?: ProviderCapabilities
 }
 
 export interface ModelOption {
   // empty means let the agent pick
   id: string
   label: string
+  // effort levels this model takes, when the agent says
+  efforts?: string[]
 }
 
 export interface CustomAgent {
@@ -97,6 +111,14 @@ export interface ThreadMessage {
   finishedAt?: number
   // approve/decline picks for cards, keyed by the card's index in the reply
   decisions?: Record<string, Decision>
+  // agent messages: tool approvals asked during the reply
+  approvals?: ApprovalRecord[]
+  // agent messages: the agent's latest plan or todo list
+  plan?: PlanStep[]
+  // user messages: sent into a reply that was still running
+  steer?: boolean
+  // agent messages: agents whose turns this agent got as a summary first
+  handoffFrom?: string[]
 }
 
 export interface Thread {
@@ -113,6 +135,12 @@ export interface Thread {
   // hash of the brand voice pack each agent's session last got, it's sent again when it changes
   voiceSent?: Record<string, string>
   archived?: boolean
+  // how much the agent may do without asking, missing means the brand's default
+  permissionMode?: PermissionMode
+  // messages waiting for the running reply to end
+  queued?: QueuedMessage[]
+  // last message id each agent's session has seen, so a switch back gets what it missed
+  seen?: Record<string, string>
   messages: ThreadMessage[]
 }
 
