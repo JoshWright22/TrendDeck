@@ -15,6 +15,7 @@
     "build": "npm run typecheck && electron-vite build",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test:gateway": "esbuild scripts/gateway-test.ts --bundle --platform=node --format=esm --outfile=out/test/gateway-test.mjs --log-level=warning && node out/test/gateway-test.mjs",
     "postinstall": "install-electron"
   },
   "dependencies": {

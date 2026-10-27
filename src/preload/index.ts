@@ -8,6 +8,7 @@ import { chatApi } from './chat'
 import { inboxApi } from './inbox'
 import { emulatorApi } from './emulator'
 import { workspaceApi } from './workspace'
+import './gateway'
 
 const api: TrendDeckApi = {
   platform: process.platform,

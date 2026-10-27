@@ -22,7 +22,7 @@ export interface AgentSession {
 export async function beginAgentTurn(
   brandId: string,
   agent: AgentKind,
-  opts: { shareSiteId?: string | null } = {}
+  opts: { shareSiteId?: string | null; threadId?: string | null } = {}
 ): Promise<AgentSession> {
   const url = await ensureServer()
   const turn = openTurn(brandId, opts)

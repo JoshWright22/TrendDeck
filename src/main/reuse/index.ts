@@ -6,7 +6,7 @@ import { loadPace, savePace } from './pace'
 import { probeVideo } from './probe'
 import { parseShorts, shortsUrl } from './shorts'
 
-async function listShorts(brandId: string, channelUrl: string): Promise<ShortsList> {
+export async function listShorts(brandId: string, channelUrl: string): Promise<ShortsList> {
   const res: ShortsList = { channelUrl, shorts: [], error: '' }
   try {
     const url = shortsUrl(channelUrl)

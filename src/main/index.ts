@@ -11,6 +11,7 @@ import { dropAnalytics, setupAnalytics } from './analytics'
 import { dropPostingBrand, setupPosting } from './posting'
 import { dropMedia, setupMedia } from './media'
 import { setupMcp } from './mcp'
+import { dropGatewayBrand, setupGateway } from './gateway'
 import { forgetBrand } from './mcp/state'
 import { forgetBrandLogins, setupVault } from './vault'
 import { dropChats, setupAgents, stopBrand } from './agents'
@@ -177,11 +178,13 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   await dropVoice(brandId)
   await dropInboxBrand(brandId)
   await dropBrandPhone(brandId)
+  await dropGatewayBrand(brandId)
 })
 
 setupTrends()
 setupAnalytics()
 setupMcp()
+setupGateway()
 setupVault()
 setupAgents()
 setupVoice()

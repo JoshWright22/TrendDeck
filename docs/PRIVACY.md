@@ -29,9 +29,13 @@ All of it is in the app's user data folder:
 | Media library | `media/<brand id>.json`, `media/<brand id>/` | file list, thumbnails and copies you asked for |
 | Posting | `posting.json`, `posting-keys.json` | queue, log and settings, API keys locked with your system keychain when it's there |
 | Posting pace | `reuse-pace.json` | daily limits and gaps per site |
+| Agent rules | `gateway/policy.json` | per brand: which kinds of agent actions run on their own and which wait for you |
+| Agent audit log | `gateway/audit/<brand id>.jsonl` | every agent tool call: time, chat, tool, arguments with secrets scrubbed, your answer and a short result |
+| Reply drafts | `gateway/replies/<brand id>.json` | inbox replies an agent drafted |
+| Pipeline | `pipeline/<brand id>.json` | the brand's content stages and the runs going through them |
 | Phone | `android/` | the Android tools if TrendDeck set them up, and one phone per brand with its apps and logins |
 
-Deleting a brand deletes its logins, its saved logins, its trends cache, its agent access data, its chats, its voice, its inbox, its media library, its posts and its phone. Deleting the folder deletes everything.
+Deleting a brand deletes its logins, its saved logins, its trends cache, its agent access data, its chats, its voice, its inbox, its media library, its posts, its phone, its agent rules and audit log, and its pipeline. Deleting the folder deletes everything.
 
 ## What goes out, and when
 

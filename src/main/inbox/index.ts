@@ -87,7 +87,7 @@ async function readSite(brandId: string, site: InboxSite): Promise<unknown> {
 
 let refreshing = false
 
-async function refresh(brandId: string): Promise<RefreshResult[]> {
+export async function refresh(brandId: string): Promise<RefreshResult[]> {
   const brand = getData()?.brands.find((b) => b.id === brandId)
   if (!brand || refreshing) return []
   refreshing = true
@@ -135,7 +135,7 @@ async function findComment(brandId: string, id: string): Promise<InboxComment | 
 }
 
 // focus the reply box and type the text with real key input, the user presses the site's reply button
-async function reply(brandId: string, commentId: string, text: string): Promise<{ ok: boolean; message: string }> {
+export async function reply(brandId: string, commentId: string, text: string): Promise<{ ok: boolean; message: string }> {
   const c = await findComment(brandId, commentId)
   if (!c || !isHttpUrl(c.url)) return { ok: false, message: 'That comment has no link to open' }
   const win = new BrowserWindow({
