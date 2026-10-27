@@ -126,8 +126,10 @@ function cleanUp(): void {
     for (const name of fs.readdirSync(updatesDir())) {
       const full = join(updatesDir(), name)
       if (name === 'state.json' || full === keep || full === `${keep}.unpacked`) continue
-      // links to the installed app's native files are removed as links, never followed
-      if (name.endsWith('.asar.unpacked')) unlinkUnpacked(full)
+      // a link (the native-files link next to a downloaded archive) is removed as a link. a
+      // recursive rm goes through a windows junction and deletes what it points to, which once
+      // emptied the installed app's app.asar.unpacked
+      if (fs.lstatSync(full).isSymbolicLink()) unlinkUnpacked(full)
       else fs.rmSync(full, { force: true, recursive: true })
     }
   } catch {

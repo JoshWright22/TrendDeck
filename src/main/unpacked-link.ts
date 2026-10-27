@@ -25,7 +25,8 @@ export function linkUnpacked(archive: string): void {
   }
 }
 
-// removes a link without touching what it points to
+// removes a link without touching what it points to. never use a recursive rm on a link: on
+// windows it follows a junction and deletes the target's files
 export function unlinkUnpacked(link: string): void {
   try {
     if (fs.lstatSync(link).isSymbolicLink()) fs.rmdirSync(link)
