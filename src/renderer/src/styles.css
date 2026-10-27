@@ -1,25 +1,35 @@
 /* colors and type follow docs/BRAND.md */
 :root {
-  /* t3 style: near black, gray text, hairlines, one muted accent. old names kept so every page follows */
-  --felt: #0b0b0c;
-  --panel: #111113;
-  --raised: #19191c;
-  --hover: #1d1d21;
-  --line: #232327;
-  --hair: rgba(255, 255, 255, 0.07);
-  --chalk: #e6e6e9;
-  --smoke: #8a8a94;
-  --faint: #5c5c66;
+  /* palette from t3code (dark) and learnharness: neutral grays with no tint, white-alpha
+     hairlines, a light monochrome primary, and t3's blue as the one accent, kept for focus,
+     selection, links and live status. old names kept so every page follows */
+  --bg-rgb: 10 10 10;
+  --fg-rgb: 232 232 232;
+  --felt: rgb(var(--bg-rgb));
+  --panel: #121212;
+  --raised: #1a1a1a;
+  --hover: #1d1d1d;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --hair: rgba(255, 255, 255, 0.06);
+  --chalk: rgb(var(--fg-rgb));
+  --smoke: #9a9a9a;
+  --faint: #666666;
   /* light fill for primary buttons and chips, text on it is --felt */
-  --card: #e6e6e9;
+  --card: #e6e6e6;
   /* the one accent. --teal is its old name and what most pages use */
-  --accent: #8b93d9;
+  --accent-rgb: 104 149 244;
+  --accent: rgb(var(--accent-rgb));
+  --accent-strong: #346bf1;
   --teal: var(--accent);
-  --teal-soft: rgba(139, 147, 217, 0.14);
-  --indigo: #5b62a6;
-  /* status only: warning and danger, kept dim */
-  --yellow: #c8a95b;
-  --pink: #d9737c;
+  --teal-soft: rgb(var(--accent-rgb) / 0.12);
+  --indigo: var(--accent-strong);
+  /* status only, small dots and text */
+  --success: #34d399;
+  --warn-rgb: 251 191 36;
+  --danger-rgb: 248 113 113;
+  --yellow: rgb(var(--warn-rgb));
+  --pink: rgb(var(--danger-rgb));
   --radius: 8px;
   /* plain and quick for everyday motion */
   --ease: cubic-bezier(0.2, 0, 0, 1);
@@ -1050,7 +1060,7 @@ select:focus-visible,
 .hero-card.rank-1 {
   box-shadow:
     0 0 0 3px var(--card),
-    0 0 36px rgba(139, 147, 217, 0.28),
+    0 0 36px rgb(var(--accent-rgb) / 0.28),
     0 18px 40px rgba(0, 0, 0, 0.45);
 }
 
@@ -1180,7 +1190,7 @@ select:focus-visible,
 
 .score-chip.hot {
   border-color: var(--pink);
-  box-shadow: 0 0 14px rgba(217, 115, 124, 0.35);
+  box-shadow: 0 0 14px rgb(var(--danger-rgb) / 0.35);
 }
 
 /* filters */
@@ -1281,7 +1291,7 @@ select:focus-visible,
 
 .trend-card:hover {
   transform: translateY(-2px);
-  border-color: #3a3a46;
+  border-color: var(--line-strong);
 }
 
 .trend-card.ghost {
@@ -1528,7 +1538,7 @@ select:focus-visible,
   flex-direction: column;
   height: 100%;
   background:
-    radial-gradient(ellipse 50% 45% at 50% 0%, rgba(59, 70, 164, 0.26), transparent 70%),
+    radial-gradient(ellipse 50% 45% at 50% 0%, rgb(var(--accent-rgb) / 0.26), transparent 70%),
     var(--felt);
 }
 

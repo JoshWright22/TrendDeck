@@ -155,7 +155,7 @@
 }
 
 .v-post.starred {
-  border-color: rgba(200, 169, 91, 0.45);
+  border-color: rgb(var(--warn-rgb) / 0.45);
 }
 
 .v-post-meta {

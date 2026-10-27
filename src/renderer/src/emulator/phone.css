@@ -64,7 +64,7 @@
   border: 6px solid #000;
   border-radius: 22px;
   background: #000;
-  box-shadow: 0 0 0 1px var(--line), 0 18px 60px rgba(59, 70, 164, 0.25);
+  box-shadow: 0 0 0 1px var(--line), 0 18px 60px rgb(var(--accent-rgb) / 0.25);
   cursor: pointer;
   touch-action: none;
 }

@@ -291,8 +291,8 @@
   margin: 6px 0 0;
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(217, 115, 124, 0.4);
-  background: rgba(217, 115, 124, 0.08);
+  border: 1px solid rgb(var(--danger-rgb) / 0.4);
+  background: rgb(var(--danger-rgb) / 0.08);
   color: var(--chalk);
   font-size: 12px;
   white-space: pre-wrap;
@@ -562,7 +562,7 @@
 }
 
 .cx-trend .cx-kind {
-  background: rgba(217, 115, 124, 0.14);
+  background: rgb(var(--danger-rgb) / 0.14);
   color: var(--pink);
 }
 
@@ -1590,7 +1590,7 @@
   height: 8px;
   padding: 0;
   border-radius: 50%;
-  background: rgba(154, 154, 166, 0.35);
+  background: rgb(var(--fg-rgb) / 0.25);
   transition: background 0.15s ease-out;
 }
 
@@ -1879,8 +1879,8 @@
 }
 
 .cx-error {
-  border-color: rgba(217, 115, 124, 0.35);
-  background: rgba(217, 115, 124, 0.06);
+  border-color: rgb(var(--danger-rgb) / 0.35);
+  background: rgb(var(--danger-rgb) / 0.06);
 }
 
 /* work log: one quiet row, "Worked · 6 steps", opens into the steps */
@@ -1949,7 +1949,7 @@
 }
 
 .cx-box:focus-within {
-  border-color: #3a3a42;
+  border-color: var(--line-strong);
 }
 
 .cx-agent .ui-dd-btn,
@@ -1991,7 +1991,7 @@
 
 .cx-card:hover {
   transform: none;
-  box-shadow: 0 0 0 1px #34343b;
+  box-shadow: 0 0 0 1px var(--line-strong);
 }
 
 /* home */

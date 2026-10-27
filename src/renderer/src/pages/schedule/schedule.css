@@ -75,7 +75,7 @@
 }
 
 .pf-reddit {
-  --pf: #7f89e6;
+  --pf: var(--accent);
 }
 
 .sc-pf {
@@ -109,7 +109,7 @@
 }
 
 .sc-chip:hover {
-  border-color: #3a3a46;
+  border-color: var(--line-strong);
   border-left-color: var(--pf);
   transform: translateY(-1px);
 }
@@ -203,11 +203,11 @@
 }
 
 .sc-day.out .sc-date {
-  color: #5c5c66;
+  color: var(--faint);
 }
 
 .sc-day.over {
-  border-color: rgba(139, 147, 217, 0.5);
+  border-color: rgb(var(--accent-rgb) / 0.5);
   background: var(--panel);
 }
 
@@ -344,7 +344,7 @@
 }
 
 .sc-wcol.today {
-  background-color: rgba(139, 147, 217, 0.04);
+  background-color: rgb(var(--accent-rgb) / 0.04);
 }
 
 .sc-wcol.past {

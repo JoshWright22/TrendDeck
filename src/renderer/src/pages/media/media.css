@@ -272,7 +272,7 @@
 
 .media-card:hover {
   transform: translateY(-1px);
-  border-color: #3a3a46;
+  border-color: var(--line-strong);
 }
 
 .media-card.sel {
@@ -347,7 +347,7 @@
   bottom: 5px;
   padding: 1px 5px;
   border-radius: 4px;
-  background: rgba(14, 14, 16, 0.85);
+  background: rgb(var(--bg-rgb) / 0.85);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
@@ -449,7 +449,7 @@
   place-items: center;
   border: 2px dashed var(--teal);
   border-radius: var(--radius);
-  background: rgba(14, 14, 16, 0.8);
+  background: rgb(var(--bg-rgb) / 0.8);
   font: 800 20px/1 var(--head);
   letter-spacing: -0.04em;
   pointer-events: none;
@@ -541,7 +541,7 @@
   gap: 8px;
   padding: 8px 10px;
   border-radius: 8px;
-  background: rgba(217, 115, 124, 0.14);
+  background: rgb(var(--danger-rgb) / 0.14);
   color: var(--pink);
   font-size: 12px;
 }

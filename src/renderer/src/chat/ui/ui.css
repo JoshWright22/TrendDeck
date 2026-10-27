@@ -40,7 +40,7 @@
 .ui-dd-btn:hover:not(:disabled),
 .ui-dd-btn[aria-expanded='true'] {
   background: var(--raised);
-  border-color: #3a3a46;
+  border-color: var(--line-strong);
 }
 .ui-dd-btn:focus-visible,
 .ui-menu-btn:focus-visible {

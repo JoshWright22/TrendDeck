@@ -29,6 +29,22 @@ The idea: your brands are a hand of cards, and TrendDeck deals you the trends wo
 
 The surface is always Felt with an indigo spotlight glow. Accents stay small: one bright card or accent per view does more than a rainbow.
 
+### Inside the app
+
+The table above is for the logo, the installer and the landing page. The app itself is plainer, after t3code's dark theme and learnharness: neutral grays with no tint, white-alpha hairlines, a light monochrome primary button, and one blue accent kept for focus, selection, links and live status. Tokens live at the top of `src/renderer/src/styles.css`.
+
+| Token | Value | Use |
+|---|---|---|
+| `--felt` | `#0A0A0A` | window background |
+| `--panel` | `#121212` | sidebar, cards |
+| `--raised` / `--hover` | `#1A1A1A` / `#1D1D1D` | menus, popovers, hover |
+| `--line` / `--line-strong` | white 8% / 14% | borders, inputs |
+| `--chalk` | `#E8E8E8` | main text |
+| `--smoke` / `--faint` | `#9A9A9A` / `#666666` | secondary, hints |
+| `--card` | `#E6E6E6` | primary buttons, text on it is `--felt` |
+| `--accent` / `--accent-strong` | `#6895F4` / `#346BF1` | the one accent: text and dots / fills and focus rings |
+| `--success` `--yellow` `--pink` | `#34D399` `#FBBF24` `#F87171` | status dots and text only |
+
 ## Type
 
 - Headlines: Inter Tight, ExtraBold or Black, tight (-0.04em), huge on landing pages.
