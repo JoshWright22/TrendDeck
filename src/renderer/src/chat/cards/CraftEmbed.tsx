@@ -8,6 +8,7 @@ import VideoReview from '../VideoReview'
 import CraftTimelineReview from './CraftTimelineReview'
 import CraftVisualReview from './CraftVisualReview'
 import { pinEmbed, registerEmbed, setEmbedVisible, takeReveal, useLiveEmbeds } from './embed-owner'
+import { Menu } from '../ui'
 import { cleanError, type CardActions } from './useCards'
 import { sendReview } from './VideoCard'
 import './craft-embed.css'
@@ -34,14 +35,6 @@ function scroller(el: HTMLElement | null): HTMLElement | null {
     if (/(auto|scroll)/.test(getComputedStyle(p).overflowY)) return p
   }
   return null
-}
-
-const savedText = (s: WebEmbedState | null): string => {
-  if (!s) return ''
-  if (s.state === 'loading') return 'Opening the project...'
-  if (s.state === 'failed') return s.note
-  const at = s.savedAt ? `Saved to the project folder at ${new Date(s.savedAt).toLocaleTimeString()}. ` : ''
-  return s.note || `${at}Changes save a few seconds after you make them, with recovery copies.`
 }
 
 export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardActions }): ReactNode {
@@ -133,8 +126,8 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
           setStill(shot)
         }
         try {
-          await api.webRelease(a.brand.id, card.id)
-          if (alive) setPage(null)
+          const released = await api.webRelease(a.brand.id, card.id)
+          if (alive && released !== false) setPage(null)
         } catch (err) {
           // it couldn't save: it stays open here so nothing is lost
           if (alive) setError(cleanError(err))
@@ -380,16 +373,21 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
             </button>
           ))}
         </div>
+        <Menu
+          label={`${card.appName} options`}
+          items={[
+            { label: 'Circle and comment', onSelect: () => void circle(), disabled: busy || (!live && !still) },
+            fullHere
+              ? { label: 'Close the full app', onSelect: () => void closeFull(), disabled: busy }
+              : { label: 'Open in the full app', onSelect: () => void openFull(), disabled: busy || cantRun || status === undefined }
+          ]}
+        />
       </header>
-      <div className="cx-embed-controls">
-        <button type="button" onClick={() => void circle()} disabled={busy || (!live && !still)}>Circle and comment</button>
-        {fullHere ? (
-          <button type="button" onClick={() => void closeFull()} disabled={busy}>Close the full app</button>
-        ) : (
-          <button type="button" onClick={() => void openFull()} disabled={busy || cantRun || status === undefined}>Open in the full app</button>
-        )}
-        <span className="muted" role="status">{page ? savedText(web) : ''}</span>
-      </div>
+      {web?.note && page && (
+        <p className={web.state === 'failed' ? 'cx-card2-error' : 'cx-card2-note'} role="status">
+          {web.note}
+        </p>
+      )}
       {card.note && <p className="cx-card2-body">{card.note}</p>}
 
       {reviewFrame ? (

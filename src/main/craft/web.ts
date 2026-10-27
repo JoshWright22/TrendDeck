@@ -43,6 +43,8 @@ interface Embed {
   saved: string | null
   // input since the last save, for builds whose saves TrendDeck can't make itself
   touched: boolean
+  // your last input in the editor, the agent hears about edits since its last reply
+  editedAt: number
   loadedAt: number
   session: Session
   timers: NodeJS.Timeout[]
@@ -78,6 +80,19 @@ function liveFor(appId: string, brandId: string, projectId: string): Embed | nul
 export function webLiveOn(appId: string, brandId: string, projectId: string): boolean {
   const e = liveFor(appId, brandId, projectId)
   return !!e && webSpec(appId)?.kind === 'api'
+}
+
+// an editor whose changes only live in the page (PhotoCraft saves as a download TrendDeck can't
+// make for you): it keeps running when it scrolls out of view, letting go would lose them
+export function webUnsaved(cardId: string): boolean {
+  const e = embeds.get(cardId)
+  return !!e && e.touched && e.state === 'ready' && webSpec(e.appId)?.kind === 'files' && !!e.guest && !e.guest.isDestroyed()
+}
+
+// the running editor on a project and when you last changed something in it
+export function webEdited(appId: string, brandId: string, projectId: string): { cardId: string; editedAt: number } | null {
+  const e = liveFor(appId, brandId, projectId)
+  return e && e.editedAt ? { cardId: e.cardId, editedAt: e.editedAt } : null
 }
 
 export function webEmbedOn(appId: string, brandId: string, projectId: string): string | null {
@@ -484,7 +499,7 @@ function onDownload(item: Electron.DownloadItem, wc: WebContents | undefined): v
       e.touched = false
       e.loadedAt = Date.now()
       e.savedAt = Date.now()
-      e.note = `Saved ${name} in the project folder.`
+      e.note = ''
       emit(e)
     }).catch((err) => {
       e.note = `Couldn't put ${name} in the project folder: ${message(err)}`
@@ -510,7 +525,6 @@ async function load(e: Embed): Promise<void> {
       e.timers.push(setInterval(() => void watchExports(e).catch(() => {}), 2_000))
     } else if (e.file) {
       await dropFile(e, e.file)
-      e.note = `Save in ${spec(e.appId).name} (File, Save) and the file lands in the project folder.`
       // the agent changed the file on disk: show it again, unless you have changes here
       e.timers.push(setInterval(() => void refreshFromDisk(e), 3_000))
     }
@@ -589,7 +603,7 @@ export async function prepareWeb(p: PrepareInput): Promise<{ src: string; partit
   ready.catch(() => {})
   const e: Embed = {
     ...p, token, guest: null, state: 'loading', note: '', savedAt: null, ready, settle, table: new PathTable(), doc: null, saved: null,
-    touched: false, loadedAt: Date.now(), timers: [], inputSave: null, seenJobs: new Set(), debugger: false,
+    touched: false, editedAt: 0, loadedAt: Date.now(), timers: [], inputSave: null, seenJobs: new Set(), debugger: false,
     session: null as unknown as Session
   }
   e.session = {
@@ -628,6 +642,7 @@ export function attachWeb(cardId: string, guestId: number, host: WebContents): v
   // what you do in the editor saves a few seconds after you stop
   const touch = (): void => {
     e.touched = true
+    e.editedAt = Date.now()
     if (webSpec(e.appId)?.kind !== 'api' || e.state !== 'ready') return
     if (e.inputSave) clearTimeout(e.inputSave)
     e.inputSave = setTimeout(() => void saveSoon(e, 'autosave').catch((err) => fail(e, err, false)), INPUT_SAVE_MS)

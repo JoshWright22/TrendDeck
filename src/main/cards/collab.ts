@@ -7,6 +7,9 @@ import { spec } from '../craft/catalog'
 import { runningApp } from '../craft/launch'
 import { knownFolder } from '../craft/paths'
 import { appCall, resultJson } from '../craft/tools'
+import { webEdited, webStill } from '../craft/web'
+import { decodeDataUrl, saveAsset } from '../visuals/store'
+import { visualsRoot } from '../visuals/paths'
 import { onTurnClosed } from '../mcp/turns'
 import { currentFile, liveOn, onCommentMarkers, setOnEmbedded } from './embed'
 import { cardsDir, listCards } from './store'
@@ -131,6 +134,23 @@ async function embedded(brandId: string, threadId: string): Promise<CraftEmbedCa
   return out.slice(0, 4)
 }
 
+async function editedPicture(brandId: string, c: CraftEmbedCard, since: number): Promise<string | null> {
+  const edit = webEdited(c.appId, brandId, c.projectId)
+  if (!edit || edit.editedAt <= since) return null
+  const still = await webStill(edit.cardId).catch(() => null)
+  if (!still) return null
+  const asset = await saveAsset(visualsRoot(), brandId, decodeDataUrl(still), {
+    origin: 'frame',
+    name: `${c.appName} after the user's edits`,
+    note: `How the ${c.appName} editor in the chat looked when the user sent this message, their edits included.`,
+    sourceUrl: '',
+    source: null
+  }).catch(() => null)
+  return asset
+    ? `the user edited it in the editor here, maybe not saved to the file yet. A picture of how it looks now is visual ${asset.id}: open it with visual_get only if you need to see their changes`
+    : null
+}
+
 export async function takeLook(brandId: string, threadId: string, appId: string, projectId: string): Promise<void> {
   await load(brandId)
   const k = key(brandId, threadId, appId, projectId)
@@ -155,6 +175,10 @@ export async function turnNotes(brandId: string, threadId: string): Promise<stri
     let lines: string[] = []
     if (prev.snapshot && now.snapshot) lines = diffSnapshots(prev.snapshot, now.snapshot, new Set(prev.skipMarkers))
     else if (prev.mtime !== now.mtime || prev.file !== now.file) lines = [`the file ${now.file ? basename(now.file) : ''} changed, look at it with the ${c.appId} tools`.replace('  ', ' ')]
+    // an image the user changed in the editor here: a picture of it the agent can open if it needs
+    // to. none when they didn't touch it, so nothing is spent on looking
+    const shot = c.appId === 'filmcraft' ? null : await editedPicture(brandId, c, prev.at)
+    if (shot) lines.push(shot)
     // what was told now is the starting point for next time
     looks.set(k, { ...now, skipMarkers: [] })
     const text = describeChanges(c.appName, now.file ? basename(now.file) : c.file, lines)

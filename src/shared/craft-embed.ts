@@ -108,7 +108,8 @@ export interface EmbedApi {
   webOpen(brandId: string, cardId: string): Promise<{ src: string; partition: string }>
   webAttach(brandId: string, cardId: string, guestId: number): Promise<WebEmbedState | null>
   // saves, then lets go of the editor (the card shows a still again)
-  webRelease(brandId: string, cardId: string): Promise<void>
+  // false when it keeps running: its changes aren't in a file yet
+  webRelease(brandId: string, cardId: string): Promise<boolean>
   webState(cardId: string): Promise<WebEmbedState | null>
   onWebState(fn: (s: WebEmbedState) => void): () => void
   // the desktop app in its own window, the editor in the chat saves and lets go first

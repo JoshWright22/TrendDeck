@@ -20,7 +20,7 @@ import { webSpec } from '@shared/craft-web'
 import { cachedTools, pickFile, sessionOf, stopSession, waitForBridge } from '../craft/agent'
 import { APPS, fill, isAppId, spec } from '../craft/catalog'
 import { runningApp } from '../craft/launch'
-import { attachWeb, cardForGuest, prepareWeb, releaseWeb, reloadWeb, webLiveOn, webReady, webState, webStill } from '../craft/web'
+import { attachWeb, cardForGuest, prepareWeb, releaseWeb, reloadWeb, webLiveOn, webReady, webState, webStill, webUnsaved } from '../craft/web'
 import { appFiles, findProject, knownFolder, projectFolder } from '../craft/paths'
 import { isInside, PathError, resolveInProject, safeName, uniqueName } from '../craft/rules'
 import { liveOf, status } from '../craft/state'
@@ -487,7 +487,10 @@ export function setupEmbeds(deps: { addToProject: (brandId: string, projectId: s
   })
   ipcMain.handle('embed:web-release', async (e, brandId: unknown, cardId: unknown) => {
     if (!fromApp(e) || !isId(brandId) || !isCardId(cardId)) bad()
+    // false: it stays running, its changes aren't in a file yet
+    if (webUnsaved(cardId)) return false
     await releaseWeb(cardId)
+    return true
   })
   ipcMain.handle('embed:web-state', (e, cardId: unknown) => {
     if (!fromApp(e) || !isCardId(cardId)) bad()
