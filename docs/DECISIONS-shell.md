@@ -35,3 +35,15 @@
 - The component mounts under the stage strip in a `position: relative` box. Fill it with `position: absolute; inset: 0`, which the `.page` class already does.
 - Main-side code reads and writes pipelines and projects through `src/main/workspace/index.ts`: `getPipeline`, `setPipeline`, `listProjects`, `saveProject`, `linkThread`. Each write saves `trenddeck.json` and sends `data:changed` to the renderer, which swaps in that copy. Otherwise the renderer's next save would put the old one back.
 - The same calls are exposed over IPC as `window.trenddeckWorkspace`.
+
+## Approvals, questions and runs in the ui (phase 2)
+
+- `chat/pending.ts` is one store for the whole window: provider approvals and questions (`chat:provider-event`) and gateway approvals and pipeline questions (`gateway:*`, `pipeline:question*`). The composer, the sidebar dots and notifications all read it, so they can't disagree. A chat's provider items are reloaded from `pending()` when it opens and for busy chats, so a reload doesn't lose them.
+- Approvals sit in the composer, t3code style. Typing while one waits makes the text the deny note: Enter denies with it, Esc denies, Ctrl+Enter approves, Ctrl+Shift+Enter approves for the turn (gateway) or always allows (provider, when it can remember). A gateway approval with no thread shows in whichever chat of its brand is open.
+- Questions from either side use the chat's question card, answered in place at the end of the chat. Pipeline questions can be skipped, that's a dismiss.
+- While a reply runs, Enter steers and Alt or Ctrl+Enter queues. The queue only lives in main now; the renderer's own queue is gone. An agent that can't steer gets the message queued and the composer says so.
+- The permission picker sets the open chat's mode, or the brand default on a new chat.
+- Sidebar dots: a chat or project waiting on an answer is "needs you", busy is "working", a reply that finished while you were elsewhere gets a small gray dot until you open it. Those also send a plain html Notification, which Electron shows as a Windows toast.
+- The stage strip shows the project's newest open run (pending, running, waiting, done, skipped) and follows `run:changed`. "Start run" makes one. "Edit" opens the pipeline editor over the pane, which saves through `trenddeckPipeline.set`. "Move here" moves the run along with the project.
+- Settings, Agent access has three tabs: Rules (per risk and per tool, approval timeout), Activity (the audit log, live, filter by tool and chat) and Sites (the old grants and site log).
+- Views that keep their own copy (writer, media, posting, inbox, trends, voice) reload on `gateway:data-changed` for their kind through `useDataChanged`. Writer and voice save unsaved typing first.

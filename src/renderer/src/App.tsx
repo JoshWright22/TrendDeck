@@ -15,6 +15,7 @@ import CodePrompt from './components/vault/CodePrompt'
 import WorkspacePane, { MAX_WS, MIN_WS, type WsView } from './workspace/WorkspacePane'
 import SiteStrip from './workspace/SiteStrip'
 import { useInbox } from './pages/inbox/useInbox'
+import { setNames, syncThread } from './chat/pending'
 
 const ChatView = lazy(() => import('./chat/ChatView'))
 const Settings = lazy(() => import('./components/Settings'))
@@ -130,6 +131,51 @@ export default function App(): ReactNode {
       off()
     }
   }, [brandIds, update])
+
+  // notifications name the chat and brand they're about
+  const brandsRef = useRef(data?.brands ?? [])
+  brandsRef.current = data?.brands ?? []
+  const threadsRef = useRef(threads)
+  threadsRef.current = threads
+  useEffect(
+    () =>
+      setNames({
+        brand: (id) => brandsRef.current.find((b) => b.id === id)?.name ?? 'TrendDeck',
+        thread: (brandId, id) => {
+          const title = threadsRef.current.find((t) => t.id === id)?.title
+          const name = brandsRef.current.find((b) => b.id === brandId)?.name
+          return [name, title].filter(Boolean).join(' · ') || 'A chat'
+        }
+      }),
+    []
+  )
+
+  // a busy chat may be waiting on an approval main has from before a reload, for the sidebar dot
+  const busyIds = threads
+    .filter((t) => t.busy)
+    .map((t) => t.id)
+    .join(',')
+  useEffect(() => {
+    if (!brand) return
+    for (const id of busyIds.split(',').filter(Boolean)) void syncThread(brand.id, id)
+  }, [busyIds, brand?.id])
+
+  // a notification was clicked: go to that brand and chat
+  const jumpRef = useRef<(brandId: string, threadId: string | null) => void>(() => {})
+  jumpRef.current = (brandId, threadId) => {
+    const b = data?.brands.find((x) => x.id === brandId)
+    if (!b) return
+    if (data?.activeBrandId !== brandId) update((d) => ({ ...d, activeBrandId: brandId }))
+    if (threadId) setPlace(brandId, (p) => ({ ...p, projectId: projectIdForThread(b.projects, threadId), threadId }))
+  }
+  useEffect(() => {
+    const on = (e: Event): void => {
+      const d = (e as CustomEvent<{ brandId: string; threadId: string | null }>).detail
+      if (d) jumpRef.current(d.brandId, d.threadId)
+    }
+    window.addEventListener('trenddeck:open-thread', on)
+    return () => window.removeEventListener('trenddeck:open-thread', on)
+  }, [])
 
   if (!data) return <div className="boot" />
 

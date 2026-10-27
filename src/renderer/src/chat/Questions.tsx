@@ -46,9 +46,15 @@ interface Props {
   answered: string[] | null
   // null when it can't be answered right now (still streaming, or a later message exists)
   onAnswer: ((text: string) => void) | null
+  // gets the picks per question instead of the Q: / A: text, Other text goes in as one more pick
+  onPicks?: (picks: string[][]) => void
+  // a skip button, for questions that wait on their own (pipeline ask_user)
+  onDismiss?: () => void
+  // shown in the header instead of "Question"
+  kind?: string
 }
 
-export default function QuestionDeck({ questions, answered, onAnswer }: Props): ReactNode {
+export default function QuestionDeck({ questions, answered, onAnswer, onPicks, onDismiss, kind }: Props): ReactNode {
   const [step, setStep] = useState(0)
   const [picks, setPicks] = useState<string[][]>(() => questions.map(() => []))
   const [other, setOther] = useState<string[]>(() => questions.map(() => ''))
@@ -88,7 +94,8 @@ export default function QuestionDeck({ questions, answered, onAnswer }: Props): 
 
   const finish = (all: string[][]): void => {
     if (!onAnswer) return
-    onAnswer(answerText(questions, all))
+    if (onPicks) onPicks(all)
+    else onAnswer(answerText(questions, all))
   }
 
   const next = (all = questions.map((_, i) => final(i))): void => {
@@ -119,7 +126,7 @@ export default function QuestionDeck({ questions, answered, onAnswer }: Props): 
     <article className={`cx-card cx-question${live ? '' : ' waiting'}`} aria-label="Question from the agent">
       <CardCorners tone="hot" />
       <header>
-        <span className="cx-kind">Question</span>
+        <span className="cx-kind">{kind ?? 'Question'}</span>
         {q.multi && <span className="muted">Pick any</span>}
         <span className="spacer" />
         {questions.length > 1 && (
@@ -194,6 +201,11 @@ export default function QuestionDeck({ questions, answered, onAnswer }: Props): 
       <footer>
         {!live && <span className="muted">Answer when the reply is done</span>}
         <span className="spacer" />
+        {onDismiss && live && (
+          <button type="button" className="pill" onClick={onDismiss}>
+            Skip
+          </button>
+        )}
         {n > 0 && (
           <button type="button" className="pill" disabled={!live} onClick={() => setStep(n - 1)}>
             Back

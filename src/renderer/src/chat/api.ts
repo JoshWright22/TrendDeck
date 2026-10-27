@@ -1,12 +1,13 @@
 import type { ChatApi } from '@shared/chat'
+import type { ProviderChatApi } from '@shared/providers'
 
 declare global {
   interface Window {
-    trenddeckChat: ChatApi
+    trenddeckChat: ChatApi & ProviderChatApi
   }
 }
 
-export const chat = (): ChatApi => window.trenddeckChat
+export const chat = (): ChatApi & ProviderChatApi => window.trenddeckChat
 
 export const newId = (): string => crypto.randomUUID()
 

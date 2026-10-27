@@ -1,8 +1,10 @@
-import { Suspense, useRef, type ReactNode } from 'react'
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { PipelineStage } from '@shared/workspace'
+import type { Run } from '@shared/pipeline'
 import { Menu } from '../chat/ui'
 import { CloseIcon } from '../components/Icons'
 import StageStrip from './StageStrip'
+import PipelineEditor from './PipelineEditor'
 import Placeholder from './Placeholder'
 import { toolWorkspaces, workspaceFor, type WorkspaceProps } from './registry'
 
@@ -55,6 +57,33 @@ function Resizer({ width, onWidth }: Pick<Props, 'width' | 'onWidth'>): ReactNod
   )
 }
 
+// the project's newest open run, kept current from run:changed
+function useRun(brandId: string, projectId: string): Run | null {
+  const [run, setRun] = useState<Run | null>(null)
+  useEffect(() => {
+    let alive = true
+    const api = window.trenddeckPipeline
+    const load = (): void => {
+      void api.listRuns(brandId, { projectId, archived: false }).then((list) => alive && setRun(list[0] ?? null))
+    }
+    setRun(null)
+    load()
+    const offRun = api.onRunChanged((c) => {
+      if (c.brandId !== brandId || c.run.projectId !== projectId) return
+      if (c.removed || c.run.archived) load()
+      else setRun((r) => (!r || r.id === c.run.id || c.run.updatedAt >= r.updatedAt ? c.run : r))
+    })
+    // stages changing moves runs along with them
+    const offPipe = api.onChanged((c) => c.brandId === brandId && load())
+    return () => {
+      alive = false
+      offRun()
+      offPipe()
+    }
+  }, [brandId, projectId])
+  return run
+}
+
 export default function WorkspacePane(props: Props): ReactNode {
   const { brand, project, view, onView, collapsed } = props
   const stages: PipelineStage[] = brand.pipeline
@@ -67,6 +96,23 @@ export default function WorkspacePane(props: Props): ReactNode {
   const crumb =
     view.kind === 'stage' ? (stage?.label ?? 'Stage') : view.kind === 'tool' ? (def?.label ?? 'Tool') : (site?.name ?? 'Site')
   const tools = toolWorkspaces()
+  const run = useRun(brand.id, project.id)
+  const [editing, setEditing] = useState(false)
+  const [runError, setRunError] = useState('')
+  const here = run?.currentStageId ?? project.stageId
+
+  const startRun = (): void => {
+    setRunError('')
+    void window.trenddeckPipeline
+      .createRun(brand.id, { projectId: project.id, title: project.name })
+      .catch((err: unknown) => setRunError(err instanceof Error ? err.message : String(err)))
+  }
+
+  // the project and its run move together
+  const setStage = (stageId: string): void => {
+    props.onSetStage(stageId)
+    if (run) void window.trenddeckPipeline.updateRun(brand.id, run.id, { currentStageId: stageId })
+  }
 
   return (
     <aside className={`ws${collapsed ? ' collapsed' : ''}`} style={{ width: props.width }} aria-label="Workspace" aria-hidden={collapsed}>
@@ -79,8 +125,8 @@ export default function WorkspacePane(props: Props): ReactNode {
           </span>
           <span className="ws-crumb-here">{crumb}</span>
         </span>
-        {stage && stage.id !== project.stageId && (
-          <button className="ws-head-btn" title={`Move ${project.name} to ${stage.label}`} onClick={() => props.onSetStage(stage.id)}>
+        {stage && stage.id !== here && (
+          <button className="ws-head-btn" title={`Move ${project.name} to ${stage.label}`} onClick={() => setStage(stage.id)}>
             Move here
           </button>
         )}
@@ -103,7 +149,11 @@ export default function WorkspacePane(props: Props): ReactNode {
         currentId={project.stageId}
         openId={stage?.id ?? null}
         onOpen={(id) => onView({ kind: 'stage', stageId: id })}
+        run={run}
+        onEdit={() => setEditing(true)}
+        onStartRun={startRun}
       />
+      {runError && <p className="cx-error ws-run-error">{runError}</p>}
       {view.kind === 'site' && props.siteStrip}
       <div className="ws-body">
         {view.kind !== 'site' &&
@@ -125,6 +175,7 @@ export default function WorkspacePane(props: Props): ReactNode {
             <Placeholder title={crumb} text="Nothing to edit by hand here yet. The agent handles this step." />
           ))}
         <div className={`ws-sites${view.kind === 'site' ? ' on' : ''}`}>{props.sites}</div>
+        {editing && <PipelineEditor brandId={brand.id} stages={stages} onClose={() => setEditing(false)} />}
       </div>
     </aside>
   )

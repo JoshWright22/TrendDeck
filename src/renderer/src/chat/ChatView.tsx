@@ -11,6 +11,13 @@ import type {
   ThreadMessage,
   ThreadSummary
 } from '@shared/chat'
+import {
+  DEFAULT_PERMISSION_MODE,
+  PERMISSION_MODES,
+  type ApprovalRecord,
+  type PermissionMode,
+  type QueuedMessage
+} from '@shared/providers'
 import { CloseIcon, SendIcon } from '../components/Icons'
 import Markdown from './Markdown'
 import { EmbedCard, type EmbedActions } from './Embeds'
@@ -19,6 +26,10 @@ import SetupSteps from './SetupSteps'
 import WorkLog from './WorkLog'
 import QuestionDeck, { questionsIn, readAnswers } from './Questions'
 import UsagePopover from './UsagePopover'
+import ApprovalPanel, { type ApprovalChoice } from './ApprovalPanel'
+import PendingQuestion, { providerAnswers } from './PendingQuestion'
+import PlanCard from './PlanCard'
+import { isApproval, pendingFor, resolveLocal, setFocus, syncThread, usePendingState, type PendingItem } from './pending'
 import { RisingMark } from './Marks'
 import { Dropdown } from './ui'
 import { fileSize, fromMedia, onAttach } from './attachments'
@@ -41,17 +52,6 @@ interface Props {
   // extra buttons for the header, e.g. the workspace toggle
   headerRight?: ReactNode
 }
-
-// a message typed while the agent was still answering, sent when it's done
-interface Queued {
-  id: string
-  text: string
-  agentId: string
-  attachments: Attachment[]
-}
-
-// follow ups per thread, kept outside the view so switching chats doesn't drop them
-const queues = new Map<string, Queued[]>()
 
 const STARTERS = [
   {
@@ -80,7 +80,15 @@ const STARTERS = [
 // anything esc should close before it stops a reply
 const OVERLAYS = '.modal-backdrop, .ui-pop, [aria-modal="true"]'
 
-const SHORTCUTS = 'Ctrl+Shift+N new chat, Ctrl+L type, Esc stop, Alt+Up/Down switch chats'
+const SHORTCUTS =
+  'Ctrl+Shift+N new chat, Ctrl+L type, Esc stop, Alt+Up/Down switch chats. While a reply runs: Enter steers it, Alt+Enter queues'
+
+const MODE_LABELS: Record<PermissionMode, { label: string; hint: string }> = {
+  supervised: { label: 'Supervised', hint: 'Asks before every tool and change' },
+  'auto-accept-edits': { label: 'Auto-accept edits', hint: 'Edits go through, the rest asks' },
+  auto: { label: 'Auto', hint: "The agent's judgement, asks when unsure" },
+  'full-access': { label: 'Full access', hint: 'Never asks' }
+}
 
 function StopIcon(): ReactNode {
   return (
@@ -173,7 +181,11 @@ export default function ChatView({
   const [scanning, setScanning] = useState(false)
   const [trends, setTrends] = useState<Map<string, TrendItem>>(new Map())
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
-  const [queued, setQueued] = useState<Queued[]>([])
+  // lives in main per thread, this is the copy for the open chat
+  const [queued, setQueued] = useState<QueuedMessage[]>([])
+  const [notice, setNotice] = useState('')
+  const [mode, setMode] = useState<PermissionMode>(DEFAULT_PERMISSION_MODE)
+  const pend = usePendingState()
   const [dragging, setDragging] = useState(false)
   const listEnd = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)
@@ -221,33 +233,68 @@ export default function ChatView({
     // each chat remembers its own agent, a pick only sticks to the chat it was made in
     setPicked(null)
     setEditing(null)
-    setQueued(openId ? (queues.get(openId) ?? []) : [])
-    if (openId) void loadThread(openId)
-    else setThread(null)
-  }, [openId, loadThread])
+    setQueued([])
+    setNotice('')
+    setFocus(brandId, openId)
+    if (openId) {
+      void loadThread(openId)
+      void syncThread(brandId, openId)
+      void chat()
+        .listQueue(brandId, openId)
+        .then((q) => openRef.current === openId && setQueued(q))
+    } else setThread(null)
+  }, [openId, loadThread, brandId])
 
-  const setQueue = useCallback((threadId: string, list: Queued[]) => {
-    if (list.length) queues.set(threadId, list)
-    else queues.delete(threadId)
-    if (openRef.current === threadId) setQueued(list)
-  }, [])
+  useEffect(() => () => setFocus(null, null), [])
 
-  // sends the next queued follow up once a reply finishes
-  const drainQueue = useCallback(
-    async (threadId: string) => {
-      const list = queues.get(threadId) ?? []
-      const next = list[0]
-      if (!next) return
-      setQueue(threadId, list.slice(1))
-      try {
-        await chat().send(brandId, threadId, next.text, next.agentId, { attachments: next.attachments })
-        if (openRef.current === threadId) void loadThread(threadId)
-      } catch (err) {
-        setQueue(threadId, [next, ...(queues.get(threadId) ?? [])])
-        if (openRef.current === threadId) setError(cleanError(err))
-      }
-    },
-    [brandId, loadThread, setQueue]
+  // brand default for a new chat, the chat's own once it exists
+  useEffect(() => {
+    let alive = true
+    void chat()
+      .getPermissionMode(brandId, openId)
+      .then((m) => alive && setMode(m))
+    return () => {
+      alive = false
+    }
+  }, [brandId, openId])
+
+  // the provider layer: plans, steered messages, the queue, handoffs, approvals in the log
+  useEffect(
+    () =>
+      chat().onProviderEvent((ev) => {
+        if (ev.brandId !== brandId || ev.threadId !== openRef.current) return
+        if (ev.type === 'queue') return setQueued(ev.queue)
+        if (ev.type === 'permission-mode') return setMode(ev.mode)
+        if (ev.type === 'usage' || ev.type === 'user-input' || ev.type === 'user-input-resolved') return
+        setThread((t) => {
+          if (!t || t.id !== ev.threadId) return t
+          if (ev.type === 'steer') {
+            if (t.messages.some((m) => m.id === ev.message.id)) return t
+            const at = t.messages.findIndex((m) => m.id === ev.messageId)
+            const messages = [...t.messages]
+            messages.splice(at < 0 ? messages.length : at, 0, ev.message)
+            return { ...t, messages }
+          }
+          const patch = (fn: (m: ThreadMessage) => ThreadMessage): Thread => ({
+            ...t,
+            messages: t.messages.map((m) => (m.id === ev.messageId ? fn(m) : m))
+          })
+          if (ev.type === 'plan') return patch((m) => ({ ...m, plan: ev.plan }))
+          if (ev.type === 'handoff') return patch((m) => ({ ...m, handoffFrom: ev.fromAgentIds }))
+          if (ev.type === 'approval') {
+            const rec: ApprovalRecord = { ...ev.request, status: 'pending' }
+            return patch((m) => ({ ...m, approvals: [...(m.approvals ?? []).filter((a) => a.requestId !== rec.requestId), rec] }))
+          }
+          if (ev.type === 'approval-resolved') {
+            return patch((m) => ({
+              ...m,
+              approvals: (m.approvals ?? []).map((a) => (a.requestId === ev.requestId ? { ...a, status: ev.status } : a))
+            }))
+          }
+          return t
+        })
+      }),
+    [brandId]
   )
 
   useEffect(
@@ -259,15 +306,14 @@ export default function ChatView({
           return
         }
         if (ev.type === 'done') {
-          // a stopped or failed reply holds the queue so you can look first
-          if (ev.status === 'done') void drainQueue(ev.threadId)
+          // main sends the next queued message itself, the reload picks it up
           if (ev.threadId === openRef.current) void loadThread(ev.threadId)
           return
         }
         if (ev.threadId !== openRef.current) return
         setThread((t) => (t && t.id === ev.threadId ? applyEvent(t, ev) : t))
       }),
-    [brandId, loadThreads, loadThread, drainQueue]
+    [brandId, loadThreads, loadThread]
   )
 
   // files handed over from elsewhere in the app
@@ -331,15 +377,105 @@ export default function ChatView({
     return list.some((m) => m.id === model) ? list : [...list, { id: model, label: model }]
   }, [agentId, agent, modelLists, model])
 
-  const send = async (text = draft): Promise<void> => {
+  // what this chat waits on: approvals go in the composer, questions at the end of the chat
+  const waiting = pendingFor(pend, brandId, openId)
+  const approvals = waiting.filter(isApproval)
+  const approval = approvals[0]
+  const asked = waiting.filter(
+    (p): p is Extract<PendingItem, { kind: 'provider-input' | 'pipeline-question' }> =>
+      p.kind === 'provider-input' || p.kind === 'pipeline-question'
+  )
+
+  // deny takes whatever is in the composer as the note, the way t3code does it
+  const respond = async (choice: ApprovalChoice): Promise<void> => {
+    const a = approval
+    if (!a) return
+    const note = choice === 'deny' ? draft.trim() : ''
+    if (note) setDraft('')
+    resolveLocal(a.id)
+    setError('')
+    try {
+      if (a.kind === 'gateway-approval') {
+        await window.trenddeckGateway.respond({
+          id: a.request.id,
+          approve: choice !== 'deny',
+          scope: choice === 'turn' ? 'turn' : 'once',
+          ...(note ? { note } : {})
+        })
+      } else {
+        await chat().respondApproval(a.brandId, a.threadId, a.request.requestId, choice === 'deny' ? 'deny' : 'allow', {
+          ...(note ? { feedback: note } : {}),
+          remember: choice === 'turn'
+        })
+      }
+    } catch (err) {
+      setError(cleanError(err))
+    }
+  }
+
+  const answer = async (item: (typeof asked)[number], picks: string[][] | null): Promise<void> => {
+    resolveLocal(item.id)
+    try {
+      if (item.kind === 'provider-input') {
+        await chat().respondUserInput(item.brandId, item.threadId, item.request.requestId, providerAnswers(item, picks ?? []))
+      } else {
+        await window.trenddeckPipeline.answer({ id: item.question.id, picks: picks ?? [], ...(picks ? {} : { dismissed: true }) })
+      }
+    } catch (err) {
+      setError(cleanError(err))
+    }
+  }
+
+  const pickMode = (m: PermissionMode): void => {
+    setMode(m)
+    void chat()
+      .setPermissionMode(brandId, openId, m)
+      .catch((err) => setError(cleanError(err)))
+  }
+
+  // steer: into the running reply. queue: waits for it to end. main falls back to the queue
+  // when the agent can't take input mid reply
+  const sendDuring = async (threadId: string, body: string, how: 'steer' | 'queue'): Promise<void> => {
+    if (!agentId) return
+    setDraft('')
+    try {
+      if (how === 'queue') {
+        setQueued(await chat().queue(brandId, threadId, body, agentId))
+        return
+      }
+      const res = await chat().steer(brandId, threadId, body, agentId)
+      if (res.mode === 'queued') {
+        setNotice(`${agentName(agentId)} can't take messages mid reply, so it's queued for when this one is done`)
+        setQueued(await chat().listQueue(brandId, threadId))
+      } else if (res.mode === 'sent') void loadThread(threadId)
+    } catch (err) {
+      setDraft(body)
+      setError(cleanError(err))
+    }
+  }
+
+  const steerNow = async (q: QueuedMessage): Promise<void> => {
+    if (!thread) return
+    try {
+      const res = await chat().steerQueued(brandId, thread.id, q.id)
+      if (res.mode === 'queued') setNotice(`${agentName(q.agentId)} can't take messages mid reply`)
+      else if (res.mode === 'sent') void loadThread(thread.id)
+    } catch (err) {
+      setError(cleanError(err))
+    }
+  }
+
+  const send = async (text = draft, how: 'steer' | 'queue' = 'steer'): Promise<void> => {
     const body = text.trim()
     if (!body || !agentId) return
     setError('')
+    setNotice('')
     if (busy && thread) {
-      // typed while the agent works, goes out when it's done
-      setQueue(thread.id, [...(queues.get(thread.id) ?? []), { id: newId(), text: body, agentId, attachments: files }])
-      setDraft('')
-      setFiles([])
+      if (files.length) {
+        setError('Files go out with a new message. Wait for this reply, or remove them first.')
+        return
+      }
+      await sendDuring(thread.id, body, how)
       return
     }
     const sending = files
@@ -475,7 +611,9 @@ export default function ChatView({
         input.current?.focus()
       } else if (e.key === 'Escape') {
         if (e.defaultPrevented || overlayOnEsc.current || manage) return
-        if (busy) stop()
+        // an approval waiting: esc says no, with the composer text as the note
+        if (approval) void respond('deny')
+        else if (busy) stop()
       } else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         const list = visible
         if (!list.length) return
@@ -560,7 +698,13 @@ export default function ChatView({
   }
 
   const agentMessage = (m: ThreadMessage, i: number): ReactNode => (
-    <div key={m.id} className={`cx-msg agent${m.status === 'streaming' ? ' streaming' : ''}`}>
+    <div key={m.id} className="cx-msg-agent-wrap">
+      {m.handoffFrom?.length ? (
+        <div className="cx-handoff" role="separator">
+          <span>Continued from {[...new Set(m.handoffFrom.map((id) => agentName(id)))].join(', ')}</span>
+        </div>
+      ) : null}
+    <div className={`cx-msg agent${m.status === 'streaming' ? ' streaming' : ''}`}>
       <div className="cx-who">
         <RisingMark className="cx-who-mark" />
         {agentName(m.agentId)}
@@ -568,6 +712,22 @@ export default function ChatView({
         {m.status === 'stopped' && <span className="muted"> stopped</span>}
       </div>
       <WorkLog m={m} />
+      {m.plan?.length ? <PlanCard plan={m.plan} /> : null}
+      {m.approvals?.some((a) => a.status !== 'pending') && (
+        <ul className="cx-approvals-log" aria-label="Approvals">
+          {m.approvals
+            .filter((a) => a.status !== 'pending')
+            .map((a) => (
+              <li key={a.requestId} className={a.status}>
+                <span className="cx-approvals-word">
+                  {a.status === 'allowed' ? 'Allowed' : a.status === 'denied' ? 'Denied' : 'Expired'}
+                </span>
+                <span className="cx-approvals-title">{a.title}</span>
+                {a.feedback && <span className="muted">· {a.feedback}</span>}
+              </li>
+            ))}
+        </ul>
+      )}
       {m.text ? (
         <ReplyText m={m} deps={embedDeps} make={makeEmbed} />
       ) : m.status === 'streaming' && !m.steps?.length && !m.thinking && !m.thinkingTokens ? (
@@ -591,6 +751,7 @@ export default function ChatView({
           )}
         </div>
       )}
+    </div>
     </div>
   )
 
@@ -627,7 +788,8 @@ export default function ChatView({
       </div>
     ) : (
       <div key={m.id} className="cx-msg-user-wrap">
-        <div className="cx-msg user">
+        <div className={`cx-msg user${m.steer ? ' steer' : ''}`}>
+          {m.steer && <span className="cx-steer-tag">Steered</span>}
           {m.text}
           {m.attachments?.length ? (
             <div className="cx-files in-msg">
@@ -698,6 +860,14 @@ export default function ChatView({
                 </div>
               </div>
             )}
+            {asked.map((item) => (
+              <PendingQuestion
+                key={item.id}
+                item={item}
+                onAnswer={(picks) => void answer(item, picks)}
+                onDismiss={item.kind === 'pipeline-question' ? () => void answer(item, null) : undefined}
+              />
+            ))}
             <div ref={listEnd} />
           </div>
         </div>
@@ -711,7 +881,9 @@ export default function ChatView({
           className={`cx-composer${dragging ? ' dragging' : ''}`}
           onSubmit={(e) => {
             e.preventDefault()
-            void send()
+            if (approval) {
+              if (draft.trim()) void respond('deny')
+            } else void send()
           }}
           onDragOver={(e) => {
             if (e.dataTransfer.types.includes('Files')) {
@@ -727,19 +899,30 @@ export default function ChatView({
           }}
         >
           {error && <p className="cx-error">{error}</p>}
+          {notice && <p className="cx-notice">{notice}</p>}
           {queued.length > 0 && (
             <ul className="cx-queue" aria-label="Queued messages">
               {queued.map((q) => (
                 <li key={q.id}>
-                  <span className="cx-queue-tag">Next</span>
-                  <span className="cx-queue-text">{q.text}</span>
+                  <span className="cx-queue-tag">Queued</span>
+                  <span className="cx-queue-text" title={q.text}>
+                    {q.text}
+                  </span>
+                  {busy && agents?.find((x) => x.id === q.agentId)?.capabilities?.steer && (
+                    <button type="button" className="cx-tool" title="Put it into the running reply" onClick={() => void steerNow(q)}>
+                      Send now
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="row-close"
                     aria-label="Remove from queue"
                     title="Remove from queue"
                     onClick={() =>
-                      thread && setQueue(thread.id, (queues.get(thread.id) ?? []).filter((x) => x.id !== q.id))
+                      thread &&
+                      void chat()
+                        .unqueue(brandId, thread.id, q.id)
+                        .then((list) => openRef.current === thread.id && setQueued(list))
                     }
                   >
                     <CloseIcon />
@@ -748,7 +931,16 @@ export default function ChatView({
               ))}
             </ul>
           )}
-          <div className="cx-box">
+          <div className={`cx-box${approval ? ' approving' : ''}`}>
+            {approval && (
+              <ApprovalPanel
+                key={approval.id}
+                item={approval}
+                count={approvals.length}
+                hasNote={!!draft.trim()}
+                onRespond={(c) => void respond(c)}
+              />
+            )}
             {files.length > 0 && (
               <div className="cx-files">
                 {files.map((f) => (
@@ -769,20 +961,29 @@ export default function ChatView({
             <textarea
               ref={input}
               value={draft}
-              rows={3}
+              rows={approval ? 1 : 3}
               placeholder={
                 !agentId
                   ? 'Set up an agent to start chatting'
-                  : busy
-                    ? 'Type a follow up, it goes out when this reply is done'
-                    : `Message ${agentName(agentId)}`
+                  : approval
+                    ? 'Type a note to deny with feedback, or approve above'
+                    : busy
+                      ? 'Steer this reply (Enter), or queue it for after (Alt+Enter)'
+                      : `Message ${agentName(agentId)}`
               }
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
+                if (e.key !== 'Enter' || e.shiftKey && !(e.ctrlKey || e.metaKey)) return
+                if (approval) {
                   e.preventDefault()
-                  void send()
+                  // ctrl+enter approves, ctrl+shift+enter approves for the turn, enter with a note denies
+                  if (e.ctrlKey || e.metaKey) void respond(e.shiftKey ? 'turn' : 'approve')
+                  else if (draft.trim()) void respond('deny')
+                  return
                 }
+                if (e.shiftKey) return
+                e.preventDefault()
+                void send(draft, busy && (e.altKey || e.ctrlKey || e.metaKey) ? 'queue' : 'steer')
               }}
               onPaste={(e) => {
                 if (e.clipboardData.files.length) {
@@ -828,6 +1029,19 @@ export default function ChatView({
                   onChange={pickEffort}
                 />
               )}
+              <Dropdown
+                className="cx-mode"
+                label="Permissions"
+                title={
+                  thread
+                    ? 'How much the agent may do without asking, for this chat'
+                    : 'How much the agent may do without asking, the default for new chats'
+                }
+                up
+                value={mode}
+                options={PERMISSION_MODES.map((m) => ({ value: m, label: MODE_LABELS[m].label, hint: MODE_LABELS[m].hint }))}
+                onChange={pickMode}
+              />
               <button
                 type="button"
                 className="ui-menu-btn"
@@ -839,13 +1053,18 @@ export default function ChatView({
               </button>
               <span className="spacer" />
               <UsagePopover agents={agents ?? []} thread={thread} />
+              {busy && thread && !approval && draft.trim() && (
+                <button type="submit" className="cx-send" title="Steer the reply (Enter)" aria-label="Steer">
+                  <SendIcon />
+                </button>
+              )}
               {busy && thread && (
                 <button type="button" className="cx-send stop" title="Stop (Esc)" aria-label="Stop" onClick={stop}>
                   <StopIcon />
                 </button>
               )}
-              {/* one button in one spot: stop while a reply runs, send otherwise. enter still queues */}
-              {!busy && (
+              {/* stop while a reply runs, send otherwise. typing during a reply shows steer next to stop */}
+              {!busy && !approval && (
                 <button
                   type="submit"
                   className="cx-send"

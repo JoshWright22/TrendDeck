@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { MediaLibrary } from '@shared/media'
 import { probeLater } from './probe'
+import { useDataChanged } from '../../useDataChanged'
 
 // the brand's library, refetched whenever the main process says it changed
 export function useMediaLibrary(brandId: string): MediaLibrary | null {
@@ -27,6 +28,8 @@ export function useMediaLibrary(brandId: string): MediaLibrary | null {
       window.removeEventListener('focus', onFocus)
     }
   }, [brandId, load])
+
+  useDataChanged(brandId, 'media', load)
 
   return lib
 }

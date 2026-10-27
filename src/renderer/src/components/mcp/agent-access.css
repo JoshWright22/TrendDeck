@@ -123,3 +123,289 @@
 .share-tab.on {
   color: var(--teal);
 }
+
+/* gateway: rules per risk and tool, and the audit log */
+
+.gw-tabs {
+  display: flex;
+  gap: 2px;
+  margin: 4px 0 12px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.gw-tabs button {
+  height: 30px;
+  padding: 0 10px;
+  margin-bottom: -1px;
+  border-bottom: 1px solid transparent;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+.gw-tabs button:hover {
+  color: var(--chalk);
+}
+
+.gw-tabs button.on {
+  color: var(--chalk);
+  border-bottom-color: var(--accent);
+}
+
+.gw-risks {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--hair);
+}
+
+.gw-risk-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.gw-risk-name {
+  width: 64px;
+  color: var(--chalk);
+  font-weight: 500;
+}
+
+.gw-risk-hint {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.gw-seg {
+  display: flex;
+  padding: 2px;
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.gw-seg button {
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 5px;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.gw-seg button.on {
+  background: var(--raised);
+  color: var(--chalk);
+}
+
+:is(.modal, .settings) label.gw-timeout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  color: var(--smoke);
+  font-size: 12.5px;
+}
+
+:is(.modal, .settings) label.gw-timeout input {
+  width: 72px;
+  height: 26px;
+  margin: 0;
+  padding: 0 6px;
+}
+
+.gw-saved {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.gw-tools-head {
+  display: flex;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.agent-access .gw-tools-head h4 {
+  margin: 0;
+  white-space: nowrap;
+}
+
+:is(.modal, .settings) .gw-filter {
+  flex: none;
+  margin: 0;
+  width: 160px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  font-size: 12px;
+}
+
+.gw-group {
+  margin-top: 8px;
+}
+
+.gw-group-head {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+  color: var(--smoke);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.gw-group-head .muted {
+  font-weight: 400;
+}
+
+.gw-tools {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--hair);
+}
+
+.gw-tools li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  border-bottom: 1px solid var(--hair);
+  font-size: 12.5px;
+}
+
+.gw-tools li.off .gw-tool-title {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+
+.gw-tool-title {
+  color: var(--chalk);
+  white-space: nowrap;
+}
+
+.gw-tool-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.gw-rule .ui-dd-btn {
+  height: 24px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.gw-rule .ui-dd-btn:hover {
+  background: var(--hover);
+  color: var(--chalk);
+}
+
+.gw-act-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.gw-acts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--hair);
+}
+
+.gw-act {
+  border-bottom: 1px solid var(--hair);
+}
+
+.gw-act-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 4px;
+  color: var(--smoke);
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.gw-act-head:hover {
+  background: var(--hover);
+}
+
+.gw-act-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+.gw-act-dot.bad {
+  background: var(--pink);
+}
+
+.gw-act-time {
+  flex: none;
+  width: 92px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.gw-act-tool {
+  color: var(--chalk);
+  white-space: nowrap;
+}
+
+.gw-act-decision {
+  color: var(--faint);
+}
+
+.gw-act-decision.denied,
+.gw-act-decision.blocked,
+.gw-act-decision.invalid,
+.gw-act-decision.timeout {
+  color: var(--pink);
+}
+
+.gw-act-decision.approved {
+  color: var(--accent);
+}
+
+.gw-act-thread {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--faint);
+}
+
+.gw-act-ms {
+  flex: none;
+  width: 56px;
+  color: var(--faint);
+  font-size: 11.5px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.gw-act-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 4px 10px 20px;
+}
+
+.gw-act-result {
+  margin: 0;
+  color: var(--smoke);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

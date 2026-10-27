@@ -4,6 +4,7 @@ import { SOURCE_NAMES, TREND_SOURCES, type TrendFeed, type TrendItem, type Trend
 import PageHeader from '../components/PageHeader'
 import { age, HeroCard, TrendCard } from '../components/TrendBits'
 import { CloseIcon, ReloadIcon, SearchIcon } from '../components/Icons'
+import { useDataChanged } from '../useDataChanged'
 import type { PageProps } from './types'
 
 type Sort = 'score' | 'newest' | 'source'
@@ -32,6 +33,11 @@ export default function Trends(props: PageProps): ReactNode {
       off()
     }
   }, [brand.id])
+
+  // an agent refreshed the feed
+  useDataChanged(brand.id, 'trends', () => {
+    void window.trenddeck.getTrends(brand.id).then((f) => f && setFeed(f))
+  })
 
   const savedUrls = useMemo(() => new Set(brand.ideas.map((i) => i.url)), [brand.ideas])
 

@@ -7,9 +7,14 @@ export function usePosting(): PostingState | null {
     let alive = true
     void window.trenddeck.posting.get().then((s) => alive && setState(s))
     const off = window.trenddeck.posting.onUpdate(setState)
+    // an agent queued or changed a post
+    const offAgent = window.trenddeckGateway.onDataChanged((c) => {
+      if (c.kind === 'posting') void window.trenddeck.posting.get().then((s) => alive && setState(s))
+    })
     return () => {
       alive = false
       off()
+      offAgent()
     }
   }, [])
   return state

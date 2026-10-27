@@ -1,6 +1,15 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { AccessLogEntry, McpBrandSites, McpState } from '@shared/mcp'
+import GatewayRules from './GatewayRules'
+import GatewayActivity from './GatewayActivity'
 import './agent-access.css'
+
+type Tab = 'rules' | 'activity' | 'sites'
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'rules', label: 'Rules' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'sites', label: 'Sites' }
+]
 
 type Loaded = McpState & { brands: McpBrandSites[] }
 
@@ -35,6 +44,7 @@ export default function AgentAccess({ brandId }: { brandId: string | null }): Re
   const [state, setState] = useState<Loaded | null>(null)
   const [picked, setPicked] = useState<string | null>(brandId)
   const [copied, setCopied] = useState<string | null>(null)
+  const [tab, setTab] = useState<Tab>('rules')
 
   useEffect(() => {
     let alive = true
@@ -60,8 +70,8 @@ export default function AgentAccess({ brandId }: { brandId: string | null }): Re
   return (
     <div className="agent-access">
       <p className="form-hint">
-        Agents can't touch any site until you allow it here. They only run when you send a chat
-        message, and never see cookies or passwords.
+        Agents work through TrendDeck's tools and never see keys, cookies or passwords. Pick what runs on its own and
+        what asks you first. Agents only run when you send a chat message.
       </p>
 
       {state.brands.length > 1 && (
@@ -81,6 +91,27 @@ export default function AgentAccess({ brandId }: { brandId: string | null }): Re
         </div>
       )}
 
+      <div className="gw-tabs" role="tablist" aria-label="Agent access">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.id}
+            className={tab === t.id ? 'on' : ''}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'rules' && <GatewayRules key={brand.id} brandId={brand.id} />}
+      {tab === 'activity' && <GatewayActivity key={brand.id} brandId={brand.id} />}
+
+      {tab === 'sites' && (
+      <>
+      <p className="form-hint">Agents can't touch a site tab until you allow it here.</p>
       <div className="aa-sites">
         {brand.sites.map((s) => {
           const on = granted.has(s.id)
@@ -137,7 +168,7 @@ export default function AgentAccess({ brandId }: { brandId: string | null }): Re
       )}
 
       <div className="aa-log-head">
-        <h4>Activity</h4>
+        <h4>Site activity</h4>
         <span className="spacer" />
         {log.length > 0 && (
           <button type="button" className="btn ghost" onClick={() => void api.clearLog(brand.id)}>
@@ -157,6 +188,8 @@ export default function AgentAccess({ brandId }: { brandId: string | null }): Re
             </li>
           ))}
         </ul>
+      )}
+      </>
       )}
     </div>
   )

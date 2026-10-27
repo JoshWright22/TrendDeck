@@ -2039,3 +2039,368 @@
   color: var(--chalk);
   box-shadow: 0 0 0 1px var(--line), 0 8px 20px rgba(0, 0, 0, 0.4);
 }
+
+/* provider layer: approvals in the composer, plans, steer and queue, handoffs */
+
+.cx-msg-agent-wrap {
+  display: contents;
+}
+
+.cx-handoff {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.cx-handoff::before,
+.cx-handoff::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--hair);
+}
+
+.cx-steer-tag {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--faint);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cx-notice {
+  margin: 0 0 6px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+/* queued messages: faint one liners over the composer */
+.cx-queue {
+  gap: 2px;
+  margin: 0 4px 6px;
+}
+
+.cx-queue li {
+  gap: 8px;
+  padding: 2px 2px 2px 8px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.cx-queue-tag {
+  color: var(--faint);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cx-queue li .row-close {
+  width: 22px;
+  height: 22px;
+}
+
+/* the approval panel, inside the composer box above the text */
+.cx-approval {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.cx-approval-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.cx-approval-kicker {
+  color: var(--smoke);
+  font-weight: 500;
+}
+
+.cx-risk {
+  padding: 0 6px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--smoke);
+  font-size: 10.5px;
+  line-height: 17px;
+}
+
+.cx-risk.publish,
+.cx-risk.spend {
+  color: var(--yellow);
+  box-shadow: inset 0 0 0 1px rgb(var(--warn-rgb) / 0.3);
+}
+
+.cx-approval-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.cx-approval-time.soon {
+  color: var(--yellow);
+}
+
+.cx-approval-title {
+  margin: 0;
+  color: var(--chalk);
+  font-weight: 500;
+}
+
+.cx-approval-summary {
+  margin: 0;
+  color: var(--smoke);
+}
+
+.cx-approval-args {
+  max-height: 160px;
+  margin: 0;
+  padding: 6px 8px;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--felt);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  color: var(--smoke);
+  font: 11.5px/1.45 ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cx-approval .cx-tool {
+  align-self: flex-start;
+}
+
+.cx-approval-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.cx-approval-hint {
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.cx-approval-hint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx-ap-btn {
+  flex: none;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--smoke);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.cx-ap-btn:hover {
+  background: var(--hover);
+  color: var(--chalk);
+}
+
+.cx-ap-btn.primary {
+  background: var(--card);
+  box-shadow: none;
+  color: var(--felt);
+  font-weight: 500;
+}
+
+.cx-ap-btn.primary:hover {
+  background: #fff;
+}
+
+.cx-box.approving textarea {
+  min-height: 36px;
+}
+
+/* pipeline proposal diff */
+.cx-diff {
+  margin: 0;
+  padding: 4px 0;
+  border-radius: 6px;
+  background: var(--felt);
+  box-shadow: inset 0 0 0 1px var(--hair);
+  list-style: none;
+  font: 12px/1.6 ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+
+.cx-diff li {
+  display: flex;
+  gap: 8px;
+  padding: 0 8px;
+  color: var(--faint);
+}
+
+.cx-diff-mark {
+  flex: none;
+  width: 10px;
+  text-align: center;
+}
+
+.cx-diff-label {
+  color: var(--smoke);
+}
+
+.cx-diff-detail {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cx-diff li.added .cx-diff-mark,
+.cx-diff li.added .cx-diff-label {
+  color: var(--accent);
+}
+
+.cx-diff li.removed .cx-diff-mark,
+.cx-diff li.removed .cx-diff-label {
+  color: var(--pink);
+}
+
+.cx-diff li.removed .cx-diff-label {
+  text-decoration: line-through;
+  text-decoration-color: rgb(var(--danger-rgb) / 0.5);
+}
+
+.cx-diff li.moved .cx-diff-label,
+.cx-diff li.changed .cx-diff-label {
+  color: var(--chalk);
+}
+
+/* approvals the agent asked during a reply, after they were answered */
+.cx-approvals-log {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0 0 0 4px;
+  list-style: none;
+  font-size: 12px;
+}
+
+.cx-approvals-log li {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  color: var(--faint);
+}
+
+.cx-approvals-word {
+  flex: none;
+  color: var(--smoke);
+}
+
+.cx-approvals-log li.denied .cx-approvals-word {
+  color: var(--pink);
+}
+
+.cx-approvals-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* plan: a compact checklist */
+.cx-plan {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 0 0 1px var(--hair);
+}
+
+.cx-plan-head {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: var(--smoke);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cx-plan-head .muted {
+  font-weight: 400;
+}
+
+.cx-plan-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cx-plan-steps li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--smoke);
+  font-size: 12.5px;
+}
+
+.cx-plan-tick {
+  flex: none;
+  position: relative;
+  top: 1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--faint);
+}
+
+.cx-plan-steps li.in-progress {
+  color: var(--chalk);
+}
+
+.cx-plan-steps li.in-progress .cx-plan-tick {
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--teal-soft);
+}
+
+.cx-plan-steps li.done {
+  color: var(--faint);
+}
+
+.cx-plan-steps li.done .cx-plan-text {
+  text-decoration: line-through;
+  text-decoration-color: var(--line);
+}
+
+.cx-plan-steps li.done .cx-plan-tick {
+  background: var(--faint);
+  box-shadow: none;
+}
+
+.cx-mode .ui-dd-btn {
+  height: 26px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--smoke);
+}
+
+.cx-mode .ui-dd-btn:hover {
+  background: var(--hover);
+  color: var(--chalk);
+}
+
+.cx-pending-q {
+  margin-top: -6px;
+}

@@ -6,6 +6,7 @@ import { Menu } from '../chat/ui'
 import { chat, newId, when } from '../chat/api'
 import { PlusIcon, SettingsIcon } from '../components/Icons'
 import JobsStrip from './JobsStrip'
+import { isUnread, usePendingState, waitingThreads } from '../chat/pending'
 
 interface Props {
   brands: Brand[]
@@ -77,13 +78,21 @@ export default function Sidebar(props: Props): ReactNode {
 
   const projects = brand?.projects ?? []
   const brandId = brand?.id ?? ''
+  const pend = usePendingState()
+  // chats with an approval or a question waiting
+  const waiting = waitingThreads(pend, brandId)
   const isOpen = (id: string): boolean => open[id] ?? id === projectId
 
   const threadsOf = (p: Project): ThreadSummary[] =>
     threads.filter((t) => projectIdForThread(projects, t.id) === p.id).sort((a, b) => b.updatedAt - a.updatedAt)
 
-  // the dot: working when any of its chats is mid reply, otherwise what was set on it
-  const statusOf = (p: Project): ProjectStatus => (threadsOf(p).some((t) => t.busy) ? 'running' : p.status)
+  // the dot: needs you while any of its chats waits on an answer, working while one is mid
+  // reply, otherwise what was set on it
+  const statusOf = (p: Project): ProjectStatus => {
+    const list = threadsOf(p)
+    if (list.some((t) => waiting.has(t.id))) return 'waiting'
+    return list.some((t) => t.busy) ? 'running' : p.status
+  }
 
   const editProject = (id: string, fn: (p: Project) => Project): void =>
     props.editBrand((b) => ({ ...b, projects: b.projects.map((p) => (p.id === id ? fn(p) : p)) }))
@@ -141,7 +150,15 @@ export default function Sidebar(props: Props): ReactNode {
         if (e.key === 'Delete') setConfirmDelete(t.id)
       }}
     >
-      {t.busy ? <StatusDot status="running" /> : <span className="dot-space" />}
+      {waiting.has(t.id) ? (
+        <StatusDot status="waiting" />
+      ) : t.busy ? (
+        <StatusDot status="running" />
+      ) : t.id !== threadId && isUnread(pend, brandId, t.id) ? (
+        <span className="dot unread" title="New reply" aria-label="New reply" />
+      ) : (
+        <span className="dot-space" />
+      )}
       {renaming === t.id ? (
         <RenameBox
           value={t.title}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useDataChanged } from '../../useDataChanged'
 import { Dropdown } from '../../chat/ui'
 import {
   analyze,
@@ -184,6 +185,11 @@ export default function VoicePage({ brand, chatOpen, onToggleChat }: PageProps):
 
   // save on the way out
   useEffect(() => () => void flush(), [flush])
+
+  // an agent changed the voice pack. unsaved edits go out first
+  useDataChanged(brandId, 'voice', () => {
+    void flush().then(() => window.trenddeck.voiceLoad(brandId).then((d) => !pending.current && setData(d)))
+  })
 
   const edit = useCallback(
     (fn: (d: VoiceData) => VoiceData): void => {

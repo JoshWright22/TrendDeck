@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { WriterDoc } from '@shared/types'
+import { useDataChanged } from '../../useDataChanged'
 
 const SAVE_DELAY_MS = 400
 
@@ -25,12 +26,32 @@ export function useDrafts(brandId: string): {
     }
   }, [brandId])
 
+  const reload = useCallback(() => {
+    void window.trenddeck.loadDrafts(brandId).then((d) => {
+      // typed something meanwhile: that wins, it saves over the agent's copy as before
+      if (pending.current) return
+      loaded.current = d
+      setDoc(d)
+    })
+  }, [brandId])
+  // an agent changed a draft. unsaved typing goes out first, then the agent's change loads
+  const reloadAfter = useRef(false)
+
   const flush = useCallback(() => {
     if (timer.current) clearTimeout(timer.current)
     timer.current = null
-    if (pending.current) void window.trenddeck.saveDrafts(brandId, pending.current)
+    const saving = pending.current ? window.trenddeck.saveDrafts(brandId, pending.current) : null
     pending.current = null
-  }, [brandId])
+    if (reloadAfter.current) {
+      reloadAfter.current = false
+      void Promise.resolve(saving).then(reload)
+    }
+  }, [brandId, reload])
+
+  useDataChanged(brandId, 'writer', () => {
+    if (pending.current) reloadAfter.current = true
+    else reload()
+  })
 
   useEffect(() => {
     if (!doc || doc === loaded.current) return

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import './inbox.css'
 import type { BrandInbox, Health } from '@shared/inbox'
+import { useDataChanged } from '../../useDataChanged'
 
 export function useInbox(brandId: string | undefined): BrandInbox | null {
   const [inbox, setInbox] = useState<BrandInbox | null>(null)
@@ -17,6 +18,10 @@ export function useInbox(brandId: string | undefined): BrandInbox | null {
       off()
     }
   }, [brandId])
+  // an agent drafted or sent a reply
+  useDataChanged(brandId, 'inbox', () => {
+    if (brandId) void window.trenddeckInbox.load(brandId).then((i) => setInbox(i))
+  })
   return inbox
 }
 
