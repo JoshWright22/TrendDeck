@@ -525,10 +525,6 @@ function Composer({ ctx }: { ctx: Ctx }): ReactNode {
         </button>
       </div>
       <label className="toggle-row">
-        <input type="checkbox" checked={config.handsFree} onChange={(e) => void ctx.save({ handsFree: e.target.checked })} />
-        <span>Hands-free: keep listening without holding the keys</span>
-      </label>
-      <label className="toggle-row">
         <input type="checkbox" checked={config.autoSend} onChange={(e) => void ctx.save({ autoSend: e.target.checked })} />
         <span>Send automatically after a pause</span>
       </label>

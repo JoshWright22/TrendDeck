@@ -5,8 +5,8 @@ import { matchesKey, type DictationControl } from '../dictation/useDictation'
 import { openSettings } from '../settings-link'
 import { Menu } from './ui'
 
-// the mic in the composer toolbar: click to start and stop, hold the shortcut to talk, a menu
-// for hands-free, local or API and Settings. while it listens the toolbar shows a level meter,
+// the mic in the composer toolbar: click to turn dictation on and off, hold the shortcut to talk,
+// a menu for local or API and Settings. while it listens the toolbar shows a level meter,
 // the time and Stop; the words land in the text box
 
 function MicIcon(): ReactNode {
@@ -66,11 +66,17 @@ export default function ComposerMic({ d, disabled }: { d: DictationControl; disa
   const loadSources = (): void => void dictationSources().then(setSources).catch(() => setSources([]))
   useEffect(loadSources, [d.config])
 
-  const toggleHandsFree = (): void => {
-    if (disabled && !handsFree) return
-    d.setOption({ handsFree: !handsFree })
-    if (!handsFree) d.start('hands-free')
-    else d.stop()
+  // Dictate is a toggle: on, it keeps listening (and what you say goes into a running reply),
+  // off, it stops. holding the shortcut still talks only while held
+  const toggle = (): void => {
+    if (listening) {
+      if (handsFree) d.setOption({ handsFree: false })
+      d.stop()
+      return
+    }
+    if (disabled) return
+    if (!handsFree) d.setOption({ handsFree: true })
+    d.start('hands-free')
   }
 
   return (
@@ -80,9 +86,9 @@ export default function ComposerMic({ d, disabled }: { d: DictationControl; disa
         className="ui-menu-btn cx-mic-btn"
         aria-pressed={listening}
         aria-label={listening ? 'Stop dictation' : 'Dictate'}
-        title={listening ? 'Stop dictation' : `Dictate instructions to the agent, not footage. Click to start and stop, or hold ${holdKey}`}
-        disabled={disabled || d.state === 'finishing'}
-        onClick={() => (listening ? d.stop() : d.start('click'))}
+        title={listening ? 'Stop dictation' : `Dictate to your agent. Click to turn it on and off, or hold ${holdKey} to talk`}
+        disabled={(disabled && !listening) || d.state === 'finishing'}
+        onClick={toggle}
         onContextMenu={(e) => {
           e.preventDefault()
           ;(e.currentTarget.nextElementSibling?.querySelector('button') as HTMLButtonElement | null)?.click()
@@ -98,11 +104,9 @@ export default function ComposerMic({ d, disabled }: { d: DictationControl; disa
         align="left"
         trigger={<Chevron />}
         items={[
-          { label: handsFree ? 'Turn hands-free off' : 'Turn hands-free on', onSelect: toggleHandsFree, disabled: disabled && !handsFree },
-          ...sources.map((src, i) => ({
+          ...sources.map((src) => ({
             label: `${src.active ? 'Using ' : ''}${src.label}${src.kind === 'api' ? ' (cloud)' : ''}`,
             disabled: src.active,
-            divider: i === 0,
             onSelect: () => void useDictationSource(src.id).then(loadSources).catch((err: unknown) => d.showError(err, "Couldn't switch the dictation source."))
           })),
           { label: 'Settings...', onSelect: () => openSettings('Dictation'), divider: true }
@@ -116,8 +120,8 @@ export default function ComposerMic({ d, disabled }: { d: DictationControl; disa
           <time className="cx-mic-time" aria-label="Listening time">
             {clock(d.elapsed)}
           </time>
-          {handsFree && <span className="cx-mic-label">Listening</span>}
-          <button type="button" className="cx-mic-stop" onClick={() => (handsFree ? toggleHandsFree() : d.stop())}>
+          <span className="cx-mic-label">Listening</span>
+          <button type="button" className="cx-mic-stop" onClick={toggle}>
             Stop
           </button>
         </>
