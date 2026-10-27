@@ -206,7 +206,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     view.sendInputEvent({ type: 'mouseUp', ...at })
   }
 
-  // filling the chat, the plan bar above the messages folds away to give the editor the room
+  // filling the chat, the chat stops following new messages to the bottom
   useEffect(() => {
     if (size !== 'fill' || !page) return
     const root = document.documentElement
@@ -251,9 +251,9 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     const measure = (): void => {
       const stage = stageRef.current
       if (!stage) return
-      const chrome = size === 'fill'
-        ? Math.max(40, stage.getBoundingClientRect().top - root.getBoundingClientRect().top)
-        : root.getBoundingClientRect().height - stage.getBoundingClientRect().height
+      // only what's above the stage, so the size stays put when the editor starts or stops and
+      // the rows under it come and go
+      const chrome = Math.max(40, stage.getBoundingClientRect().top - root.getBoundingClientRect().top)
       const room = Math.max(1, (sc?.clientHeight ?? window.innerHeight) - chrome - 24)
       setHeight(stageHeight(size, stage.getBoundingClientRect().width, room))
     }
@@ -341,6 +341,8 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
 
   const turn = card.turn
   const canComment = card.appId === 'filmcraft' && (live || fullHere)
+  // the row with it stays while the editor stops off screen, so the chat under it doesn't move
+  const commentRow = card.appId === 'filmcraft' && !cantRun
   const alts = card.alternatives
   const stageStyle = height ? { height } : undefined
   const cover = !live || !page
@@ -472,7 +474,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
         </div>
       )}
 
-      {(turn || canComment || dropping) && (
+      {(turn || commentRow || dropping) && (
         <div className="cx-card2-actions cx-embed-foot" role="status">
           {dropping ? (
             <span>Drop to add the files to the {card.appName} project</span>
@@ -488,8 +490,8 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
             )
           )}
           <span className="spacer" />
-          {canComment && !dropping && (
-            <button type="button" aria-expanded={commenting} onClick={() => setCommenting(!commenting)}>
+          {commentRow && !dropping && (
+            <button type="button" aria-expanded={commenting} disabled={!canComment && !commenting} onClick={() => setCommenting(!commenting)}>
               {commenting ? 'Close comments' : 'Comment on the timeline'}
             </button>
           )}
@@ -506,7 +508,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
         </div>
       )}
       {turn?.note && turn.state !== 'failed' && <p className="cx-card2-note">{turn.note}</p>}
-      {commenting && canComment && (
+      {commenting && commentRow && (
         <CraftTimelineReview brandId={a.brand.id} card={card} projectName={project?.name ?? ''} send={a.hasAgent ? a.sendToAgent : null} />
       )}
       {note && <p className="cx-card2-note">{note}</p>}

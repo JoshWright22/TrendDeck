@@ -214,10 +214,6 @@
   text-overflow: ellipsis;
 }
 
-html[data-embed-fill] .cx-project-progress {
-  display: none;
-}
-
 /* the chat keeps its centered column, an editor at Whole chat breaks out of it to the chat's full
    width (cqw is the message list's width without its scrollbar) */
 .cx-messages:has(.cx-embed) {
@@ -231,16 +227,12 @@ html[data-embed-fill] .cx-project-progress {
 
 .cx-messages:has(.cx-embed) {
   scrollbar-gutter: stable;
-  overflow-anchor: none;
 }
 
-html[data-embed-fill] .cx-jump {
-  position: static;
-  flex: none;
-  align-self: center;
-  margin: 4px auto;
-  transform: none;
-  animation: none;
+/* the chat keeps its place by the messages around an editor, not by the editor: it changes size
+   and swaps between a live editor and a still while you scroll */
+.cx-embed {
+  overflow-anchor: none;
 }
 
 .cx-embed-web {
