@@ -324,3 +324,22 @@
   border-radius: 8px;
   background: #000;
 }
+
+/* over the last picture of the editor: the picture stays bright, what's going on sits in a small
+   label in the corner instead of a grey layer over all of it */
+.cx-embed-cover.over-still {
+  inset: auto auto 10px 10px;
+  flex-direction: row;
+  gap: 8px;
+  max-width: calc(100% - 20px);
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.cx-embed-cover.over-still:not(:has(button)) {
+  padding-right: 10px;
+}

@@ -427,7 +427,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
           )}
           {cover && still && <img className="cx-embed-still" src={still} alt="" />}
           {cover && (
-            <div className="cx-embed-cover">
+            <div className={`cx-embed-cover${still ? ' over-still' : ''}`}>
               {coverText && <span>{coverText}</span>}
               {!page && !fullHere && (
                 <button type="button" className="primary" disabled={busy || installKind === 'installing' || status === undefined} onClick={() => void openHere()}>
