@@ -286,8 +286,9 @@ export interface LiveCandidate {
   rank: number
 }
 
-// the embeds that get a running web editor: the newest you can see, at most max, one per document.
-// one that's live stays live while you can still see it, so scrolling never reloads an editor
+// the embeds that get a running web editor: the newest you can see (or are about to), at most max,
+// one per document. one that's live keeps running after it scrolls away while there's room, so
+// scrolling back to it never reloads it
 export function pickLive(cands: LiveCandidate[], current: ReadonlySet<string>, max = MAX_LIVE): Set<string> {
   const out = new Set<string>()
   const keys = new Set<string>()
@@ -302,6 +303,8 @@ export function pickLive(cands: LiveCandidate[], current: ReadonlySet<string>, m
   if (pinnedTop) take(pinnedTop)
   for (const c of visible) if (current.has(c.id)) take(c)
   for (const c of visible) take(c)
+  // out of view but running: kept while no editor you can see needs the room
+  for (const c of [...cands].sort((a, b) => b.rank - a.rank)) if (!c.visible && current.has(c.id)) take(c)
   return out
 }
 

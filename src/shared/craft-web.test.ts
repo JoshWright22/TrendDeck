@@ -134,8 +134,12 @@ describe('which editors run', () => {
     expect([...pickLive([c('a', 'k1', 1), c('b', 'k2', 2), c('x', 'k3', 10)], now)].sort()).toEqual(['b', 'x'])
   })
 
-  it('stops what you can not see', () => {
-    expect(pickLive([c('a', 'k1', 1, false)], new Set(['a'])).size).toBe(0)
+  it('keeps one running after it scrolls away, until one you can see needs the room', () => {
+    expect([...pickLive([c('a', 'k1', 1, false)], new Set(['a']))]).toEqual(['a'])
+    // never starts one you can't see
+    expect(pickLive([c('a', 'k1', 1, false)], new Set()).size).toBe(0)
+    // two visible ones take both places from the one out of view
+    expect([...pickLive([c('a', 'k1', 9, false), c('b', 'k2', 1), c('d', 'k3', 2)], new Set(['a']))].sort()).toEqual(['b', 'd'])
   })
 
   it('only FilmCraft and PhotoCraft run in the chat for now', () => {

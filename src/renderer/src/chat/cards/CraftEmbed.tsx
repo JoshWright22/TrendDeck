@@ -83,11 +83,16 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     if (Date.now() - revealAt.current < 4000) rootRef.current?.scrollIntoView({ block: 'start' })
   })
 
-  // any of it in view counts as visible
+  // any of it in view, or within a screen of it, counts as visible
   useEffect(() => {
     const el = rootRef.current
     if (!el) return
-    const io = new IntersectionObserver(([entry]) => setEmbedVisible(card.id, entry.isIntersecting && entry.intersectionRect.height > 0), { threshold: [0, 0.01] })
+    // a screen ahead: the editor starts before you scroll to it, so it's running when you get there
+    const io = new IntersectionObserver(([entry]) => setEmbedVisible(card.id, entry.isIntersecting), {
+      root: scroller(el),
+      rootMargin: '100% 0px',
+      threshold: 0
+    })
     io.observe(el)
     return () => {
       io.disconnect()
