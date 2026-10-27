@@ -314,7 +314,6 @@
   min-height: 0;
   overflow-y: auto;
   border-top: 1px solid var(--line);
-  scrollbar-width: thin;
   scrollbar-gutter: stable;
 }
 

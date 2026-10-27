@@ -85,7 +85,6 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .cx-threads-empty {
@@ -196,7 +195,6 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .cx-column {
@@ -470,7 +468,6 @@
   margin: 0;
   padding: 10px 12px;
   overflow-x: auto;
-  scrollbar-width: thin;
 }
 
 .cx-code pre code {
@@ -636,7 +633,6 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   user-select: text;
-  scrollbar-width: thin;
 }
 
 .cx-count {
@@ -2447,4 +2443,55 @@
   .cx-mic-meter > span {
     transition: none;
   }
+}
+
+/* layout pass: your messages take no more room than they show, the Edit button sits beside the
+   bubble instead of under it, and a reply's Retry and Copy show when you point at it */
+.cx-msg-user-wrap {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.cx-msg-user-wrap > .cx-edit-btn {
+  order: 1;
+}
+
+.cx-msg-user-wrap > :not(.cx-msg):not(.cx-edit-btn) {
+  order: 2;
+  flex-basis: 100%;
+}
+
+.cx-msg-user-wrap:has(> :not(.cx-msg):not(.cx-edit-btn)) {
+  flex-wrap: wrap;
+}
+
+.cx-msg-tools {
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+}
+
+.cx-msg.agent:hover .cx-msg-tools,
+.cx-msg-tools:focus-within {
+  opacity: 1;
+}
+
+.cx-add .ui-menu-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+/* the mic reads as one button: icon and word side by side */
+.cx-box-row .cx-mic-btn {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: 28px;
+  padding: 0 9px;
+  font-size: 12.5px;
 }

@@ -156,7 +156,6 @@ body.resizing webview {
   min-height: 0;
   padding: 6px 8px 8px;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .sb-brand + .sb-brand {

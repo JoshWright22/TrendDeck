@@ -45,7 +45,7 @@ import PendingQuestion, { providerAnswers } from './PendingQuestion'
 import PlanCard from './PlanCard'
 import { isApproval, pendingFor, resolveLocal, setFocus, syncThread, usePendingState, type PendingItem } from './pending'
 import { RisingMark } from './Marks'
-import { Dropdown } from './ui'
+import { Dropdown, Menu } from './ui'
 import { fileSize, fromMedia, onAttach } from './attachments'
 import MediaPicker from '../pages/media/MediaPicker'
 import { chat, newId } from './api'
@@ -132,59 +132,18 @@ const MODE_LABELS: Record<PermissionMode, { label: string; hint: string }> = {
   'full-access': { label: 'Full access', hint: 'Never asks' }
 }
 
+function PlusIcon(): ReactNode {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+      <path d="M7 2.5v9M2.5 7h9" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function StopIcon(): ReactNode {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
       <rect x="1" y="1" width="10" height="10" rx="2" fill="currentColor" />
-    </svg>
-  )
-}
-
-function RecordIcon(): ReactNode {
-  return (
-    <svg width="15" height="14" viewBox="0 0 15 14" aria-hidden="true">
-      <rect x="1" y="3" width="9" height="8" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M10 6l3.6-2v6L10 8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function ObsIcon(): ReactNode {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-      <rect x="1" y="2" width="12" height="8.5" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M4.5 13h5M7 10.5V13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function SketchIcon(): ReactNode {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-      <path d="M2 12l1-3.2 6.6-6.6a1.5 1.5 0 0 1 2.2 2.2L5.2 11 2 12zM8.6 3.2l2.2 2.2" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function FindIcon(): ReactNode {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-      <circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M9.1 9.1l3.4 3.4M3.6 7.4l1.6-1.5 1.3 1.1 1-0.9" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
-function ClipIcon(): ReactNode {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-      <path
-        d="M9.5 4.5L5.2 8.8a1.2 1.2 0 0 0 1.7 1.7l4.6-4.6a2.5 2.5 0 0 0-3.5-3.5L3.4 7a3.7 3.7 0 0 0 5.3 5.3l3.6-3.6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
     </svg>
   )
 }
@@ -936,6 +895,13 @@ export default function ChatView({
     )
   }
 
+  // who answered shows once, then again only when the agent or model changes
+  const showWho = (m: ThreadMessage, i: number): boolean => {
+    if (m.status === 'stopped' || m.handoffFrom?.length) return true
+    const prev = thread?.messages.slice(0, i).reverse().find((p) => p.role === 'agent')
+    return !prev || prev.agentId !== m.agentId || (prev.model ?? '') !== (m.model ?? '')
+  }
+
   const agentMessage = (m: ThreadMessage, i: number): ReactNode => (
     <div key={m.id} className="cx-msg-agent-wrap">
       {m.handoffFrom?.length ? (
@@ -944,12 +910,14 @@ export default function ChatView({
         </div>
       ) : null}
     <div className={`cx-msg agent${m.status === 'streaming' ? ' streaming' : ''}`}>
+      {showWho(m, i) && (
       <div className="cx-who">
         <RisingMark className="cx-who-mark" />
         {agentName(m.agentId)}
         {m.model && <span className="muted"> {agents?.find((a) => a.id === m.agentId)?.models?.find((o) => o.id === m.model)?.label ?? m.model}</span>}
         {m.status === 'stopped' && <span className="muted"> stopped</span>}
       </div>
+      )}
       <WorkLog m={m} />
       {m.plan?.length ? <PlanCard plan={m.plan} /> : null}
       {m.approvals?.some((a) => a.status !== 'pending') && (
@@ -1320,6 +1288,25 @@ export default function ChatView({
             />
             </div>
             <div className="cx-box-row">
+              <Menu
+                label="Add to your message"
+                className="cx-add"
+                up
+                align="left"
+                trigger={<PlusIcon />}
+                items={[
+                  { label: 'Attach from Media', onSelect: () => setPicking(true) },
+                  { label: 'Draw a sketch', onSelect: () => setSketch(null) },
+                  { label: finding ? 'Close the online search' : 'Find visuals online', onSelect: () => setFinding(!finding) },
+                  {
+                    label: recording ? 'Close the take recorder' : 'Record a take',
+                    onSelect: () => setRecording(!recording),
+                    disabled: takeBusy || dictation.state !== 'idle',
+                    divider: true
+                  },
+                  ...(project ? [{ label: 'Show OBS in the chat', onSelect: () => openId && void window.trenddeckObs.showCard(brandId, openId, project.id).catch((err: unknown) => setError(cleanError(err))), disabled: !openId }] : [])
+                ]}
+              />
               <Dropdown
                 className="cx-agent"
                 label="Agent"
@@ -1369,61 +1356,8 @@ export default function ChatView({
                 options={PERMISSION_MODES.map((m) => ({ value: m, label: MODE_LABELS[m].label, hint: MODE_LABELS[m].hint }))}
                 onChange={pickMode}
               />
-              <button
-                type="button"
-                className="ui-menu-btn"
-                title="Attach from Media"
-                aria-label="Attach from Media"
-                onClick={() => setPicking(true)}
-              >
-                <ClipIcon />
-              </button>
-              <button
-                type="button"
-                className={`ui-menu-btn${sketch !== false ? ' on' : ''}`}
-                title="Draw a sketch for your agent: on a blank page, a frame from the editor or a pasted screenshot"
-                aria-label="Sketch"
-                onClick={() => setSketch(null)}
-              >
-                <SketchIcon />
-              </button>
-              <button
-                type="button"
-                className={`ui-menu-btn${finding ? ' on' : ''}`}
-                title="Find images, clips, GIFs and audio online"
-                aria-label="Find visuals online"
-                aria-expanded={finding}
-                onClick={() => setFinding(!finding)}
-              >
-                <FindIcon />
-              </button>
-              <ComposerMic d={dictation} disabled={!agentId || !!approval || recording} />
-              <button
-                type="button"
-                className={`ui-menu-btn${recording ? ' on' : ''}`}
-                title={takeBusy ? 'Stop and save or discard this take before closing' : dictation.state !== 'idle' ? 'Finish dictating before recording footage' : project ? 'Record footage for this project, preview, then save for the agent' : 'Record footage, preview, then attach it to your message'}
-                aria-label="Record a take"
-                aria-expanded={recording}
-                disabled={takeBusy || dictation.state !== 'idle'}
-                onClick={() => setRecording(!recording)}
-              >
-                <RecordIcon />
-                <span>Take</span>
-              </button>
-              {project && (
-                <button
-                  type="button"
-                  className="ui-menu-btn"
-                  title="Show OBS in the chat"
-                  aria-label="Show OBS in the chat"
-                  disabled={!openId}
-                  onClick={() => openId && void window.trenddeckObs.showCard(brandId, openId, project.id).catch((err: unknown) => setError(cleanError(err)))}
-                >
-                  <ObsIcon />
-                  <span>OBS</span>
-                </button>
-              )}
               <span className="spacer" />
+              <ComposerMic d={dictation} disabled={!agentId || !!approval || recording} />
               <UsagePopover agents={agents ?? []} thread={thread} />
               {busy && thread && !approval && draft.trim() && (
                 <button type="submit" className="cx-send" title="Steer the reply (Enter)" aria-label="Steer">
