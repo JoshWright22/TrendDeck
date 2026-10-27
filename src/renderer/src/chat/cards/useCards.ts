@@ -41,5 +41,4 @@ export function useCards(brandId: string, threadId: string | null): ChatCard[] {
   return cards
 }
 
-export const cleanError = (err: unknown): string =>
-  err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : String(err)
+export { cleanError } from '../../plain-error'

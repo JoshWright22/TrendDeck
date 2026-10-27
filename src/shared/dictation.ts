@@ -306,6 +306,8 @@ export interface DictationApi {
   addCustomModel(repo: string): Promise<DictationConfig>
   removeCustomModel(id: string): Promise<DictationConfig>
   onModelProgress(fn: (progress: LocalModelProgress) => void): () => void
+  // the saved config changed outside this page, e.g. the agent set dictation up
+  onConfigChanged(fn: (config: DictationConfig) => void): () => void
 
   providers(): Promise<SttProviderInfo[]>
   saveProvider(input: ProviderInput): Promise<DictationConfig>
@@ -338,6 +340,7 @@ export const DICTATION_CHANNELS = {
 
 // main to the window, not an invoke channel
 export const DICTATION_PROGRESS_EVENT = 'dictation:model-progress'
+export const DICTATION_CONFIG_EVENT = 'dictation:config-changed'
 
 export const DICTATION_MAX_BYTES = 25 * 1024 * 1024
 export const DICTATION_TIMEOUT_MS = 120_000

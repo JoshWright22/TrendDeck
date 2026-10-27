@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import type { ChatCard, TakeCard } from '@shared/cards'
 import { transcribePcm } from '../dictation/engine'
+import { cleanError } from '../plain-error'
 
 // takes are transcribed here, in the window, because Whisper runs in the window's worker. main
 // makes the card and pulls the audio out with ffmpeg; this takes the brand's waiting takes one at
@@ -18,7 +19,7 @@ function transcribe(card: TakeCard): void {
       const t = await transcribePcm(new Float32Array(bytes))
       await window.trenddeckTakes.setTranscript(card.brandId, card.id, t)
     } catch (err) {
-      const message = err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : "Couldn't transcribe this take."
+      const message = cleanError(err, "Couldn't transcribe this take.")
       await window.trenddeckTakes.setTranscript(card.brandId, card.id, null, message).catch(() => {})
     } finally {
       running.delete(card.id)

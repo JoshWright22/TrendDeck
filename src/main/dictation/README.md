@@ -14,6 +14,8 @@ One active source turns speech into text, picked in Settings, Dictation and swit
 - `src/main/media/protocol.ts` serves `td-media://stt/<id>/<dtype>/<file>` through `servedModelFile`: only the files that variant lists, of a finished download.
 - `sources.ts`: the provider registry as main uses it, and the migration of the old single-API config.
 - `providers/`: the adapters. `http.ts` holds the shared network rules (checked URLs, no redirects, 120 s timeout tied to cancel, 1 MiB response cap, error messages with no body, URL or key), `timing.ts` turns provider answers into words with times.
+- `tools.ts`: gateway tools for the agent. `dictation_status` (read: the GPU in use, WebGPU and hardware acceleration, local models with download state and size, providers as configured yes or no, the recommended model) and `dictation_setup` (edit: downloads a local model in main and makes it the source, waits 45 s then says it's still going). Local models only, never a provider. A change made there reaches the window as `dictation:config-changed`.
+- `pick.ts`: the GPU facts from `app.getGPUInfo('basic')` and `app.getGPUFeatureStatus()`, and the pick rule: a dedicated GPU with WebGPU gets Whisper Large v3 Turbo, built-in graphics Whisper Small, no WebGPU or acceleration Whisper Base.
 - `preload.ts`: `dictationBridge(ipcRenderer)`, exposed as `window.trenddeckDictation`.
 - `src/renderer/src/dictation/engine.ts`: what the rest of the ui calls. `transcribePcm`, `decodeToPcm`, `dictationReady`, `warmUp`, `encodeWav`, the source switcher.
 

@@ -103,7 +103,7 @@ export default function ComposerMic({ d, disabled }: { d: DictationControl; disa
             label: `${src.active ? 'Using ' : ''}${src.label}${src.kind === 'api' ? ' (cloud)' : ''}`,
             disabled: src.active,
             divider: i === 0,
-            onSelect: () => void useDictationSource(src.id).then(loadSources).catch(() => {})
+            onSelect: () => void useDictationSource(src.id).then(loadSources).catch((err: unknown) => d.showError(err, "Couldn't switch the dictation source."))
           })),
           { label: 'Settings...', onSelect: () => openSettings('Dictation'), divider: true }
         ]}

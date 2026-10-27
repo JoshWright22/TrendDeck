@@ -6,6 +6,7 @@ import {
 } from '@shared/dictation'
 import { Dropdown } from '../../chat/ui'
 import { lastWhisperDevice, onWhisperDevice, useDictationSource, type Device } from '../../dictation/engine'
+import { cleanError } from '../../plain-error'
 import './dictation-settings.css'
 
 // Settings, Dictation: where speech becomes text (a local model, a server on this computer or a
@@ -23,9 +24,7 @@ function formatBytes(bytes: number): string {
   return `${Math.max(0, Math.round(bytes / 1e3))} KB`
 }
 
-function plainError(err: unknown, fallback: string): string {
-  return err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : fallback
-}
+const plainError = cleanError
 
 // "Ctrl+Space" from a key press, null for a lone modifier
 function shortcutFrom(e: KeyboardEvent): string | null {
@@ -73,9 +72,12 @@ export default function DictationSettings(): ReactNode {
         void bridge.models().then((s) => { if (mounted.current) setState(s) }).catch(() => {})
       }
     })
+    // the agent can set dictation up while this is open
+    const offConfig = bridge.onConfigChanged((c) => { if (mounted.current) setConfig(c) })
     return () => {
       mounted.current = false
       off()
+      offConfig()
     }
   }, [bridge])
 

@@ -1,11 +1,12 @@
-import { app, ipcMain, safeStorage, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
+import { app, ipcMain, safeStorage, type BrowserWindow, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import {
-  DEFAULT_DICTATION_OPTIONS, DICTATION_CHANNELS, DICTATION_PROGRESS_EVENT, DICTATION_TIMEOUT_MS, LOCAL_DTYPES, prefsFor, sourceParts,
-  type ApiTranscript, type DictationConfig, type DictationOptions, type LocalDtype, type ProviderConfig, type SttModelInfo
+  DEFAULT_DICTATION_OPTIONS, DICTATION_CHANNELS, DICTATION_CONFIG_EVENT, DICTATION_PROGRESS_EVENT, DICTATION_TIMEOUT_MS, LOCAL_DTYPES, prefsFor, sourceParts,
+  type ApiTranscript, type DictationConfig, type DictationOptions, type LocalDtype, type LocalModelProgress, type ProviderConfig, type SttModelInfo
 } from '../../shared/dictation'
+import { registerToolSource } from '../gateway/call'
 import { registerSecretSource } from '../gateway/secrets'
 import {
   PROVIDER_CONFIG_ID, migrateDictationOptions, validateDictationAudio, validateDictationOptions, validateFieldValue, validateSource
@@ -16,6 +17,7 @@ import {
 } from './models'
 import type { SttProvider } from './providers'
 import { allProviders, findProvider, legacyProvider, providerInfo } from './sources'
+import { DICTATION_TOOLS } from './tools'
 
 // a configured provider as stored: secret field values only as safeStorage ciphertext
 interface StoredProvider {
@@ -146,6 +148,46 @@ export function dictationSecrets(): string[] {
   }
 }
 
+// makes a source active: a local model only once downloaded (another download of it works too),
+// a provider only when configured and usable. the Settings switch and dictation_setup both use it
+export function applySource(input: unknown): DictationConfig {
+  const source = validateSource(input)
+  const stored = loadStored()
+  const parts = sourceParts(source)!
+  if (parts.kind === 'local') {
+    const info = findModel(parts.id)
+    if (!info) throw new Error('Unknown model.')
+    const prefs = prefsFor(info, stored.options.localPrefs)
+    if (!isInstalled(info.id, prefs.dtype)) {
+      // a different download of the same model works too
+      const other = installedDtypes(info.id)[0]
+      if (!other) throw new Error(`Download ${info.label} first.`)
+      stored.options.localPrefs = { ...stored.options.localPrefs, [info.id]: { ...prefs, dtype: other } }
+    }
+  } else {
+    const entry = stored.providers.find((p) => p.id === parts.id)
+    if (!entry) throw new Error('That provider is not configured.')
+    if (findProvider(entry.providerId)?.unavailable) throw new Error(findProvider(entry.providerId)!.unavailable)
+  }
+  stored.options.source = source
+  persistStored(stored)
+  const config = publicConfig(stored)
+  sendToWindows(DICTATION_CONFIG_EVENT, config)
+  return config
+}
+
+// the app windows dictation is set up for, so changes made outside them (the agent's
+// dictation_setup) still show: download progress and the new config
+const windows = new Set<WebContents>()
+
+function sendToWindows(channel: string, payload: unknown): void {
+  for (const wc of windows) if (!wc.isDestroyed()) wc.send(channel, payload)
+}
+
+export function sendModelProgress(progress: LocalModelProgress): void {
+  sendToWindows(DICTATION_PROGRESS_EVENT, progress)
+}
+
 let secretsRegistered = false
 
 export function setupDictation(window: BrowserWindow, trustedRendererUrl: string): () => void {
@@ -157,7 +199,9 @@ export function setupDictation(window: BrowserWindow, trustedRendererUrl: string
   if (!secretsRegistered) {
     secretsRegistered = true
     registerSecretSource(dictationSecrets)
+    registerToolSource(() => DICTATION_TOOLS)
   }
+  windows.add(webContents)
 
   function authorize(event: IpcMainInvokeEvent): void {
     const frame = event.senderFrame
@@ -208,27 +252,7 @@ export function setupDictation(window: BrowserWindow, trustedRendererUrl: string
   })
   ipcMain.handle(DICTATION_CHANNELS.setSource, (event, input: unknown) => {
     authorize(event)
-    const source = validateSource(input)
-    const stored = loadStored()
-    const parts = sourceParts(source)!
-    if (parts.kind === 'local') {
-      const info = findModel(parts.id)
-      if (!info) throw new Error('Unknown model.')
-      const prefs = prefsFor(info, stored.options.localPrefs)
-      if (!isInstalled(info.id, prefs.dtype)) {
-        // a different download of the same model works too
-        const other = installedDtypes(info.id)[0]
-        if (!other) throw new Error(`Download ${info.label} first.`)
-        stored.options.localPrefs = { ...stored.options.localPrefs, [info.id]: { ...prefs, dtype: other } }
-      }
-    } else {
-      const entry = stored.providers.find((p) => p.id === parts.id)
-      if (!entry) throw new Error('That provider is not configured.')
-      if (findProvider(entry.providerId)?.unavailable) throw new Error(findProvider(entry.providerId)!.unavailable)
-    }
-    stored.options.source = source
-    persistStored(stored)
-    return publicConfig(stored)
+    return applySource(input)
   })
   ipcMain.handle(DICTATION_CHANNELS.cancel, (event) => {
     authorize(event)
@@ -421,6 +445,7 @@ export function setupDictation(window: BrowserWindow, trustedRendererUrl: string
   function dispose(): void {
     if (disposed) return
     disposed = true
+    windows.delete(webContents)
     abort()
     for (const channel of Object.values(DICTATION_CHANNELS)) ipcMain.removeHandler(channel)
     if (!webContents.isDestroyed()) {

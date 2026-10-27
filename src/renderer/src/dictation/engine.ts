@@ -4,6 +4,7 @@ import {
   type DictationConfig, type LocalModelInfo, type LocalModelsState
 } from '@shared/dictation'
 import { lastWhisperDevice, loadWhisper, loadedWhisper, onWhisperDevice, runWhisper, unloadWhisper, type Device, type WorkerModel } from './whisper'
+import { cleanError } from '../plain-error'
 import { splitAtPauses } from './segments'
 
 // the one place the ui turns audio into words. framework-free, the composer, takes and scripts
@@ -120,7 +121,7 @@ async function transcribeApi(pcm: Float32Array, config: DictationConfig, signal?
     }
   } catch (err) {
     if (signal?.aborted) throw abortError()
-    throw err instanceof Error ? new Error(err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')) : err
+    throw err instanceof Error ? new Error(cleanError(err, 'Transcription failed.')) : err
   } finally {
     signal?.removeEventListener('abort', cancel)
   }
@@ -203,7 +204,7 @@ export async function dictationReady(): Promise<{ ready: boolean; reason: string
     const local = activeLocal(config, await api().models())
     return typeof local === 'string' ? { ready: false, reason: local } : { ready: true, reason: '' }
   } catch (err) {
-    return { ready: false, reason: err instanceof Error ? err.message : 'Dictation settings could not be read.' }
+    return { ready: false, reason: cleanError(err, 'Dictation settings could not be read.') }
   }
 }
 

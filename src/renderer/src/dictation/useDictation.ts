@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DictationConfig, DictationOptions } from '@shared/dictation'
 import type { SpokenWord, Transcription } from '@shared/speech'
 import { createSegmenter, type Segmenter, type Utterance } from '@shared/vad'
+import { cleanError } from '../plain-error'
 import { dictationReady, transcribePcm, warmUp } from './engine'
 import { openMic, type Mic } from './mic'
 
@@ -32,6 +33,8 @@ export interface DictationControl {
   stop: () => void
   setOption: (patch: Partial<DictationOptions>) => void
   clearError: () => void
+  // shows a problem from elsewhere in the mic controls, e.g. a failed source switch
+  showError: (err: unknown, fallback: string) => void
 }
 
 // joins everything said since the last send, word times shifted onto one clock
@@ -76,8 +79,11 @@ export function useDictation(h: DictationHandlers): DictationControl {
       ?.getConfig()
       .then((c) => alive && setConfig(c))
       .catch(() => {})
+    // the agent or another view changed it, e.g. dictation_setup picked a model
+    const off = api?.onConfigChanged?.((c) => { if (alive) setConfig(c) })
     return () => {
       alive = false
+      off?.()
     }
   }, [])
 
@@ -110,7 +116,7 @@ export function useDictation(h: DictationHandlers): DictationControl {
         const text = t.text.trim()
         if (text) handlers.current.onText(text, t)
       } catch (err) {
-        if (!controller?.signal.aborted) setError(err instanceof Error ? err.message : 'Transcription failed.')
+        if (!controller?.signal.aborted) setError(cleanError(err, 'Transcription failed.'))
       } finally {
         pending.current--
         if (pending.current === 0) {
@@ -170,7 +176,7 @@ export function useDictation(h: DictationHandlers): DictationControl {
       } catch (err) {
         close()
         setState('idle')
-        setError(err instanceof DOMException && err.name === 'NotAllowedError' ? 'Microphone access was blocked.' : err instanceof Error ? err.message : "Couldn't open the microphone.")
+        setError(err instanceof DOMException && err.name === 'NotAllowedError' ? 'Microphone access was blocked.' : cleanError(err, "Couldn't open the microphone."))
       }
     })()
   }, [])
@@ -195,10 +201,10 @@ export function useDictation(h: DictationHandlers): DictationControl {
     void window.trenddeckDictation
       ?.saveConfig(patch)
       .then(setConfig)
-      .catch((err) => setError(err instanceof Error ? err.message : "Couldn't save that."))
+      .catch((err) => setError(cleanError(err, "Couldn't save that.")))
   }, [])
 
-  return { state, level, elapsed, error, config, start, stop, setOption, clearError: () => setError('') }
+  return { state, level, elapsed, error, config, start, stop, setOption, clearError: () => setError(''), showError: (err, fallback) => setError(cleanError(err, fallback)) }
 }
 
 // "Ctrl+Space" against a key event
