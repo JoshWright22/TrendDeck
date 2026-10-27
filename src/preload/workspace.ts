@@ -8,6 +8,7 @@ export const workspaceApi: WorkspaceBridge = {
   listProjects: (brandId) => ipcRenderer.invoke('workspace:projects', brandId),
   saveProject: (brandId, project) => ipcRenderer.invoke('workspace:project-save', brandId, project),
   linkThread: (brandId, projectId, threadId) => ipcRenderer.invoke('workspace:link-thread', brandId, projectId, threadId),
+  setChatProjects: (brandId, threadId, projectIds) => ipcRenderer.invoke('workspace:chat-projects-set', brandId, threadId, projectIds),
   // main changed trenddeck.json itself, e.g. an agent edited the pipeline
   onDataChanged: (fn) => {
     const listener: Parameters<typeof ipcRenderer.on>[1] = (_event, data) => fn(data)

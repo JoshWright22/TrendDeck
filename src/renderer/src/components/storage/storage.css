@@ -29,3 +29,8 @@
   background: var(--raised);
   font: 12px ui-monospace, Consolas, monospace;
 }
+
+.settings-field {
+  display: grid;
+  gap: 6px;
+}

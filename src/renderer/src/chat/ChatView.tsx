@@ -53,13 +53,16 @@ interface Props {
   // the open chat, null for a new one. the sidebar picks it, so the shell owns it
   openId: string | null
   onOpenId: (id: string | null) => void
-  // a first message just made this chat, the shell files it under the open project
+  // a first message just made this chat, the shell links it to the video it was started from
   onThreadCreated?: (id: string) => void
-  // shown before the chat's title, e.g. the project name
+  // shown after the chat's title, the videos it's linked to
   context?: string
   // extra buttons for the header, e.g. the workspace toggle
   headerRight?: ReactNode
+  // where the chat's files and runs go: its first linked video, General when it has none
   project?: Project
+  // every video the chat is linked to, each gets a progress row
+  linkedProjects?: Project[]
   onInlineCraft?: () => void
 }
 
@@ -68,7 +71,7 @@ const STARTERS = [
     title: 'Start a new video',
     hint: 'Plan it and set up its checklist',
     prompt:
-      "Let's start a new video. Ask me what it's about and who it's for, then set up its checklist from idea to post and tell me the first thing I should do."
+      "Let's start a new video. Ask me what it's about and who it's for, make a video project for it and link this chat to it, then set up its checklist from idea to post and tell me the first thing I should do."
   },
   {
     title: 'Get ready to record',
@@ -84,8 +87,8 @@ const STARTERS = [
   },
   {
     title: 'Titles and thumbnail',
-    hint: 'Ten pairs for this video',
-    prompt: 'Write 10 titles with matching thumbnail text for the video in this project. Keep the thumbnail text under 5 words.'
+    hint: 'Ten pairs for the video you pick',
+    prompt: 'Write 10 titles with matching thumbnail text for the video this chat is about. If it is not linked to one yet, ask me which. Keep the thumbnail text under 5 words.'
   }
 ]
 
@@ -177,6 +180,7 @@ export default function ChatView({
   context,
   headerRight,
   project,
+  linkedProjects = [],
   onInlineCraft
 }: Props): ReactNode {
   const [agents, setAgents] = useState<AgentInfo[] | null>(null)
@@ -859,21 +863,20 @@ export default function ChatView({
       <div className={`cx-main${home ? ' home' : ''}`}>
         <header className="cx-head">
           <h2 title={SHORTCUTS}>
-            {context && (
-              <>
-                <span className="cx-head-context">{context}</span>
-                <svg className="cx-head-sep" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                  <path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                </svg>
-              </>
-            )}
             <span className="cx-head-title">{thread?.title ?? 'New chat'}</span>
+            {context && <span className="cx-head-context" title={`Linked to ${context}`}>{context}</span>}
           </h2>
           <span className="spacer" />
           {headerRight}
         </header>
 
-        {project && <ProjectProgress key={`progress:${brand.id}:${project.id}`} brand={brand} project={project} actions={cardActions} />}
+        {linkedProjects.length > 0 && (
+          <div className="cx-progress-list">
+            {linkedProjects.slice(0, 3).map((p) => (
+              <ProjectProgress key={`progress:${brand.id}:${p.id}`} brand={brand} project={p} actions={cardActions} />
+            ))}
+          </div>
+        )}
         {project && <CraftChat key={`${brand.id}:${project.id}`} brand={brand} project={project} onActivate={onInlineCraft} />}
         <div className="cx-messages" ref={scroller} onScroll={onScroll}>
           <div className="cx-column">
@@ -884,28 +887,21 @@ export default function ChatView({
               <SetupSteps agents={agents ?? []} scanning={scanning} onRescan={() => void loadAgents(true)} onAdd={() => setManage(true)} />
             ) : (
               <div className="cx-empty">
-                <RisingMark className="cx-home-mark" />
-                <p className="cx-home-brand">{brand.name}</p>
-                <p className="cx-hello">What are we making today?</p>
-                <p className="muted">
-                  Your agent gets this brand's voice, its videos and how they're doing. Never your logins or what's in your
-                  tabs.
+                <h1 className="cx-hello">{context ? `New chat about ${context}` : `New chat in ${brand.name}`}</h1>
+                <p className="cx-home-note">
+                  Your agent sees everything in {brand.name}: its voice, every video project and how the posted ones are doing. Never
+                  your logins or what's in your tabs.
                 </p>
-                <div className="cx-starters">
+                <ul className="cx-starters" aria-label="Ways to start">
                   {STARTERS.map((s) => (
-                    <button
-                      key={s.title}
-                      className="cx-starter"
-                      disabled={!agentId}
-                      title={s.prompt}
-                      onClick={() => void send(s.prompt)}
-                    >
-                      <RisingMark className="cx-starter-mark" />
-                      <span className="cx-starter-title">{s.title}</span>
-                      <span className="cx-starter-hint">{s.hint}</span>
-                    </button>
+                    <li key={s.title}>
+                      <button className="cx-starter" disabled={!agentId} title={s.prompt} onClick={() => void send(s.prompt)}>
+                        <span className="cx-starter-title">{s.title}</span>
+                        <span className="cx-starter-hint">{s.hint}</span>
+                      </button>
+                    </li>
                   ))}
-                </div>
+                </ul>
               </div>
             )}
             {thread && (

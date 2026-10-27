@@ -1,11 +1,12 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { DEFAULT_SITES, hostOf, isHttpUrl, partitionFor, TAB_CAP_DEFAULT, type Brand, type Site } from '@shared/types'
-import { DEFAULT_PIPELINE, GENERAL_PROJECT_ID, generalProject, projectIdForThread } from '@shared/workspace'
+import { chatProjectIds, DEFAULT_PIPELINE, generalProject, mainProjectId, withChatProjects } from '@shared/workspace'
 import { pickSite } from './links'
 import { useAppData } from './useAppData'
 import { useLiveTabs } from './useLiveTabs'
 import Sidebar from './shell/Sidebar'
 import { useThreads } from './shell/useThreads'
+import VideosList from './shell/VideosList'
 import SiteView from './components/SiteView'
 import TitleBar from './components/TitleBar'
 import { PanelIcon } from './components/Icons'
@@ -16,7 +17,6 @@ import WorkspacePane, { MAX_WS, MIN_WS, type WsView } from './workspace/Workspac
 import SiteStrip from './workspace/SiteStrip'
 import { useInbox } from './pages/inbox/useInbox'
 import { setNames, syncThread } from './chat/pending'
-import { draftChat } from './pages/voice/chatDraft'
 
 const ChatView = lazy(() => import('./chat/ChatView'))
 const Settings = lazy(() => import('./components/Settings'))
@@ -27,15 +27,16 @@ const Onboarding = lazy(() => import('./components/Onboarding'))
 
 type ModalState = { kind: 'brand'; id: string | null } | { kind: 'site' } | { kind: 'settings' } | null
 
-// where each brand is: which project, which chat, what the workspace shows. not saved,
-// the app always opens on General with a new chat
+// where each brand is: which chat, what the workspace shows. not saved, the app always opens
+// on a new chat. link is a video project a new chat gets linked to once its first message is sent
 interface Place {
-  projectId: string
   threadId: string | null
+  view: 'chat' | 'videos'
+  link: string | null
   ws: WsView | null
 }
 
-const START: Place = { projectId: GENERAL_PROJECT_ID, threadId: null, ws: null }
+const START: Place = { threadId: null, view: 'chat', link: null, ws: null }
 
 // the workspace pane's width and whether it's hidden, saved on this machine only
 const WS_KEY = 'trenddeck.workspace'
@@ -68,17 +69,21 @@ export default function App(): ReactNode {
   // asks an open site tab to go to a url
   const [nav, setNav] = useState<{ key: string; url: string; n: number } | null>(null)
   const openUrlRef = useRef<(url: string) => void>(() => {})
-  // a chat the composer just made, it stays in the project that was open
-  const created = useRef<string | null>(null)
 
   useEffect(() => window.trenddeck.onOpenUrl((url) => openUrlRef.current(url)), [])
   useEffect(() => localStorage.setItem(WS_KEY, JSON.stringify(pane)), [pane])
 
   const brand = data?.brands.find((b) => b.id === data.activeBrandId) ?? null
-  const { threads } = useThreads(brand?.id ?? null)
+  const { byBrand } = useThreads(data?.brands.map((b) => b.id) ?? [])
+  const threads = (brand && byBrand[brand.id]) || []
   const inbox = useInbox(brand?.id)
   const place = (brand && places[brand.id]) || START
-  const project = brand?.projects.find((p) => p.id === place.projectId) ?? brand?.projects[0] ?? null
+  // a chat sees the whole brand. its first linked video is where files, runs and the workspace go,
+  // General when it isn't linked to one
+  const linkedIds = brand ? (place.threadId ? chatProjectIds(brand, place.threadId) : place.link ? [place.link] : []) : []
+  const linked = brand ? linkedIds.flatMap((id) => brand.projects.filter((p) => p.id === id)) : []
+  const projectId = brand ? (place.threadId ? mainProjectId(brand, place.threadId) : linked[0]?.id) : undefined
+  const project = brand?.projects.find((p) => p.id === projectId) ?? brand?.projects[0] ?? null
   const ws: WsView = place.ws ?? { kind: 'stage', stageId: project?.stageId ?? brand?.pipeline[0]?.id ?? '' }
   const brandTemps = (brand && temps[brand.id]) || []
   const site =
@@ -136,30 +141,32 @@ export default function App(): ReactNode {
   // notifications name the chat and brand they're about
   const brandsRef = useRef(data?.brands ?? [])
   brandsRef.current = data?.brands ?? []
-  const threadsRef = useRef(threads)
-  threadsRef.current = threads
+  const threadsRef = useRef(byBrand)
+  threadsRef.current = byBrand
   useEffect(
     () =>
       setNames({
         brand: (id) => brandsRef.current.find((b) => b.id === id)?.name ?? 'TrendDeck',
         thread: (brandId, id) => {
-          const title = threadsRef.current.find((t) => t.id === id)?.title
+          const title = threadsRef.current[brandId]?.find((t) => t.id === id)?.title
           const name = brandsRef.current.find((b) => b.id === brandId)?.name
-          return [name, title].filter(Boolean).join(' · ') || 'A chat'
+          return title && name ? `${title} in ${name}` : title || name || 'A chat'
         }
       }),
     []
   )
 
-  // a busy chat may be waiting on an approval main has from before a reload, for the sidebar dot
-  const busyIds = threads
-    .filter((t) => t.busy)
-    .map((t) => t.id)
+  // a busy chat may be waiting on an approval main has from before a reload, for the sidebar's
+  // Needs you. every brand's, the sidebar shows them all
+  const busyIds = Object.entries(byBrand)
+    .flatMap(([brandId, list]) => list.filter((t) => t.busy).map((t) => `${brandId}/${t.id}`))
     .join(',')
   useEffect(() => {
-    if (!brand) return
-    for (const id of busyIds.split(',').filter(Boolean)) void syncThread(brand.id, id)
-  }, [busyIds, brand?.id])
+    for (const pair of busyIds.split(',').filter(Boolean)) {
+      const [brandId, id] = pair.split('/')
+      void syncThread(brandId, id)
+    }
+  }, [busyIds])
 
   // a notification was clicked: go to that brand and chat
   const jumpRef = useRef<(brandId: string, threadId: string | null) => void>(() => {})
@@ -167,7 +174,7 @@ export default function App(): ReactNode {
     const b = data?.brands.find((x) => x.id === brandId)
     if (!b) return
     if (data?.activeBrandId !== brandId) update((d) => ({ ...d, activeBrandId: brandId }))
-    if (threadId) setPlace(brandId, (p) => ({ ...p, projectId: projectIdForThread(b.projects, threadId), threadId }))
+    if (threadId) setPlace(brandId, (p) => ({ ...p, view: 'chat', link: null, threadId }))
   }
   useEffect(() => {
     const on = (e: Event): void => {
@@ -322,44 +329,39 @@ export default function App(): ReactNode {
     openWs({ kind: 'site', id: siteId })
   }
 
+  // the newest chat linked to it, or a new chat that gets linked once it's sent
   const openProject = (projectId: string): void => {
     if (!brand) return
+    const latest = threads.find((t) => !t.archived && chatProjectIds(brand, t.id).includes(projectId))
     const p = brand.projects.find((x) => x.id === projectId)
-    // one made a moment ago isn't in this render yet, it starts on a new chat at its first stage
-    if (!p) {
-      setPlace(brand.id, () => ({ projectId, threadId: null, ws: null }))
-      return
-    }
-    // picks up its newest chat
-    const latest = threads
-      .filter((t) => !t.archived && projectIdForThread(brand.projects, t.id) === p.id)
-      .sort((a, b) => b.updatedAt - a.updatedAt)[0]
-    setPlace(brand.id, () => ({ projectId: p.id, threadId: latest?.id ?? null, ws: { kind: 'stage', stageId: p.stageId } }))
+    setPlace(brand.id, () => ({
+      view: 'chat',
+      threadId: latest?.id ?? null,
+      link: latest ? null : projectId,
+      ws: p ? { kind: 'stage', stageId: p.stageId } : null
+    }))
+  }
+
+  const newChatFor = (projectId: string): void => {
+    if (brand) setPlace(brand.id, (p) => ({ ...p, view: 'chat', threadId: null, link: projectId }))
   }
 
   const openThread = (threadId: string | null): void => {
     if (!brand) return
-    if (!threadId) {
-      setPlace(brand.id, (p) => ({ ...p, threadId: null }))
-      return
-    }
-    // one the composer just made isn't filed yet, it stays where it is
-    const projectId =
-      created.current === threadId ? (project?.id ?? GENERAL_PROJECT_ID) : projectIdForThread(brand.projects, threadId)
-    setPlace(brand.id, (p) => ({ ...p, projectId, threadId }))
+    setPlace(brand.id, (p) => ({ ...p, view: 'chat', threadId, link: threadId ? null : p.link }))
   }
 
+  // a sidebar row may be in another brand
+  const openChatIn = (brandId: string, threadId: string | null): void => {
+    if (data.activeBrandId !== brandId) update((d) => ({ ...d, activeBrandId: brandId }))
+    setPlace(brandId, (p) => ({ ...p, view: 'chat', threadId, link: null }))
+  }
+
+  // the composer's first message made this chat. one started from a video gets linked to it
   const fileThread = (threadId: string): void => {
-    if (!brand || !project) return
-    created.current = threadId
-    if (project.id === GENERAL_PROJECT_ID) return
-    const pid = project.id
-    editBrand(brand.id, (b) => ({
-      ...b,
-      projects: b.projects.map((p) =>
-        p.id === pid ? { ...p, threadIds: [...p.threadIds.filter((t) => t !== threadId), threadId] } : p
-      )
-    }))
+    if (!brand || !place.link) return
+    const link = place.link
+    editBrand(brand.id, (b) => ({ ...b, chatProjects: withChatProjects(b.chatProjects, b.projects, threadId, [link], 'add') }))
   }
 
   const editing = modal?.kind === 'brand' ? data.brands.find((b) => b.id === modal.id) : undefined
@@ -383,18 +385,19 @@ export default function App(): ReactNode {
       <div className="shell">
         <Sidebar
           brands={data.brands}
-          brand={brand}
-          threads={threads}
-          projectId={project?.id ?? GENERAL_PROJECT_ID}
+          activeBrandId={brand?.id ?? null}
+          threadsByBrand={byBrand}
           threadId={place.threadId}
-          onSelectBrand={(id) => update((d) => ({ ...d, activeBrandId: id }))}
+          view={place.view}
+          onOpenThread={openChatIn}
+          onNewThread={(brandId) => openChatIn(brandId, null)}
+          onOpenVideos={(brandId) => {
+            if (data.activeBrandId !== brandId) update((d) => ({ ...d, activeBrandId: brandId }))
+            setPlace(brandId, (p) => ({ ...p, view: 'videos' }))
+          }}
           onAddBrand={() => setModal({ kind: 'brand', id: null })}
           onEditBrand={(id) => setModal({ kind: 'brand', id })}
-          editBrand={(fn) => brand && editBrand(brand.id, fn)}
-          onOpenProject={openProject}
-          onOpenThread={openThread}
-          onNewThread={(pid) => brand && setPlace(brand.id, (p) => ({ ...p, projectId: pid, threadId: null }))}
-          onOpenPipeline={() => project && draftChat(`Set up and manage the workflow for ${project.name}. Inspect the existing pipeline and use your pipeline tools to adapt it to this video. Ask me only for missing creative decisions, then explain the next step in plain language.`)}
+          editBrand={editBrand}
           onSettings={() => setModal({ kind: 'settings' })}
         />
 
@@ -407,7 +410,10 @@ export default function App(): ReactNode {
               </button>
             </div>
           )}
-          {brand && (
+          {brand && place.view === 'videos' && (
+            <VideosList brand={brand} threads={threads} editBrand={(fn) => editBrand(brand.id, fn)} onOpenProject={openProject} onNewChatFor={newChatFor} />
+          )}
+          {brand && place.view === 'chat' && (
             <Suspense fallback={<div className="cx" />}>
               <ChatView
                 key={brand.id}
@@ -417,9 +423,10 @@ export default function App(): ReactNode {
                 openId={place.threadId}
                 onOpenId={openThread}
                 onThreadCreated={fileThread}
-                context={project?.name}
+                context={linked.map((p) => p.name).join(', ') || undefined}
                 headerRight={wsToggle}
                 project={project ?? undefined}
+                linkedProjects={linked}
                 onInlineCraft={() => setPane((current) => current.collapsed ? current : { ...current, collapsed: true })}
               />
             </Suspense>

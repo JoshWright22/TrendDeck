@@ -67,10 +67,15 @@ function openInApp(host: WebContents | null | undefined, url: string): void {
   if (host && !host.isDestroyed() && isHttpUrl(url)) host.send('open:url', url)
 }
 
+// test runs only: the window opens far off screen, never takes focus and stays off the taskbar,
+// so screenshots over the debugging port don't pop up on the desktop
+const offscreen = process.env.TRENDDECK_TEST_OFFSCREEN === '1'
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
+    ...(offscreen ? { x: -10000, y: -10000, focusable: false, skipTaskbar: true } : {}),
     minWidth: 960,
     minHeight: 600,
     show: false,
@@ -97,7 +102,8 @@ function createWindow(): void {
   win.once('ready-to-show', () => {
     // a downloaded update that got this far works, boot.ts keeps using it
     bootInfo()?.markGood()
-    win.show()
+    if (offscreen) win.showInactive()
+    else win.show()
     // the ad blocker engine is big, give the first paint a head start
     setTimeout(startAdblock, 1000)
   })

@@ -14,8 +14,6 @@
   margin: 4px 0 12px;
   color: var(--smoke);
   font: 700 12px/1 var(--body);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .posting-head + .feed-empty {
@@ -99,8 +97,6 @@
 .post-platform {
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .post-status {

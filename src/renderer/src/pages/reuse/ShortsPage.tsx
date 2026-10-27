@@ -174,9 +174,7 @@ export default function ShortsPage({
                 </button>
                 {video && (
                   <span className="muted small" title={video.name}>
-                    {video.name} · {mb(video.bytes)}
-                    {video.seconds ? ` · ${clock(video.seconds)}` : ''}
-                    {video.width ? ` · ${video.width}x${video.height}` : ''}
+                    {[video.name, mb(video.bytes), video.seconds ? clock(video.seconds) : '', video.width ? `${video.width}x${video.height}` : ''].filter(Boolean).join(', ')}
                   </span>
                 )}
               </div>

@@ -121,8 +121,7 @@ function Accounts(props: {
               <div>
                 {s.name}
                 <small>
-                  {HEALTH_LABEL[h?.state ?? 'unknown']} · {hostOf(s.url)}
-                  {h?.checkedAt ? ` · ${ago(h.checkedAt)}` : ''}
+                  {[HEALTH_LABEL[h?.state ?? 'unknown'], hostOf(s.url), h?.checkedAt ? `checked ${ago(h.checkedAt)}` : ''].filter(Boolean).join(', ')}
                 </small>
               </div>
             </div>
@@ -209,7 +208,7 @@ function Comments(props: {
         {inbox.refreshedAt > 0 && <span className="inbox-note">Refreshed {ago(inbox.refreshedAt)}</span>}
       </div>
       {problems.length > 0 && (
-        <p className="inbox-note">{problems.map((r) => `${SITE_NAMES[r.site]}: ${r.message}`).join(' · ')}</p>
+        <p className="inbox-note">{problems.map((r) => `${SITE_NAMES[r.site]}: ${r.message}`).join('. ')}</p>
       )}
       {note && <p className="inbox-note">{note}</p>}
       {visible.length === 0 && (
@@ -226,7 +225,7 @@ function Comments(props: {
               <b>{c.author}</b>
               <span>{SITE_NAMES[c.site]}</span>
               {c.account && <span>on {c.account}</span>}
-              {c.postTitle && <span>· {c.postTitle}</span>}
+              {c.postTitle && <span>on {c.postTitle}</span>}
               <span>{ago(c.at)}</span>
             </div>
             <p className="inbox-text">{c.text}</p>

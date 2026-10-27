@@ -3,7 +3,7 @@ import type { MediaApi } from './media'
 import type { VoiceApi } from './voice'
 import type { ReuseApi } from './reuse'
 import type { EmulatorApi } from './emulator'
-import type { PipelineStage, Project } from './workspace'
+import type { ChatProjects, PipelineStage, Project } from './workspace'
 
 export interface Site {
   id: string
@@ -81,6 +81,9 @@ export interface Brand {
   schedule?: ScheduleSlot[]
   // pieces of content, General first. see shared/workspace.ts
   projects: Project[]
+  // which video projects each chat is linked to, keyed by chat id. missing on files from before
+  // chats could link to several, the store fills it from projects[].threadIds then
+  chatProjects?: ChatProjects
   // the stages a project runs through, each opens a workspace in the right pane
   pipeline: PipelineStage[]
 }

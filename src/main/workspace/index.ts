@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron'
+import { randomUUID } from 'node:crypto'
 import { ID_PATTERN, type AppData, type Brand } from '@shared/types'
-import type { PipelineStage, Project } from '@shared/workspace'
+import { withChatProjects, type PipelineStage, type Project } from '@shared/workspace'
 import { getData, saveData } from '../store'
 import { setStages } from '../pipeline/store'
 
@@ -54,30 +55,45 @@ export function listProjects(brandId: string): Project[] {
   return brandOf(brandId).projects
 }
 
+// chat links aren't changed here, they live on the chat side: see setChatProjects
 export async function saveProject(brandId: string, project: Project): Promise<Project[]> {
   brandOf(brandId)
-  const moving = Array.isArray(project.threadIds) ? project.threadIds : []
   const b = await editBrand(brandId, (b) => {
     const has = b.projects.some((p) => p.id === project.id)
-    // a thread moving in here leaves the project it was in
-    const others = b.projects.map((p) =>
-      p.id === project.id ? p : { ...p, threadIds: p.threadIds.filter((t) => !moving.includes(t)) }
-    )
-    return { ...b, projects: has ? others.map((p) => (p.id === project.id ? project : p)) : [...others, project] }
+    return { ...b, projects: has ? b.projects.map((p) => (p.id === project.id ? project : p)) : [...b.projects, project] }
   })
   return b.projects
 }
 
-export async function linkThread(brandId: string, projectId: string, threadId: string): Promise<void> {
+// links, unlinks or replaces the video projects a chat is linked to
+export async function editChatProjects(brandId: string, threadId: string, projectIds: string[], mode: 'add' | 'remove' | 'set'): Promise<string[]> {
   if (!ID_PATTERN.test(threadId)) throw new Error('Bad thread id')
+  const b = await editBrand(brandId, (b) => ({ ...b, chatProjects: withChatProjects(b.chatProjects, b.projects, threadId, projectIds, mode) }))
+  return b.chatProjects?.[threadId] ?? []
+}
+
+// a new video project on the brand's first stage, linked to the chat it was made from
+export async function createProject(brandId: string, name: string, threadId: string | null): Promise<Project> {
+  const project: Project = {
+    id: randomUUID(),
+    name: name.trim().slice(0, 80),
+    createdAt: Date.now(),
+    stageId: brandOf(brandId).pipeline[0]?.id ?? '',
+    status: 'idle',
+    threadIds: []
+  }
+  if (!project.name) throw new Error('A project needs a name')
+  await editBrand(brandId, (b) => {
+    const projects = [...b.projects, project]
+    const chatProjects = threadId && ID_PATTERN.test(threadId) ? withChatProjects(b.chatProjects, projects, threadId, [project.id], 'add') : b.chatProjects
+    return { ...b, projects, chatProjects }
+  })
+  return project
+}
+
+export async function linkThread(brandId: string, projectId: string, threadId: string): Promise<void> {
   if (!brandOf(brandId).projects.some((p) => p.id === projectId)) throw new Error('No project with that id')
-  await editBrand(brandId, (b) => ({
-    ...b,
-    projects: b.projects.map((p) => ({
-      ...p,
-      threadIds: p.id === projectId ? [...p.threadIds.filter((t) => t !== threadId), threadId] : p.threadIds.filter((t) => t !== threadId)
-    }))
-  }))
+  await editChatProjects(brandId, threadId, [projectId], 'add')
 }
 
 export function setupWorkspace(): void {
@@ -93,5 +109,9 @@ export function setupWorkspace(): void {
   ipcMain.handle('workspace:link-thread', (_e, brandId: unknown, projectId: unknown, threadId: unknown) => {
     if (typeof projectId !== 'string' || typeof threadId !== 'string') throw new Error('Bad ids')
     return linkThread(brandOf(brandId).id, projectId, threadId)
+  })
+  ipcMain.handle('workspace:chat-projects-set', async (_e, brandId: unknown, threadId: unknown, projectIds: unknown) => {
+    if (typeof threadId !== 'string' || !Array.isArray(projectIds)) throw new Error('Bad ids')
+    await editChatProjects(brandOf(brandId).id, threadId, projectIds.filter((id): id is string => typeof id === 'string'), 'set')
   })
 }

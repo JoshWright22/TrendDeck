@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import type { Brand } from '@shared/types'
 import type { StorageRemoteInput, StorageState } from '@shared/storage'
+import { Dropdown } from '../../chat/ui'
 import './storage.css'
 
 // Settings, Storage: where this brand's big video files get copied besides this computer, and
@@ -106,16 +107,11 @@ export default function StorageSection({ brand }: { brand: Brand }): ReactNode {
           {state.connecting && <p className="form-hint">Setting up {state.connecting}. Finish signing in in your browser.</p>}
           {form ? (
             <div className="settings-form">
-              <label>
-                Kind
-                <select value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
-                  {KINDS.map((k) => (
-                    <option key={k.kind} value={k.kind}>
-                      {k.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className="settings-field">
+                <span>Kind</span>
+                <Dropdown label="Kind" value={form.kind} onChange={(value) => setForm({ ...form, kind: value })}
+                  options={KINDS.map((k) => ({ value: k.kind, label: k.label }))} />
+              </div>
               <label>
                 Name
                 <input value={form.name} maxLength={64} placeholder="videos" onChange={(e) => setForm({ ...form, name: e.target.value })} />
