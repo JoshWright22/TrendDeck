@@ -12,6 +12,7 @@ import { onTurnClosed } from '../mcp/turns'
 import { historyCard } from '../production-storage'
 import { commitChanges, restoreCommit, saveCheckpoint, serialize } from '../production-storage/git'
 import { noSymlinks, StorageError } from '../production-storage/safety'
+import { logFriction } from '../brand-memory'
 import { makeCheckpoint, restoreCheckpoint } from './checkpoint'
 import { checkProjectFile, newVideosSince, projectFileUrl, relativeIn } from './files'
 import { addCard, cardsDir, changeCard, dropCards, getCard, listCards, newCardId } from './store'
@@ -136,6 +137,12 @@ export function setupCards(): void {
     const choice = typeof a.choice === 'string' ? a.choice.slice(0, 40) : ''
     if (!choice) bad()
     const text = typeof a.text === 'string' ? a.text.slice(0, 4000) : ''
+    // turned down and undone suggestions go in the brand's friction log for the wrap-up
+    void getCard(brandId, cardId).then((c) => {
+      if (c?.type !== 'suggestion') return
+      if (choice === 'later') return logFriction(brandId, { kind: 'rejected-suggestion', projectId: c.preview?.projectId ?? null, before: `${c.title}: ${c.body}`, after: text, ref: c.id })
+      if (choice === 'undo') return logFriction(brandId, { kind: 'undo', projectId: c.preview?.projectId ?? null, before: `${c.title}: ${c.body}`, after: text, ref: c.id })
+    })
     return changeCard(brandId, cardId, (c) => {
       if (c.type !== 'suggestion') return
       if (choice !== 'preview' && choice !== 'apply' && choice !== 'undo') c.answer = { choice, text, at: Date.now() }

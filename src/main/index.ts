@@ -32,6 +32,7 @@ import { dropCards, setupCards } from './cards'
 import { dropStorageBrand, setupStorageSettings } from './production-storage'
 import { dropContextBrand, setupContext } from './context'
 import { dropMcpServersBrand, setupMcpServers } from './mcp-servers'
+import { dropBrandMemory, setupVoiceScript } from './voice-script'
 
 const PARTITION_PREFIX = 'persist:brand-'
 if (process.platform === 'win32') app.setAppUserModelId('com.joshwright.trenddeck')
@@ -217,6 +218,7 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   await dropStorageBrand(brandId)
   await dropContextBrand(brandId)
   await dropMcpServersBrand(brandId)
+  await dropBrandMemory(brandId)
 })
 
 setupTrends()
@@ -236,6 +238,7 @@ setupCards()
 setupStorageSettings()
 setupContext()
 setupMcpServers()
+setupVoiceScript()
 
 void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()

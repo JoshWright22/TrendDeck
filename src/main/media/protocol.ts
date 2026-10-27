@@ -4,6 +4,7 @@ import { Readable } from 'node:stream'
 import { MEDIA_SCHEME } from '@shared/media'
 import { getLib, thumbPath, validId } from './library'
 import { servedPath } from '../cards/files'
+import { servedModelFile } from '../dictation/models'
 
 // has to run before the app is ready
 export function registerMediaScheme(): void {
@@ -86,6 +87,12 @@ export function handleMediaScheme(): void {
         if (!path) return notFound()
         const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
         return await serveFile(path, TYPES[ext] ?? 'application/octet-stream', req.headers.get('range'))
+      }
+      // a local Whisper model file for the dictation worker, td-media://stt/<model>/<file>
+      if (url.hostname === 'stt') {
+        const path = servedModelFile(url.pathname)
+        if (!path) return notFound()
+        return await serveFile(path, path.endsWith('.json') ? 'application/json' : 'application/octet-stream', req.headers.get('range'))
       }
       const [brandId, id] = url.pathname.split('/').filter(Boolean)
       if (!validId(brandId) || !validId(id)) return notFound()

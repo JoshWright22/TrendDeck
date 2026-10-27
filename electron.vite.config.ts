@@ -20,10 +20,33 @@ function buildCsp(): Plugin {
           attrs: {
             'http-equiv': 'Content-Security-Policy',
             content:
-              "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: td-media:; media-src 'self' td-media:"
+              // wasm-unsafe-eval and connect-src for the local Whisper worker: it compiles the onnx runtime and
+              // fetches model files from td-media:, recordings come in as blob: urls
+              "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: td-media:; media-src 'self' td-media: blob:; connect-src 'self' td-media: blob:"
           }
         }
       ]
+    }
+  }
+}
+
+// the onnx runtime files the local Whisper worker loads (wasm and webgpu both use the asyncify build).
+// copied into the renderer output as ort/, never fetched from a CDN, see src/renderer/src/dictation
+const ORT_FILES = ['ort-wasm-simd-threaded.asyncify.mjs', 'ort-wasm-simd-threaded.asyncify.wasm']
+function ortRuntime(): Plugin {
+  const dir = resolve('node_modules/onnxruntime-web/dist')
+  return {
+    name: 'trenddeck-ort',
+    configureServer(server) {
+      server.middlewares.use('/ort/', (req, res, next) => {
+        const name = (req.url ?? '').split('?')[0].replace(/^\//, '')
+        if (!ORT_FILES.includes(name)) return next()
+        res.setHeader('Content-Type', name.endsWith('.wasm') ? 'application/wasm' : 'text/javascript')
+        res.end(readFileSync(resolve(dir, name)))
+      })
+    },
+    generateBundle() {
+      for (const name of ORT_FILES) this.emitFile({ type: 'asset', fileName: `ort/${name}`, source: readFileSync(resolve(dir, name)) })
     }
   }
 }
@@ -59,8 +82,17 @@ export default defineConfig({
     }
   },
   renderer: {
-    resolve: { alias: shared },
-    plugins: [react(), buildCsp()],
+    resolve: {
+      alias: {
+        ...shared,
+        // the runtime build that loads its wasm from ort/ (see ortRuntime) instead of embedding a
+        // second copy of the 27 MB file in assets/
+        'onnxruntime-web/webgpu': resolve('node_modules/onnxruntime-web/dist/ort.webgpu.min.mjs')
+      }
+    },
+    plugins: [react(), buildCsp(), ortRuntime()],
+    // the Whisper worker is an es module, transformers.js loads the runtime with import()
+    worker: { format: 'es' },
     define: { __APP_VERSION__: JSON.stringify(version) },
     // smaller bundle, less to parse before the first paint
     build: { minify: true }

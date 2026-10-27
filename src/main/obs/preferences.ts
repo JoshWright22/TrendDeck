@@ -1,12 +1,13 @@
 import { app, safeStorage } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
-import type { ObsConnectionInput, ObsPreferences } from '@shared/obs'
+import type { ObsConnectionInput, ObsPreferences, ObsRecordingSettings } from '@shared/obs'
 import { ID_PATTERN } from '@shared/types'
 import { getData } from '../store'
 import { normalizeEndpoint } from './protocol'
+import { cleanSettings, loadSettings } from './rules'
 
-interface Saved { endpoint: string; password?: string }
+interface Saved { endpoint: string; password?: string; recording: ObsRecordingSettings }
 
 export function assertBrand(brandId: unknown): asserts brandId is string {
   if (typeof brandId !== 'string' || !ID_PATTERN.test(brandId) || !getData()?.brands.some((brand) => brand.id === brandId)) {
@@ -22,9 +23,13 @@ function file(brandId: string): string {
 async function read(brandId: string): Promise<Saved> {
   try {
     const saved = JSON.parse(await fs.readFile(file(brandId), 'utf8')) as Saved
-    return { endpoint: normalizeEndpoint(saved.endpoint), password: typeof saved.password === 'string' ? saved.password : undefined }
+    return {
+      endpoint: normalizeEndpoint(saved.endpoint),
+      password: typeof saved.password === 'string' ? saved.password : undefined,
+      recording: loadSettings(saved.recording)
+    }
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { endpoint: 'ws://127.0.0.1:4455/' }
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { endpoint: 'ws://127.0.0.1:4455/', recording: loadSettings(null) }
     throw new Error('Cannot read OBS preferences; check the brand and OBS settings file')
   }
 }
@@ -37,7 +42,35 @@ function requireEncryption(): void {
 
 export async function obsPreferences(brandId: string): Promise<ObsPreferences> {
   const saved = await read(brandId)
-  return { endpoint: saved.endpoint, hasPassword: !!saved.password }
+  return { endpoint: saved.endpoint, hasPassword: !!saved.password, recording: saved.recording }
+}
+
+export async function recordingSettings(brandId: string): Promise<ObsRecordingSettings> {
+  return (await read(brandId)).recording
+}
+
+async function write(brandId: string, saved: Saved): Promise<void> {
+  const target = file(brandId)
+  await fs.mkdir(join(app.getPath('userData'), 'obs'), { recursive: true })
+  await fs.writeFile(`${target}.tmp`, JSON.stringify(saved), { mode: 0o600 })
+  await fs.rename(`${target}.tmp`, target)
+}
+
+// one save at a time per brand, so the connection and the recording settings don't race
+const saving = new Map<string, Promise<unknown>>()
+function serial<T>(brandId: string, fn: () => Promise<T>): Promise<T> {
+  const next = (saving.get(brandId) ?? Promise.resolve()).then(fn, fn)
+  saving.set(brandId, next.catch(() => {}))
+  return next
+}
+
+export function saveRecordingSettings(brandId: string, patch: unknown): Promise<ObsPreferences> {
+  return serial(brandId, async () => {
+    const saved = await read(brandId)
+    saved.recording = cleanSettings(saved.recording, patch)
+    await write(brandId, saved)
+    return { endpoint: saved.endpoint, hasPassword: !!saved.password, recording: saved.recording }
+  })
 }
 
 export async function obsCredentials(brandId: string): Promise<{ endpoint: string; password?: string }> {
@@ -48,7 +81,11 @@ export async function obsCredentials(brandId: string): Promise<{ endpoint: strin
   catch { throw new Error('Cannot decrypt OBS password; import it again from local OBS') }
 }
 
-export async function saveObsPreferences(brandId: string, input: ObsConnectionInput): Promise<ObsPreferences> {
+export function saveObsPreferences(brandId: string, input: ObsConnectionInput): Promise<ObsPreferences> {
+  return serial(brandId, () => saveConnection(brandId, input))
+}
+
+async function saveConnection(brandId: string, input: ObsConnectionInput): Promise<ObsPreferences> {
   if (!input || typeof input.endpoint !== 'string' || Object.keys(input).some((key) => !['endpoint', 'importLocalPassword', 'clearPassword'].includes(key)) ||
       (input.importLocalPassword !== undefined && typeof input.importLocalPassword !== 'boolean') ||
       (input.clearPassword !== undefined && typeof input.clearPassword !== 'boolean') || (input.clearPassword && input.importLocalPassword)) {
@@ -56,7 +93,7 @@ export async function saveObsPreferences(brandId: string, input: ObsConnectionIn
   }
   const endpoint = normalizeEndpoint(input.endpoint)
   const previous = await read(brandId)
-  const saved: Saved = { endpoint, password: previous.endpoint === endpoint && !input.clearPassword ? previous.password : undefined }
+  const saved: Saved = { endpoint, password: previous.endpoint === endpoint && !input.clearPassword ? previous.password : undefined, recording: previous.recording }
   if (input.importLocalPassword) {
     requireEncryption()
     const root = process.platform === 'darwin' ? join(app.getPath('home'), 'Library', 'Application Support') : process.platform === 'linux' ? (process.env.XDG_CONFIG_HOME || join(app.getPath('home'), '.config')) : app.getPath('appData')
@@ -67,9 +104,6 @@ export async function saveObsPreferences(brandId: string, input: ObsConnectionIn
       saved.password = safeStorage.encryptString(config.server_password).toString('base64')
     } catch { throw new Error('Cannot import local OBS password. Enable authentication in local OBS, match its port, and try again. Portable OBS is not auto-discovered') }
   }
-  const target = file(brandId)
-  await fs.mkdir(join(app.getPath('userData'), 'obs'), { recursive: true })
-  await fs.writeFile(`${target}.tmp`, JSON.stringify(saved), { mode: 0o600 })
-  await fs.rename(`${target}.tmp`, target)
-  return { endpoint, hasPassword: !!saved.password }
+  await write(brandId, saved)
+  return { endpoint, hasPassword: !!saved.password, recording: saved.recording }
 }

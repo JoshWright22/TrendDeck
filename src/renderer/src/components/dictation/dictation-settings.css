@@ -1,0 +1,168 @@
+/* Settings, Dictation. grays only, red for errors */
+
+.dz-line {
+  margin: 0 0 12px;
+  color: var(--chalk);
+  font-size: 13px;
+}
+
+.dz-meta {
+  margin: 8px 0 14px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+/* the model and provider lists */
+.dz-list {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.dz-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.dz-row + .dz-row {
+  border-top: 1px solid var(--line);
+}
+
+.dz-row.active {
+  background: var(--raised);
+}
+
+.dz-row-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dz-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dz-row-name {
+  color: var(--chalk);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.dz-row-state {
+  margin-left: 8px;
+  color: var(--smoke);
+  font-weight: 400;
+}
+
+.dz-row-facts {
+  color: var(--smoke);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.dz-row-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.dz-row-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dz-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dz-bar {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+.dz-bar span {
+  display: block;
+  height: 100%;
+  background: var(--chalk);
+  transition: width 0.2s var(--ease);
+}
+
+/* adding a custom model, provider forms */
+.dz-key {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.settings .dz-key input:not([type='checkbox']) {
+  flex: 1;
+  margin: 0;
+}
+
+.dz-add {
+  margin-top: 10px;
+}
+
+.dz-form {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.dz-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* the composer options */
+.dz-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.dz-group > .dz-row-main {
+  align-items: center;
+}
+
+.dz-group .dz-pause {
+  margin: 0 0 0 24px;
+}
+
+.dz-shortcut kbd {
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--raised);
+  color: var(--chalk);
+  font: 500 12px/1.5 var(--body);
+}
+
+.dz-error {
+  margin: 12px 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dz-bar span {
+    transition: none;
+  }
+}

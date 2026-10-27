@@ -6,6 +6,7 @@ import { SOURCE_NAMES, type Brand, type TrendFeed } from '@shared/types'
 import { EMBED_LANG, type Attachment, type Thread, type ThreadMessage } from '@shared/chat'
 import { chatProjectIds, videoProjects } from '@shared/workspace'
 import { styleContext } from '../context'
+import { brandMemoryContext } from '../brand-memory'
 
 // what an agent gets with every message: the brand's name, keywords, top trends and
 // saved ideas. never cookies, logins or anything from inside a site tab
@@ -101,6 +102,9 @@ export async function brandContext(brand: Brand, threadId: string | null = null)
     "The Craft editors live in the chat. Post one with craft_embed when you start working in it or want the user to look at something; it's the real app and the user edits in it too. Make every edit with the app's own commands on the project file (FilmCraft: file.newSequence, timeline.place, timeline.razor, timeline.trim, timeline.move, edit.rippleDelete, captions.*, effects.*, markers.add), so the project holds each edit at its place and stays editable. Use render_frame and exports only to check frames; never hand over a separately rendered video as the edit. Your edits in one reply are one undo group the user can undo or keep. For alternatives, make each version a separate sequence in the same project (or a separate layer) and pass them to craft_embed as alternatives instead of describing them. Timeline comments from the user arrive with FilmCraft marker ids at their sequence times.",
     "When a message comes with what the user changed in the editors since your last reply, respect those edits and build on them. Never silently revert them; if one conflicts with what you planned, say so and ask.",
     'Before you write or cut, check brand_docs_search, past_videos_search and the style rules below. When the user states a lasting preference (pacing, words to avoid, a look), propose it with remember_style; it is only kept once they confirm.',
+    "Scripts are talk-first. The creator talks the video through with dictation; each dictation is saved as a dump (dumps_list, dump_read). Build the script with script_write from their own sentences quoted word for word as spoken lines, and add only short connecting lines of your own as suggestions. Never polish their lines; they re-speak or edit lines on the script card. Before recording, run the claim check: script_claims_set, verify each claim with your web tools, then script_claim_update. Takes come back as take cards (take_get) with the pickup list.",
+    "OBS: use obs_status, obs_scenes and obs_screenshot to look, obs_show to put OBS in the chat. Starting and stopping recordings and streams always asks the creator.",
+    'At a wrap-up, read friction_log and propose at most 3 rules with rule_propose, only for patterns that repeat. For a new brand, run the intake: the creator talks about positioning, audience, voice and pillars, and you draft positioning.md and voice.md with brand_file_propose in their words.',
     'Use login for website authentication. TrendDeck can request private credentials directly in chat; never ask the user to put passwords or two-factor codes into ordinary messages.',
     '',
     `## Brand: ${oneLine(brand.name, 60)}`,
@@ -142,6 +146,8 @@ export async function brandContext(brand: Brand, threadId: string | null = null)
 
   const style = await styleContext(brand.id)
   if (style) lines.push('', style)
+  const memory = await brandMemoryContext(brand.id)
+  if (memory) lines.push('', memory)
 
   lines.push('', '## Cards', EMBED_GUIDE)
   return lines.join('\n')

@@ -6,7 +6,22 @@ contextBridge.exposeInMainWorld('trenddeckDictation', dictationBridge(ipcRendere
 contextBridge.exposeInMainWorld('trenddeckObs', {
   preferences: (brandId) => ipcRenderer.invoke(OBS_CHANNELS.preferences, brandId),
   configure: (brandId, input) => ipcRenderer.invoke(OBS_CHANNELS.configure, brandId, input),
-  status: (brandId) => ipcRenderer.invoke(OBS_CHANNELS.status, brandId)
+  saveSettings: (brandId, patch) => ipcRenderer.invoke(OBS_CHANNELS.saveSettings, brandId, patch),
+  status: (brandId) => ipcRenderer.invoke(OBS_CHANNELS.status, brandId),
+  scenes: (brandId) => ipcRenderer.invoke(OBS_CHANNELS.scenes, brandId),
+  switchScene: (brandId, scene) => ipcRenderer.invoke(OBS_CHANNELS.switchScene, brandId, scene),
+  screenshot: (brandId) => ipcRenderer.invoke(OBS_CHANNELS.screenshot, brandId),
+  startRecording: (brandId, projectId, threadId) => ipcRenderer.invoke(OBS_CHANNELS.startRecording, brandId, projectId, threadId),
+  stopRecording: (brandId, projectId) => ipcRenderer.invoke(OBS_CHANNELS.stopRecording, brandId, projectId),
+  takes: (brandId, projectId) => ipcRenderer.invoke(OBS_CHANNELS.takes, brandId, projectId),
+  showCard: (brandId, threadId, projectId) => ipcRenderer.invoke(OBS_CHANNELS.showCard, brandId, threadId, projectId),
+  watch: (brandId) => ipcRenderer.invoke(OBS_CHANNELS.watch, brandId),
+  unwatch: (brandId) => ipcRenderer.invoke(OBS_CHANNELS.unwatch, brandId),
+  onLive: (fn) => {
+    const listener = (_event: unknown, live: Parameters<typeof fn>[0]): void => fn(live)
+    ipcRenderer.on(OBS_CHANNELS.live, listener)
+    return () => ipcRenderer.removeListener(OBS_CHANNELS.live, listener)
+  }
 } satisfies ObsApi)
 import type { AppData, StatPlatform, TrendDeckApi, TrendFeed } from '@shared/types'
 import { postingApi } from './posting'
@@ -23,6 +38,7 @@ import { cardsApi, storageApi } from './cards'
 import { embedApi } from './embed'
 import { contextApi } from './context'
 import { mcpServersApi } from './mcp-servers'
+import { brandMemoryApi, scriptsApi, takesApi } from './voice-script'
 import './qc'
 
 const api: TrendDeckApi = {
@@ -135,3 +151,6 @@ contextBridge.exposeInMainWorld('trenddeckEmbed', embedApi)
 contextBridge.exposeInMainWorld('trenddeckStorage', storageApi)
 contextBridge.exposeInMainWorld('trenddeckContext', contextApi)
 contextBridge.exposeInMainWorld('trenddeckMcpServers', mcpServersApi)
+contextBridge.exposeInMainWorld('trenddeckScripts', scriptsApi)
+contextBridge.exposeInMainWorld('trenddeckTakes', takesApi)
+contextBridge.exposeInMainWorld('trenddeckBrandMemory', brandMemoryApi)

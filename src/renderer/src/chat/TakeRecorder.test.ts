@@ -146,8 +146,7 @@ describe('take recorder lifecycle', () => {
   })
 
   it('requests camera and microphone only after choosing camera and starting', async () => {
-    const select = elements(tree).find((element) => element.type === 'select')!
-    select.props.onChange!({ target: { value: 'camera' } })
+    click('Camera and mic')
     render(); click('Record take'); await settle()
     expect(getUserMedia).toHaveBeenCalledWith({ audio: true, video: true })
     expect(FakeRecorder.last.mimeType).toBe('video/webm;codecs=vp8,opus')

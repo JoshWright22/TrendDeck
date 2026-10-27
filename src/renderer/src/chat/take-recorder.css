@@ -1,13 +1,19 @@
-.take-recorder { padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--chalk); font-size: 12px; }
+.take-recorder { display: grid; gap: 10px; color: var(--chalk); font-size: 13px; }
 .take-recorder-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.take-recorder label { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--smoke); }
-.take-recorder select, .take-recorder input { min-width: 0; max-width: 100%; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--raised); color: var(--chalk); font: inherit; }
-.take-recorder input { flex: 1; }
-.take-recorder :is(button, input, select):focus-visible { outline: 2px solid var(--chalk); outline-offset: 2px; }
-.take-recorder :disabled { opacity: .55; }
-.take-recorder-live { color: #f08b8b; font-weight: 600; }
+.take-recorder label { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--chalk); }
+.take-recorder input { flex: 1; min-width: 0; max-width: 100%; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--raised); color: var(--chalk); font: inherit; }
+.take-recorder button { min-height: 30px; padding: 4px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: transparent; color: var(--chalk); font: inherit; cursor: pointer; }
+.take-recorder button:hover:not(:disabled) { background: var(--hover); }
+.take-recorder button.primary { border-color: var(--card); background: var(--card); color: var(--felt); font-weight: 500; }
+.take-recorder-source { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 8px; overflow: hidden; }
+.take-recorder-source button { border: 0; border-radius: 0; }
+.take-recorder-source button[aria-pressed='true'] { background: var(--raised); color: var(--accent); font-weight: 500; }
+.take-recorder :is(button, input):focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+.take-recorder :disabled { opacity: .55; cursor: default; }
+.take-recorder-live { display: inline-flex; align-items: center; gap: 6px; color: var(--chalk); font-weight: 500; }
+.take-recorder-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pink); }
 .take-recorder time { font-variant-numeric: tabular-nums; }
-.take-recorder-preview { display: grid; gap: 10px; margin-top: 10px; }
+.take-recorder-preview { display: grid; gap: 10px; }
 .take-recorder audio { width: 100%; }
-.take-recorder-video { display: block; width: 100%; max-height: 240px; margin-top: 10px; border-radius: 8px; background: #000; object-fit: contain; }
-.take-recorder-error { margin: 8px 0 0; color: #f08b8b; overflow-wrap: anywhere; }
+.take-recorder-video { display: block; width: 100%; max-height: 240px; border-radius: 8px; background: #000; object-fit: contain; }
+.take-recorder-error { margin: 0; color: var(--pink); overflow-wrap: anywhere; }

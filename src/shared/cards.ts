@@ -1,4 +1,7 @@
 import type { EmbedAlternatives, EmbedFocus, EmbedTurn } from './craft-embed'
+import type { Transcription } from './speech'
+import type { TakeDiff, TakeFeedback } from './take'
+import type { BrandFileName, ProposedRule } from './brand-memory'
 
 // cards in the chat timeline that the agent's tools put there: a video to review, a suggestion,
 // a cloud copy, a project's history. main keeps them per brand, the chat shows the ones of the
@@ -113,7 +116,66 @@ export interface CraftEmbedCard extends CardBase {
   auto: boolean
 }
 
-export type ChatCard = VideoCard | SuggestionCard | StorageCard | HistoryCard | CraftEmbedCard
+// a recording of the creator: from the composer's recorder or an OBS recording that stopped.
+// main transcribes it (through the window's Whisper) and fills in cadence and the script diff
+export interface TakeCard extends CardBase {
+  type: 'take'
+  projectId: string
+  media: ProjectFileRef
+  source: 'obs' | 'composer'
+  title: string
+  state: 'transcribing' | 'ready' | 'failed'
+  error: string
+  transcript: Transcription | null
+  feedback: TakeFeedback | null
+  // against the project's script, null when it has none
+  diff: TakeDiff | null
+}
+
+// a script in the project folder, the card reads it live from the file
+export interface ScriptCard extends CardBase {
+  type: 'script'
+  projectId: string
+  // relative to the project folder, e.g. scripts/script.md
+  file: string
+  title: string
+}
+
+// a rule the agent proposes from the session's friction log: keep, edit or drop
+export interface RuleCard extends CardBase {
+  type: 'rule'
+  rule: ProposedRule
+  state: 'proposed' | 'kept' | 'dropped'
+  // what got saved, can differ from the proposal when you edited it
+  kept: string
+}
+
+// a brand file the agent drafted, e.g. voice.md from the intake: keep, edit or drop
+export interface BrandFileCard extends CardBase {
+  type: 'brand-file'
+  file: BrandFileName
+  content: string
+  note: string
+  state: 'proposed' | 'kept' | 'dropped'
+}
+
+// OBS in the chat: connection, preview, scenes, record and stop, recent takes
+export interface ObsCard extends CardBase {
+  type: 'obs'
+  projectId: string | null
+}
+
+export type ChatCard =
+  | VideoCard
+  | SuggestionCard
+  | StorageCard
+  | HistoryCard
+  | CraftEmbedCard
+  | TakeCard
+  | ScriptCard
+  | RuleCard
+  | BrandFileCard
+  | ObsCard
 
 export interface CardsChanged {
   brandId: string

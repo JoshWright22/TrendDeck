@@ -1,0 +1,59 @@
+/* Settings, OBS. same fields and spacing as the other sections, sub heads like Context's */
+.obs-settings-head {
+  margin: 18px 0 8px;
+  color: var(--chalk);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.obs-settings-line {
+  margin: 0 0 8px;
+  color: var(--chalk);
+  font-size: 13px;
+}
+
+.obs-settings-actions {
+  flex-wrap: wrap;
+  margin: 4px 0 12px;
+}
+
+.obs-settings-btn {
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--chalk);
+  background: var(--raised);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.obs-settings-btn:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.obs-settings-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.obs-settings-btn.primary {
+  border-color: transparent;
+  background: var(--card);
+  color: var(--felt);
+  font-weight: 500;
+}
+
+.obs-settings-btn.primary:hover:not(:disabled) {
+  background: #fff;
+}
+
+.obs-settings-btn:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.obs-settings .toggle-row {
+  margin-top: 4px;
+}

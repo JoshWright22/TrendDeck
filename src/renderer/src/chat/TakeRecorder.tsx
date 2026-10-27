@@ -6,6 +6,11 @@ import './take-recorder.css'
 export interface TakeRecorderProps {
   brandId: string
   onAttach: (attachments: Attachment[]) => void
+  // with a project the take goes into its footage	akes\ folder and shows as a take card in this
+  // chat; without one it goes to the media library and gets attached
+  projectId?: string | null
+  threadId?: string | null
+  onSaved?: () => void
 }
 
 type Phase = 'idle' | 'requesting' | 'recording' | 'stopping' | 'preview' | 'saving'
@@ -22,7 +27,7 @@ export function TakeRecorder(props: TakeRecorderProps): ReactNode {
 
 export default TakeRecorder
 
-function Recorder({ brandId, onAttach }: TakeRecorderProps): ReactNode {
+function Recorder({ brandId, onAttach, projectId, threadId, onSaved }: TakeRecorderProps): ReactNode {
   const [mode, setMode] = useState<Mode>('mic')
   const [phase, setPhase] = useState<Phase>('idle')
   const [elapsed, setElapsed] = useState(0)
@@ -177,6 +182,15 @@ function Recorder({ brandId, onAttach }: TakeRecorderProps): ReactNode {
     setPhase('saving')
     setError('')
     try {
+      if (projectId) {
+        const bytes = await blob.arrayBuffer()
+        if (!valid()) return
+        await window.trenddeckTakes.saveRecording(brandId, threadId ?? null, projectId, name.trim(), blob.type, bytes)
+        if (!valid()) return
+        discard()
+        onSaved?.()
+        return
+      }
       if (!savedId.current) {
         const bytes = await blob.arrayBuffer()
         if (!valid()) return
@@ -202,23 +216,23 @@ function Recorder({ brandId, onAttach }: TakeRecorderProps): ReactNode {
   return (
     <section className='take-recorder' aria-label='Record a take' data-over-craft>
       <div className='take-recorder-controls'>
-        <label>Source <select aria-label='Recording source' value={mode} disabled={phase !== 'idle'} onChange={(event) => setMode(event.target.value as Mode)}>
-          <option value='mic'>Microphone</option>
-          <option value='camera'>Camera + microphone</option>
-        </select></label>
-        {phase === 'idle' && <button type='button' className='pill' onClick={() => void start()}>Record take</button>}
-        {phase === 'requesting' && <><span role='status'>Waiting for device permission…</span><button type='button' className='pill' onClick={discard}>Cancel</button></>}
-        {phase === 'recording' && <><span className='take-recorder-live' role='status'>● Recording <time>{time}</time></span><button type='button' className='pill' onClick={stop}>Stop</button></>}
-        {phase === 'stopping' && <span role='status'>Preparing preview…</span>}
+        <div className='take-recorder-source' role='group' aria-label='Recording source'>
+          <button type='button' aria-pressed={mode === 'mic'} disabled={phase !== 'idle'} onClick={() => setMode('mic')}>Microphone</button>
+          <button type='button' aria-pressed={mode === 'camera'} disabled={phase !== 'idle'} onClick={() => setMode('camera')}>Camera and mic</button>
+        </div>
+        {phase === 'idle' && <button type='button' className='primary' onClick={() => void start()}>Record take</button>}
+        {phase === 'requesting' && <><span role='status'>Waiting for the {mode === 'camera' ? 'camera' : 'microphone'}</span><button type='button' onClick={discard}>Cancel</button></>}
+        {phase === 'recording' && <><span className='take-recorder-live' role='status'><span className='take-recorder-dot' aria-hidden='true' />Recording <time>{time}</time></span><button type='button' onClick={stop}>Stop</button></>}
+        {phase === 'stopping' && <span role='status'>Preparing the preview</span>}
       </div>
       {mode === 'camera' && phase === 'recording' && <video className='take-recorder-video' aria-label='Live camera preview' muted autoPlay playsInline ref={(element) => { if (element) element.srcObject = stream.current }} />}
       {preview && <div className='take-recorder-preview'>
         {mode === 'camera' ? <video className='take-recorder-video' aria-label='Recorded take preview' src={preview} controls playsInline /> : <audio aria-label='Recorded take preview' src={preview} controls />}
         <label>Take name <input value={name} maxLength={200} disabled={phase === 'saving' || savedId.current !== null} onChange={(event) => setName(event.target.value)} /></label>
         <div className='take-recorder-controls'>
-          <span>{time} · {blob ? (blob.size / 1_000_000).toFixed(1) : '0'} MB</span>
-          <button type='button' className='pill' disabled={phase === 'saving'} onClick={discard}>Discard</button>
-          <button type='button' className='pill teal' disabled={phase === 'saving' || !name.trim()} onClick={() => void save()}>{phase === 'saving' ? 'Saving…' : savedId.current ? 'Retry attach' : 'Save & attach'}</button>
+          <span>{time}, {blob ? (blob.size / 1_000_000).toFixed(1) : '0'} MB</span>
+          <button type='button' disabled={phase === 'saving'} onClick={discard}>Discard</button>
+          <button type='button' className='primary' disabled={phase === 'saving' || !name.trim()} onClick={() => void save()}>{phase === 'saving' ? 'Saving' : projectId ? 'Save take' : savedId.current ? 'Retry attach' : 'Save & attach'}</button>
         </div>
       </div>}
       {error && <p className='take-recorder-error' role='alert'>{error}</p>}

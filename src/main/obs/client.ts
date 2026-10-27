@@ -8,18 +8,32 @@ interface Pending {
   timer: ReturnType<typeof setTimeout>
 }
 
+// for a long-lived monitor connection: what to subscribe to, events as they come, and one call
+// when an identified connection ends for any reason
+export interface ObsEventHandlers {
+  subscriptions: number
+  onEvent: (eventType: string, eventData: Record<string, unknown>) => void
+  onClose: (error: Error) => void
+}
+
 export class ObsClient {
   private socket: WebSocket | null = null
   private pending = new Map<string, Pending>()
   private ready = false
+  private events: ObsEventHandlers | undefined
 
   constructor(private readonly timeoutMs = 8000) {}
 
-  async connect(endpoint: string, password?: string): Promise<void> {
+  get connected(): boolean {
+    return this.ready
+  }
+
+  async connect(endpoint: string, password?: string, events?: ObsEventHandlers): Promise<void> {
     if (this.socket) throw new Error('OBS client already connected')
     if (typeof WebSocket === 'undefined') throw new Error('This Electron runtime does not provide built-in WebSocket')
     const socket = new WebSocket(normalizeEndpoint(endpoint))
     this.socket = socket
+    this.events = events
     await new Promise<void>((resolve, reject) => {
       let phase = 'hello'
       let settled = false
@@ -38,7 +52,7 @@ export class ObsClient {
           const frame = parseFrame(event.data)
           if (phase === 'hello') {
             if (frame.op !== 0) throw new Error('OBS did not send a v5 Hello')
-            socket.send(JSON.stringify(identify(frame.d, password)))
+            socket.send(JSON.stringify(identify(frame.d, password, events?.subscriptions ?? 0)))
             password = undefined
             phase = 'identify'
           } else if (phase === 'identify') {
@@ -55,6 +69,9 @@ export class ObsClient {
             clearTimeout(pending.timer)
             this.pending.delete(requestId)
             try { pending.resolve(responseData(frame.d, pending.requestType)) } catch (error) { pending.reject(error as Error) }
+          } else if (frame.op === 5 && this.events && typeof frame.d.eventType === 'string') {
+            const data = frame.d.eventData && typeof frame.d.eventData === 'object' && !Array.isArray(frame.d.eventData) ? frame.d.eventData as Record<string, unknown> : {}
+            try { this.events.onEvent(frame.d.eventType, data) } catch (error) { console.error('obs: an event handler failed', error) }
           }
         } catch (error) {
           fail(error instanceof SyntaxError ? new Error('Invalid JSON from OBS') : error as Error)
@@ -78,11 +95,17 @@ export class ObsClient {
   }
 
   disconnect(error = new Error('OBS disconnected')): void {
+    const wasReady = this.ready
     this.ready = false
     const socket = this.socket
     this.socket = null
     for (const pending of this.pending.values()) { clearTimeout(pending.timer); pending.reject(error) }
     this.pending.clear()
     if (socket && socket.readyState < 2) socket.close()
+    const events = this.events
+    this.events = undefined
+    if (wasReady && events) {
+      try { events.onClose(error) } catch (err) { console.error('obs: a close handler failed', err) }
+    }
   }
 }
