@@ -1,34 +1,26 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import type { WebviewTag } from 'electron'
 import type { CraftEmbedCard, ProjectFileRef } from '@shared/cards'
-import { stageHeight, type EmbedSize } from '@shared/craft-embed'
+import { stageHeight } from '@shared/craft-embed'
 import { webSpec, type WebEmbedState } from '@shared/craft-web'
 import { craftApi, putCraft, useCraftApp } from '../../workspace/craft/store'
 import VideoReview from '../VideoReview'
-import CraftTimelineReview from './CraftTimelineReview'
-import CraftVisualReview from './CraftVisualReview'
-import { pinEmbed, registerEmbed, setEmbedVisible, takeReveal, useLiveEmbeds } from './embed-owner'
-import { Menu } from '../ui'
+import { liveMax, newestOnDoc, pinEmbed, registerEmbed, setEmbedVisible, takeReveal, useEmbeds, useLiveEmbeds } from './embed-owner'
 import { cleanError, type CardActions } from './useCards'
 import { sendReview } from './VideoCard'
 import './craft-embed.css'
 
 // a Craft editor in the chat. FilmCraft and PhotoCraft run here as their web builds, a real part
-// of the page: it scrolls with the chat, menus draw over it, and two can run at once. the others
-// show a still and open in their own window. the agent's edits of the reply show as a count with
-// Undo this turn and Keep, its versions of a cut as a switch, and FilmCraft gets timeline comments
-// that become markers
+// of the page: it scrolls with the chat and menus draw over it, as many at once as Settings, Craft
+// apps says. the others show a still and open in their own window. the agent's edits of the reply
+// show as a count with Undo this turn and Keep, its versions of a cut as a switch. what you change
+// in it reaches the agent with your next message (main/cards/collab.ts), feedback is what you type
+// or dictate
 
 // the last still of each embed, for when its editor isn't running here
 const stills = new Map<string, string>()
 
 const fileName = (p: string | null): string | null => (p ? (p.split(/[\\/]/).pop() ?? p) : null)
-
-const SIZES: { id: EmbedSize; label: string }[] = [
-  { id: 'inline', label: 'Inline' },
-  { id: 'large', label: 'Large' },
-  { id: 'fill', label: 'Whole chat' }
-]
 
 function scroller(el: HTMLElement | null): HTMLElement | null {
   for (let p = el?.parentElement ?? null; p; p = p.parentElement) {
@@ -41,17 +33,19 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   const api = window.trenddeckEmbed
   const status = useCraftApp(card.appId)
   const liveSet = useLiveEmbeds()
+  // re-renders when cards come and go: an older card on the same file points to the newest one
+  useEmbeds()
+  const newest = newestOnDoc(card.id)
   const rootRef = useRef<HTMLElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<WebviewTag | null>(null)
-  const [size, setSize] = useState<EmbedSize>('fill')
+  // always the whole chat
+  const size = 'fill'
   const [height, setHeight] = useState(0)
   const [still, setStill] = useState<string | null>(stills.get(card.id) ?? null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [note, setNote] = useState('')
-  const [commenting, setCommenting] = useState(false)
-  const [reviewFrame, setReviewFrame] = useState<string | null>(null)
   const [dropping, setDropping] = useState(false)
   const [preview, setPreview] = useState<ProjectFileRef | null | undefined>(undefined)
   const [page, setPage] = useState<{ src: string; partition: string } | null>(null)
@@ -70,7 +64,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     (!card.file || !status.file || fileName(status.file)?.toLowerCase() === fileName(card.file)?.toLowerCase())
   const installKind = status?.install.kind
   const cantRun = installKind === 'not-installed' || installKind === 'failed'
-  const wanted = inChat && liveSet.has(card.id) && !fullHere && !cantRun && status !== undefined && reviewFrame === null
+  const wanted = inChat && liveSet.has(card.id) && !fullHere && !cantRun && status !== undefined
   const live = !!page && web?.state === 'ready'
 
   useEffect(() => registerEmbed(card.id, card.appId, card.appName, card.projectId, card.at), [card.id, card.appId, card.appName, card.projectId, card.at])
@@ -281,7 +275,6 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   // Open here: this card's editor runs (the oldest live one lets go if two are running)
   const openHere = (): Promise<void> =>
     run(async () => {
-      setReviewFrame(null)
       if (cantRun) putCraft(await craftApi()!.install(card.appId))
       if (inChat) {
         pinEmbed(card.id)
@@ -308,14 +301,6 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
       await craftApi()!.close(card.appId)
     })
 
-  const circle = (): Promise<void> => run(async () => {
-    const frame = page ? await api!.still(a.brand.id, card.id, null) : still
-    if (!frame) throw new Error('The editor did not provide a frame. Wait for it to finish opening, then try again.')
-    stills.set(card.id, frame)
-    setStill(frame)
-    setReviewFrame(frame)
-  })
-
   const onDrop = (e: DragEvent): void => {
     e.preventDefault()
     setDropping(false)
@@ -337,10 +322,21 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     )
   }
 
+  if (newest !== card.id) {
+    return (
+      <article ref={rootRef} data-embed-id={card.id} className="cx-card2 cx-embed-older" aria-label={`${card.appName} in the chat`}>
+        <strong>{card.appName}</strong>
+        <span className="muted">{card.file ?? project?.name ?? ''}</span>
+        <span className="cx-embed-older-text">Open further down in the chat.</span>
+        <span className="spacer" />
+        <button type="button" onClick={() => document.querySelector(`[data-embed-id="${newest}"]`)?.scrollIntoView({ block: 'start' })}>
+          Go to it
+        </button>
+      </article>
+    )
+  }
+
   const turn = card.turn
-  const canComment = card.appId === 'filmcraft' && (live || fullHere)
-  // the row with it stays while the editor stops off screen, so the chat under it doesn't move
-  const commentRow = card.appId === 'filmcraft' && !cantRun
   const alts = card.alternatives
   const stageStyle = height ? { height } : undefined
   const cover = !live || !page
@@ -352,11 +348,12 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
         ? `${card.appName} opens in its own window.`
         : page
           ? web?.state === 'failed' ? web.note : 'Opening the project...'
-          : still ? '' : `${card.appName} isn't running here. Two editors can run at once.`
+          : still ? '' : `${card.appName} isn't running. Up to ${liveMax()} editor${liveMax() === 1 ? '' : 's'} run at once, change it in Settings, Craft apps.`
 
   return (
     <article
       ref={rootRef}
+      data-embed-id={card.id}
       className={`cx-card2 cx-embed size-${size}${dropping ? ' dropping' : ''}`}
       aria-label={`${card.appName} in the chat`}
       onDragOver={(e) => {
@@ -371,22 +368,15 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
         <strong>{card.appName}</strong>
         <span className="muted">{card.file ?? project?.name ?? ''}</span>
         <span className="spacer" />
-        <div className="cx-embed-sizes" role="group" aria-label="Size">
-          {SIZES.map((s) => (
-            <button key={s.id} type="button" aria-pressed={size === s.id} onClick={() => setSize(s.id)}>
-              {s.label}
-            </button>
-          ))}
-        </div>
-        <Menu
-          label={`${card.appName} options`}
-          items={[
-            { label: 'Circle and comment', onSelect: () => void circle(), disabled: busy || (!live && !still) },
-            fullHere
-              ? { label: 'Close the full app', onSelect: () => void closeFull(), disabled: busy }
-              : { label: 'Open in the full app', onSelect: () => void openFull(), disabled: busy || cantRun || status === undefined }
-          ]}
-        />
+        {fullHere ? (
+          <button type="button" className="cx-embed-full" onClick={() => void closeFull()} disabled={busy}>
+            Close the full app
+          </button>
+        ) : (
+          <button type="button" className="cx-embed-full" onClick={() => void openFull()} disabled={busy || cantRun || status === undefined}>
+            Open in the full app
+          </button>
+        )}
       </header>
       {web?.note && page && (
         <p className={web.state === 'failed' ? 'cx-card2-error' : 'cx-card2-note'} role="status">
@@ -395,9 +385,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
       )}
       {card.note && <p className="cx-card2-body">{card.note}</p>}
 
-      {reviewFrame ? (
-        <CraftVisualReview card={card} a={a} initialFrame={reviewFrame} onClose={() => setReviewFrame(null)} />
-      ) : cantRun && card.appId === 'filmcraft' && preview ? (
+      {cantRun && card.appId === 'filmcraft' && preview ? (
         <div className="cx-embed-fallback">
           <p className="cx-card2-note">
             Preview of the newest video in this project, {preview.file}. It isn't the editable project: FilmCraft {installKind === 'failed' ? "couldn't be installed" : "isn't installed"}, so comments here go to your agent without markers.
@@ -477,7 +465,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
         </div>
       )}
 
-      {(turn || commentRow || dropping) && (
+      {(turn || dropping) && (
         <div className="cx-card2-actions cx-embed-foot" role="status">
           {dropping ? (
             <span>Drop to add the files to the {card.appName} project</span>
@@ -493,11 +481,6 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
             )
           )}
           <span className="spacer" />
-          {commentRow && !dropping && (
-            <button type="button" aria-expanded={commenting} disabled={!canComment && !commenting} onClick={() => setCommenting(!commenting)}>
-              {commenting ? 'Close comments' : 'Comment on the timeline'}
-            </button>
-          )}
           {turn?.state === 'review' && !dropping && (
             <>
               <button type="button" disabled={busy || !turn.checkpoint} title={turn.checkpoint ? 'Puts the project back the way it was before this reply' : turn.note} onClick={() => void run(() => api.undoTurn(a.brand.id, card.id))}>
@@ -511,9 +494,6 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
         </div>
       )}
       {turn?.note && turn.state !== 'failed' && <p className="cx-card2-note">{turn.note}</p>}
-      {commenting && commentRow && (
-        <CraftTimelineReview brandId={a.brand.id} card={card} projectName={project?.name ?? ''} send={a.hasAgent ? a.sendToAgent : null} />
-      )}
       {note && <p className="cx-card2-note">{note}</p>}
       {error && (
         <p className="cx-card2-error" role="alert">

@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { CraftAppStatus } from '@shared/craft'
+import { Dropdown } from '../../chat/ui'
+import { LIVE_CHOICES, liveMax, setLiveMax } from '../../chat/cards/embed-owner'
 import { InstallProgress, mb } from './CraftWorkspace'
 import { craftApi, errorText, putCraft, putCraftList, reloadCraft, useCraftApps } from './store'
 import './craft.css'
@@ -98,12 +100,29 @@ export default function CraftSettings(): ReactNode {
   const api = craftApi()
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState('')
+  const [atOnce, setAtOnce] = useState(liveMax())
   if (!api) return <p className="form-hint">This copy of TrendDeck can't run the Craft apps yet.</p>
   return (
     <>
       <p className="form-hint">
-        Free editors from the Craft suite on GitHub. They open docked in the workspace and the agent can work in them. Your
+        Free editors from the Craft suite on GitHub. FilmCraft and PhotoCraft open inside the chat, the others in their own window, and your agent can work in all of them. Your
         files stay in each project's folder, removing an app doesn't touch them.
+      </p>
+      <div className="craft-at-once">
+        <span>Editors running in the chat at once</span>
+        <Dropdown
+          label="Editors running in the chat at once"
+          value={String(atOnce)}
+          options={LIVE_CHOICES.map((n) => ({ value: String(n), label: String(n) }))}
+          onChange={(v) => {
+            setLiveMax(Number(v))
+            setAtOnce(Number(v))
+          }}
+        />
+      </div>
+      <p className="form-hint">
+        Each running editor is a whole copy of the app, about 1 GB of memory for FilmCraft. Ones past the limit show their last
+        picture until you scroll to them.
       </p>
       <div className="suggest">
         <button

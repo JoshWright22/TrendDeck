@@ -23,12 +23,38 @@ let version = 0
 
 function recompute(): void {
   const cands = [...entries.values()]
-    .filter((e) => webSpec(e.appId))
+    // only the newest card on a file runs it, older ones point to that one
+    .filter((e) => webSpec(e.appId) && newestOnDoc(e.id) === e.id)
     .map((e) => ({ id: e.id, key: `${e.appId}|${e.projectId}`, visible: e.visible, rank: Math.max(e.at, e.pinned) }))
-  const next = pickLive(cands, live, MAX_LIVE)
+  const next = pickLive(cands, live, liveMax())
   version += 1
   live = next
   for (const fn of subs) fn()
+}
+
+// how many editors run in the chat at once, Settings, Craft apps. each is a whole editor in memory
+const LIVE_KEY = 'trenddeck.editorsAtOnce'
+export const LIVE_CHOICES = [1, 2, 3, 4]
+
+export function liveMax(): number {
+  const n = Number(localStorage.getItem(LIVE_KEY))
+  return LIVE_CHOICES.includes(n) ? n : MAX_LIVE
+}
+
+export function setLiveMax(n: number): void {
+  if (!LIVE_CHOICES.includes(n)) return
+  localStorage.setItem(LIVE_KEY, String(n))
+  recompute()
+}
+
+// the newest card on the same document as this one. only that one shows the editor, older ones
+// point to it
+export function newestOnDoc(id: string): string {
+  const e = entries.get(id)
+  if (!e) return id
+  let best = e
+  for (const o of entries.values()) if (o.appId === e.appId && o.projectId === e.projectId && o.at > best.at) best = o
+  return best.id
 }
 
 export function registerEmbed(id: string, appId: string, appName: string, projectId: string, at: number): () => void {

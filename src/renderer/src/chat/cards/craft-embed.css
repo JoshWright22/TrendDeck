@@ -342,3 +342,21 @@
 .cx-embed-cover.over-still:not(:has(button)) {
   padding-right: 10px;
 }
+
+/* an older card on a file the newer one below has open: one quiet row */
+.cx-embed-older {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.cx-embed-older-text {
+  color: var(--smoke);
+  font-size: 12.5px;
+}
+
+.cx-embed-full {
+  height: 28px;
+}
