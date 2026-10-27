@@ -1,37 +1,19 @@
 # TrendDeck brand
 
-The idea: your brands are a hand of cards, and TrendDeck deals you the trends worth playing.
+TrendDeck is where you and your agent make videos together, from the first idea to how the video does after it's posted.
 
 ## Logo
 
-`resources/logo.svg`: a hand of three playing cards fanned from the bottom (indigo, pink, teal on top), white edges, large black YouTube and Instagram logos centered on the back cards and mostly hidden by the top card, a small rising-line mark in two corners of every card, and a black TD on the teal card where the D's curve rises into a yellow spark.
+`resources/logo.svg`: the TD mark in light gray (`#E6E6E6`) on a black rounded square (`#0A0A0A`, corner radius about 22% of the side) with a faint gray edge. The D's curve ends in a small gray dot. No cards, no color.
 
-- Use it on off-black. On a light background, keep the white card edges and add the soft shadow.
+- The same file is the app icon (`resources/icon.png`, `resources/icon.ico`) and the installer art (`resources/installer/`).
 - Minimum size 16 px (`resources/icon.ico` has the small sizes).
-- Don't recolor the cards, rotate the hand, or take the TD off its card.
+- Don't recolor it or put the TD on anything but its square.
 - Wordmark: "TrendDeck" in Inter Tight ExtraBold, letter spacing -0.05em, next to the mark with a gap of half the mark's width.
 
 ## Colors
 
-| Name | Hex | Use |
-|---|---|---|
-| Felt | `#0E0E10` | background, the table everything is dealt onto |
-| Panel | `#16161A` | panels, cards in the UI |
-| Raised | `#1E1E24` | hover, raised panels |
-| Line | `#2A2A33` | borders, dividers |
-| Chalk | `#E8E8EC` | main text |
-| Smoke | `#9A9AA6` | secondary text |
-| Card white | `#F2F2F4` | card edges, pill buttons |
-| Teal | `#00BF9C` | rising trends, primary actions, the top card |
-| Yellow | `#FFD814` | highlights, the spark, wins |
-| Pink | `#FA4E93` | hot items, alerts, the glow on the spark |
-| Indigo | `#3B46A4` | soft glows and spotlights, secondary |
-
-The surface is always Felt with an indigo spotlight glow. Accents stay small: one bright card or accent per view does more than a rainbow.
-
-### Inside the app
-
-The table above is for the landing page. The app, its icon and the installer are black, white and grays only, like t3code's dark theme and learnharness: neutral grays with no tint, white-alpha hairlines, light primary buttons. Emphasis comes from brightness, not hue. The only color is red, for errors. Tokens live at the top of `src/renderer/src/styles.css`.
+The app, its icon, the installer and the landing page are black, white and grays only, like t3code's dark theme and learnharness: neutral grays with no tint, white-alpha hairlines, light primary buttons. Emphasis comes from brightness, not hue. The only color is red, for errors. Tokens live at the top of `src/renderer/src/styles.css`.
 
 | Token | Value | Use |
 |---|---|---|
@@ -52,22 +34,18 @@ The table above is for the landing page. The app, its icon and the installer are
 - Numbers (scores, counts): Inter with tabular figures.
 - Fonts are bundled, never loaded from a CDN in the app.
 
-## Motifs
+## Look
 
-- **Cards.** Anything that is a thing you can pick (a brand, a trend, an idea, a draft) is a card: 5:7, rounded 12 px corners, white edge on art, the rising-line mark in the corners.
-- **Marks.** Two marks, never a four-point sparkle. On cards: the rising line, a tiny trend line ending in a dot, in the corners where a suit would go. On backgrounds: the rounded diamond, for floating accents and texture. Teal for rising, pink for hot, yellow for a win.
-- **Dealing.** Things arrive the way cards are dealt from the top of the deck: a short slide in, no spin.
-- **Chips and stakes.** Growth scores and counts can sit in round chips. Use sparingly.
-- **No dithering.** No dot-grid or dither textures. For texture use a faint tiled rounded-diamond pattern (about 5% opacity) that fades out.
-- **Dotted lines.** Trend charts join points with thin dotted lines, the hottest point glows.
-- **Pill buttons.** Small white or teal pills with dark text.
+- **Plain surfaces.** Flat panels on black, separated by hairlines, not shadows or tinted cards. Rounded 8 px corners.
+- **Status as small dots.** Gray for idle, white for running or done, red only for errors and recording.
+- **Work collapses.** Agent tool calls fold into one "Worked · N steps" row that opens on click.
+- **Light primary buttons.** One light button per view for the main action; everything else is a quiet hairline button.
+- **No decoration.** No glows, gradients, textures, sparkles or mascots.
 
 ## Motion
 
-Quiet by default, loud on a win. Everyday motion is a short fade and slide with a plain ease-out: cards rise 8 px in about 200 ms with a small stagger and panels slide in 12 px. Hovers lift a pixel or two and presses shrink a little. No overshoot, no rotation.
-
-The bounce is saved for small wins, like saving an idea or a post going out: a quick pop that overshoots and settles, with a burst of small yellow diamonds. Nothing loops forever except a slow glow. Respect reduced motion, and keep slow devices fast (fewer particles, no blur on big areas).
+Quiet. A short fade and slide with a plain ease-out: panels slide in about 12 px in about 200 ms. Hovers brighten, presses shrink a little. No overshoot, no bounce, no rotation, nothing that loops except a running dot's slow pulse. Respect reduced motion.
 
 ## Voice
 
-Plain and a little cocky, like someone who knows the odds. Short sentences. Talk to one creator, say "you". Card and table words are seasoning, not every line: "Deal yourself in", "Play your hand", "Every account in one deck".
+Plain and direct. Short sentences. Talk to one creator, say "you". Say what happened and what's next ("Cut 14 filler words. Record the intro again?"), no puns or hype.
