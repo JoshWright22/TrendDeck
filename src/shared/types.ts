@@ -3,6 +3,7 @@ import type { MediaApi } from './media'
 import type { VoiceApi } from './voice'
 import type { ReuseApi } from './reuse'
 import type { EmulatorApi } from './emulator'
+import type { PipelineStage, Project } from './workspace'
 
 export interface Site {
   id: string
@@ -78,6 +79,10 @@ export interface Brand {
   threads: ChatThread[]
   ideas: Idea[]
   schedule?: ScheduleSlot[]
+  // pieces of content, General first. see shared/workspace.ts
+  projects: Project[]
+  // the stages a project runs through, each opens a workspace in the right pane
+  pipeline: PipelineStage[]
 }
 
 export interface Settings {

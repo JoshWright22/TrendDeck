@@ -291,8 +291,8 @@
   margin: 6px 0 0;
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(250, 78, 147, 0.4);
-  background: rgba(250, 78, 147, 0.08);
+  border: 1px solid rgba(217, 115, 124, 0.4);
+  background: rgba(217, 115, 124, 0.08);
   color: var(--chalk);
   font-size: 12px;
   white-space: pre-wrap;
@@ -562,7 +562,7 @@
 }
 
 .cx-trend .cx-kind {
-  background: rgba(250, 78, 147, 0.14);
+  background: rgba(217, 115, 124, 0.14);
   color: var(--pink);
 }
 
@@ -1808,4 +1808,234 @@
 
 .cx-box-row > .spacer {
   min-width: 0;
+}
+
+/* t3 look for the one-window shell. kept at the end so it wins over the older rules above */
+
+.center > .cx {
+  position: absolute;
+  inset: 0;
+}
+
+.cx-head {
+  height: 44px;
+  padding: 0 8px 0 18px;
+  border-bottom-color: var(--hair);
+}
+
+.cx-head h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  min-width: 0;
+  font: 500 13px/1 var(--body);
+  letter-spacing: 0;
+}
+
+.cx-head-context {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--smoke);
+}
+
+.cx-head-sep {
+  flex: none;
+  margin: 0 7px;
+  color: var(--faint);
+}
+
+.cx-head-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--chalk);
+}
+
+.cx-column {
+  max-width: 760px;
+  gap: 18px;
+}
+
+.cx-msg.user {
+  padding: 8px 12px;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  background: var(--raised);
+}
+
+.cx-who {
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.cx-who-mark {
+  color: var(--smoke);
+}
+
+.cx-thinking span {
+  background: var(--smoke);
+}
+
+.cx-error {
+  border-color: rgba(217, 115, 124, 0.35);
+  background: rgba(217, 115, 124, 0.06);
+}
+
+/* work log: one quiet row, "Worked · 6 steps", opens into the steps */
+.cx-fold {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.cx-fold-head {
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px 0 4px;
+  border-radius: 6px;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.cx-fold-head:hover {
+  background: var(--hover);
+  color: var(--smoke);
+}
+
+.cx-fold.live .cx-fold-head > span:first-of-type {
+  color: var(--smoke);
+}
+
+.cx-fold-body {
+  margin: 2px 0 4px 8px;
+  padding: 4px 0 4px 12px;
+  border-left: 1px solid var(--hair);
+}
+
+.cx-step {
+  font-size: 12px;
+}
+
+.cx-step-dot {
+  width: 5px;
+  height: 5px;
+  background: var(--faint);
+}
+
+.cx-step.running .cx-step-dot {
+  background: var(--accent);
+}
+
+.cx-step-label {
+  color: var(--smoke);
+}
+
+.cx-step-detail,
+.cx-step-time {
+  color: var(--faint);
+}
+
+/* composer */
+.cx-composer {
+  max-width: 760px;
+  padding: 0 24px 14px;
+}
+
+.cx-box {
+  border-color: var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.cx-box:focus-within {
+  border-color: #3a3a42;
+}
+
+.cx-agent .ui-dd-btn,
+.cx-model .ui-dd-btn,
+.cx-effort .ui-dd-btn {
+  height: 26px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--smoke);
+}
+
+.cx-agent .ui-dd-btn:hover,
+.cx-model .ui-dd-btn:hover,
+.cx-effort .ui-dd-btn:hover {
+  background: var(--hover);
+  color: var(--chalk);
+}
+
+.cx-send {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--felt);
+}
+
+.cx-send.stop {
+  background: var(--raised);
+  color: var(--chalk);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+/* cards: plain panels with a hairline, no white ring */
+.cx-card {
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.cx-card:hover {
+  transform: none;
+  box-shadow: 0 0 0 1px #34343b;
+}
+
+/* home */
+.cx-hello {
+  font: 600 20px/1.2 var(--body);
+  letter-spacing: -0.01em;
+}
+
+.cx-home-mark {
+  width: 26px;
+  height: 22px;
+  color: var(--faint);
+}
+
+.cx-home-brand {
+  color: var(--faint);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.cx-starter {
+  min-height: 92px;
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 0 0 1px var(--hair);
+}
+
+.cx-starter:hover:not(:disabled) {
+  transform: none;
+  background: var(--hover);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.cx-starter-mark {
+  color: var(--faint);
+}
+
+.cx-starter-title {
+  font: 500 13px/1.3 var(--body);
+  letter-spacing: 0;
+}
+
+.cx-jump {
+  background: var(--raised);
+  color: var(--chalk);
+  box-shadow: 0 0 0 1px var(--line), 0 8px 20px rgba(0, 0, 0, 0.4);
 }

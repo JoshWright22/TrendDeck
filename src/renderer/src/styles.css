@@ -1,24 +1,33 @@
 /* colors and type follow docs/BRAND.md */
 :root {
-  --felt: #0e0e10;
-  --panel: #16161a;
-  --raised: #1e1e24;
-  --line: #2a2a33;
-  --chalk: #e8e8ec;
-  --smoke: #9a9aa6;
-  --card: #f2f2f4;
-  --teal: #00bf9c;
-  --yellow: #ffd814;
-  --pink: #fa4e93;
-  --indigo: #3b46a4;
-  --teal-soft: rgba(0, 191, 156, 0.14);
-  --radius: 12px;
+  /* t3 style: near black, gray text, hairlines, one muted accent. old names kept so every page follows */
+  --felt: #0b0b0c;
+  --panel: #111113;
+  --raised: #19191c;
+  --hover: #1d1d21;
+  --line: #232327;
+  --hair: rgba(255, 255, 255, 0.07);
+  --chalk: #e6e6e9;
+  --smoke: #8a8a94;
+  --faint: #5c5c66;
+  /* light fill for primary buttons and chips, text on it is --felt */
+  --card: #e6e6e9;
+  /* the one accent. --teal is its old name and what most pages use */
+  --accent: #8b93d9;
+  --teal: var(--accent);
+  --teal-soft: rgba(139, 147, 217, 0.14);
+  --indigo: #5b62a6;
+  /* status only: warning and danger, kept dim */
+  --yellow: #c8a95b;
+  --pink: #d9737c;
+  --radius: 8px;
   /* plain and quick for everyday motion */
   --ease: cubic-bezier(0.2, 0, 0, 1);
   /* springy, only for small wins */
   --spring: cubic-bezier(0.34, 1.7, 0.5, 1);
   --body: 'Inter', system-ui, sans-serif;
-  --head: 'Inter Tight', 'Inter', system-ui, sans-serif;
+  /* headings are plain Inter now, no display face */
+  --head: 'Inter', system-ui, sans-serif;
   color-scheme: dark;
 }
 
@@ -39,6 +48,8 @@ body {
   font: 13px/1.45 var(--body);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  /* only 400 to 600 are bundled, heavier weights render as 600 instead of a smeared fake bold */
+  font-synthesis-weight: none;
 }
 
 /* any text can be highlighted and copied into the chat, only the controls and chrome can't */
@@ -95,10 +106,7 @@ select:focus-visible,
   display: flex;
   flex-direction: column;
   height: 100%;
-  /* the indigo spotlight on the felt */
-  background:
-    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(59, 70, 164, 0.22), transparent 70%),
-    var(--felt);
+  background: var(--felt);
 }
 
 .shell {
@@ -297,94 +305,7 @@ select:focus-visible,
   letter-spacing: -0.04em;
 }
 
-/* sidebar */
-
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  flex: none;
-  width: 232px;
-  min-height: 0;
-  padding: 8px 6px 0 14px;
-}
-
-.rail {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-  /* room for the active ring */
-  padding: 4px;
-}
-
-/* brands are cards, 5:7 */
-.brand-icon {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 24px;
-  height: 32px;
-  padding: 0;
-  border-radius: 5px;
-  background: var(--raised);
-  border: 1px solid var(--line);
-  color: var(--smoke);
-  font: 800 11px/1 var(--head);
-  letter-spacing: -0.02em;
-  text-align: center;
-  transition:
-    transform 0.15s var(--ease),
-    border-color 0.15s,
-    color 0.15s;
-}
-
-.brand-icon:hover {
-  color: var(--chalk);
-  transform: translateY(-1px);
-}
-
-.brand-icon:active {
-  transform: scale(0.95);
-  transition-duration: 0.08s;
-}
-
-.brand-icon.active {
-  background: var(--card);
-  border-color: var(--card);
-  color: var(--felt);
-  box-shadow: 0 0 0 2px var(--felt), 0 0 0 3px var(--teal);
-}
-
-.brand-icon.add {
-  background: none;
-  border-style: dashed;
-}
-
-.brand-icon.add:hover {
-  border-color: var(--teal);
-  color: var(--teal);
-}
-
-.brand-head {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 0 10px 8px;
-  min-width: 0;
-}
-
-.brand-head h1 {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  font: 800 19px/1.15 var(--head);
-  letter-spacing: -0.04em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+/* side lists, used by the settings nav */
 
 .side-section {
   display: flex;
@@ -1129,7 +1050,7 @@ select:focus-visible,
 .hero-card.rank-1 {
   box-shadow:
     0 0 0 3px var(--card),
-    0 0 36px rgba(0, 191, 156, 0.28),
+    0 0 36px rgba(139, 147, 217, 0.28),
     0 18px 40px rgba(0, 0, 0, 0.45);
 }
 
@@ -1259,7 +1180,7 @@ select:focus-visible,
 
 .score-chip.hot {
   border-color: var(--pink);
-  box-shadow: 0 0 14px rgba(250, 78, 147, 0.35);
+  box-shadow: 0 0 14px rgba(217, 115, 124, 0.35);
 }
 
 /* filters */
@@ -1899,73 +1820,4 @@ select:focus-visible,
 .about-line strong {
   font: 800 16px var(--head);
   letter-spacing: -0.04em;
-}
-
-/* a sidebar group's pages, as tabs over the page */
-
-.group-view {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.group-tabs {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  flex: none;
-  height: 44px;
-  border-bottom: 1px solid var(--line);
-}
-
-.group-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 14px;
-  border-radius: 999px;
-  color: var(--smoke);
-  font-weight: 500;
-  transition:
-    background 0.15s,
-    color 0.15s;
-}
-
-.group-tab:hover {
-  color: var(--chalk);
-}
-
-.group-tab.active {
-  background: var(--raised);
-  color: var(--chalk);
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-
-.group-body {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-}
-
-/* the tab already names the page */
-.group-body .page-head > h2:first-child {
-  display: none;
-}
-
-/* the chat's list of chats, in the sidebar */
-
-.side-threads {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 96px;
-  padding: 0 0 12px;
-}
-
-.side-threads ~ .side-section {
-  flex: none;
-  max-height: 34%;
 }

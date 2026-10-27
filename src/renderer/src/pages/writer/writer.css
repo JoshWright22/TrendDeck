@@ -108,7 +108,7 @@
   border-color: transparent;
   box-shadow:
     0 0 0 2px var(--card),
-    0 0 24px rgba(0, 191, 156, 0.22);
+    0 0 24px rgba(139, 147, 217, 0.22);
 }
 
 .wr-card.wr-new {
@@ -352,7 +352,7 @@
   margin: 0;
   padding: 8px 12px;
   border-radius: 8px;
-  background: rgba(250, 78, 147, 0.12);
+  background: rgba(217, 115, 124, 0.12);
   color: var(--pink);
   font-size: 12px;
 }

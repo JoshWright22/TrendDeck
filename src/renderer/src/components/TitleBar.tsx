@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { isHttpUrl, type Brand } from '@shared/types'
+import type { ThreadSummary } from '@shared/chat'
 import logo from '../../../../resources/logo.svg'
-import BrandRail from './BrandRail'
-import { PAGES } from './ComingSoon'
 import { SearchIcon } from './Icons'
-import type { View } from './Sidebar'
+import { toolWorkspaces } from '../workspace/registry'
 
 export type SearchPick =
   | { kind: 'trends'; query: string }
-  | { kind: 'view'; view: View }
+  | { kind: 'workspace'; key: string }
+  | { kind: 'site'; id: string }
+  | { kind: 'settings' }
   | { kind: 'brand'; id: string }
+  | { kind: 'project'; id: string }
+  | { kind: 'thread'; id: string }
   | { kind: 'url'; url: string }
 
 interface Result {
@@ -22,9 +25,7 @@ interface Result {
 interface Props {
   brands: Brand[]
   brand: Brand | null
-  onSelectBrand: (id: string) => void
-  onEditBrand: (id: string) => void
-  onAddBrand: () => void
+  threads: ThreadSummary[]
   onPick: (pick: SearchPick) => void
 }
 
@@ -38,7 +39,7 @@ function asUrl(text: string): string | null {
   return full && isHttpUrl(full) ? full : null
 }
 
-function results(query: string, brands: Brand[], brand: Brand | null): Result[] {
+function results(query: string, brands: Brand[], brand: Brand | null, threads: ThreadSummary[]): Result[] {
   const q = query.trim().toLowerCase()
   if (!q) return []
   const has = (s: string): boolean => s.toLowerCase().includes(q)
@@ -47,13 +48,19 @@ function results(query: string, brands: Brand[], brand: Brand | null): Result[] 
   if (url) out.push({ key: 'url', label: `Open ${url}`, hint: 'Tab', pick: { kind: 'url', url } })
   const trends: SearchPick = { kind: 'trends', query: query.trim() }
   out.push({ key: 'trends', label: `Search trends for "${query.trim()}"`, hint: 'Trends', pick: trends })
-  for (const p of PAGES) {
-    if (has(p)) out.push({ key: `page:${p}`, label: p, hint: 'Page', pick: { kind: 'view', view: { kind: 'page', page: p } } })
+  for (const p of brand?.projects ?? []) {
+    if (has(p.name)) out.push({ key: `project:${p.id}`, label: p.name, hint: 'Project', pick: { kind: 'project', id: p.id } })
   }
-  if (has('Settings')) out.push({ key: 'settings', label: 'Settings', hint: 'Page', pick: { kind: 'view', view: { kind: 'settings' } } })
+  for (const t of threads) {
+    if (!t.archived && has(t.title)) out.push({ key: `thread:${t.id}`, label: t.title, hint: 'Chat', pick: { kind: 'thread', id: t.id } })
+  }
+  for (const [key, def] of toolWorkspaces()) {
+    if (has(def.label) || has(key)) out.push({ key: `ws:${key}`, label: def.label, hint: 'Tool', pick: { kind: 'workspace', key } })
+  }
+  if (has('Settings')) out.push({ key: 'settings', label: 'Settings', hint: 'App', pick: { kind: 'settings' } })
   for (const s of brand?.sites ?? []) {
     if (has(s.name) || has(s.url)) {
-      out.push({ key: `site:${s.id}`, label: s.name, hint: 'Site', pick: { kind: 'view', view: { kind: 'site', id: s.id } } })
+      out.push({ key: `site:${s.id}`, label: s.name, hint: 'Site', pick: { kind: 'site', id: s.id } })
     }
   }
   for (const b of brands) {
@@ -63,18 +70,18 @@ function results(query: string, brands: Brand[], brand: Brand | null): Result[] 
   }
   for (const i of brand?.ideas ?? []) {
     if (has(i.title)) {
-      out.push({ key: `idea:${i.id}`, label: i.title, hint: 'Idea', pick: { kind: 'view', view: { kind: 'page', page: 'Ideas' } } })
+      out.push({ key: `idea:${i.id}`, label: i.title, hint: 'Idea', pick: { kind: 'workspace', key: 'ideas' } })
     }
   }
   return out.slice(0, MAX_RESULTS)
 }
 
-function Search({ brands, brand, onPick }: Pick<Props, 'brands' | 'brand' | 'onPick'>): ReactNode {
+function Search({ brands, brand, threads, onPick }: Props): ReactNode {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [index, setIndex] = useState(0)
   const input = useRef<HTMLInputElement>(null)
-  const list = results(query, brands, brand)
+  const list = results(query, brands, brand, threads)
 
   // ctrl+k jumps to search from anywhere in the app
   useEffect(() => {
@@ -104,7 +111,7 @@ function Search({ brands, brand, onPick }: Pick<Props, 'brands' | 'brand' | 'onP
         <input
           ref={input}
           value={query}
-          placeholder="Search trends, sites, brands or paste a link"
+          placeholder="Search projects, chats, tools, trends or paste a link"
           aria-label="Search"
           spellCheck={false}
           onChange={(e) => {
@@ -215,15 +222,9 @@ export default function TitleBar(props: Props): ReactNode {
   return (
     <header className={`titlebar${isMac ? ' mac' : ''}`}>
       <img className="title-logo" src={logo} alt="" draggable={false} />
-      <BrandRail
-        brands={props.brands}
-        activeId={props.brand?.id ?? null}
-        onSelect={props.onSelectBrand}
-        onEdit={props.onEditBrand}
-        onAdd={props.onAddBrand}
-      />
+      <span className="title-name">TrendDeck</span>
       <span className="spacer" />
-      <Search brands={props.brands} brand={props.brand} onPick={props.onPick} />
+      <Search {...props} />
       <span className="spacer" />
       {!isMac && <WindowButtons />}
     </header>

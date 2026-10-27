@@ -1,0 +1,734 @@
+/* the one-window shell: sidebar tree, chat, workspace pane. t3code look: near black, gray text,
+   hairline borders, one muted accent, small status dots. tokens are in styles.css :root */
+
+.shell {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+  border-top: 1px solid var(--hair);
+}
+
+body.resizing,
+body.resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* a webview eats pointer events, which would drop the drag */
+body.resizing webview {
+  pointer-events: none;
+}
+
+/* title bar */
+
+.titlebar {
+  height: 38px;
+  gap: 8px;
+  padding-left: 12px;
+}
+
+.title-logo {
+  width: 18px;
+  height: 18px;
+  opacity: 0.9;
+}
+
+.title-name {
+  color: var(--smoke);
+  font-weight: 500;
+  font-size: 12.5px;
+}
+
+.title-search .search {
+  height: 26px;
+  border: 1px solid var(--hair);
+  background: var(--panel);
+}
+
+.update-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--card);
+  font-weight: 500;
+}
+
+.update-btn:hover {
+  transform: none;
+  background: #fff;
+}
+
+/* headings everywhere: plain, no display weight */
+
+.page-head {
+  height: 44px;
+  padding: 0 10px 0 16px;
+  border-bottom-color: var(--hair);
+}
+
+.page-head h2,
+.coming-soon-card h2 {
+  font: 600 14px/1 var(--body);
+  letter-spacing: 0;
+}
+
+.main,
+.panel {
+  border-color: var(--hair);
+}
+
+.pill {
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.pill.teal {
+  background: var(--card);
+  color: var(--felt);
+}
+
+.icon-btn {
+  border-radius: 6px;
+}
+
+.icon-btn.on {
+  background: var(--raised);
+  color: var(--chalk);
+}
+
+/* status dots: idle hollow, running accent and breathing, waiting half, done gray */
+
+.dot,
+.dot-space {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.dot.idle {
+  box-shadow: inset 0 0 0 1px var(--faint);
+}
+
+.dot.running {
+  background: var(--accent);
+  animation: dot-breathe 1.6s ease-in-out infinite;
+}
+
+.dot.waiting {
+  background: linear-gradient(90deg, var(--yellow) 50%, transparent 50%);
+  box-shadow: inset 0 0 0 1px var(--yellow);
+}
+
+.dot.done {
+  background: var(--faint);
+}
+
+@keyframes dot-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot.running {
+    animation: none;
+  }
+}
+
+/* sidebar */
+
+.sb {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: 248px;
+  min-height: 0;
+  border-right: 1px solid var(--hair);
+  background: var(--felt);
+  user-select: none;
+}
+
+.sb-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 6px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.tree-brand + .tree-brand {
+  margin-top: 2px;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 6px;
+  color: var(--smoke);
+  text-align: left;
+  cursor: pointer;
+}
+
+.tree-row:hover {
+  background: var(--hover);
+  color: var(--chalk);
+}
+
+.tree-row.active {
+  background: var(--raised);
+  color: var(--chalk);
+}
+
+.tree-row.brand {
+  color: var(--chalk);
+  font-weight: 600;
+}
+
+.tree-brand:not(.active) .tree-row.brand {
+  color: var(--smoke);
+  font-weight: 500;
+}
+
+.tree-row.pipeline svg {
+  flex: none;
+  color: var(--faint);
+}
+
+.tree-row.thread {
+  height: 26px;
+  font-size: 12.5px;
+}
+
+.tree-row.thread.archived .tree-name {
+  color: var(--faint);
+}
+
+.tree-children {
+  padding-left: 12px;
+}
+
+.tree-project .tree-children {
+  padding-left: 10px;
+}
+
+.tree-caret {
+  flex: none;
+  color: var(--faint);
+  transition: transform 0.12s var(--ease);
+}
+
+.tree-caret.open {
+  transform: rotate(90deg);
+}
+
+.tree-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.tree-meta {
+  flex: none;
+  color: var(--faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tree-menu .ui-menu-btn {
+  width: 20px;
+  height: 20px;
+  opacity: 0;
+}
+
+.tree-row:hover .tree-menu .ui-menu-btn,
+.tree-row:focus-within .tree-menu .ui-menu-btn,
+.tree-menu .ui-menu-btn[aria-expanded='true'] {
+  opacity: 1;
+}
+
+/* the time makes room for the menu on hover */
+.tree-row:hover .tree-meta {
+  display: none;
+}
+
+.tree-rename {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--felt);
+  outline: none;
+}
+
+.tree-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  color: var(--chalk);
+  font-size: 12px;
+}
+
+.tree-confirm .pill {
+  padding: 2px 8px;
+}
+
+.tree-empty {
+  margin: 2px 0;
+  padding: 0 6px 0 20px;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.tree-row-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.tree-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 6px;
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+.tree-add svg {
+  width: 11px;
+  height: 11px;
+}
+
+.tree-add:hover {
+  background: var(--hover);
+  color: var(--chalk);
+}
+
+.tree-add.brand-add {
+  margin-top: 6px;
+}
+
+/* jobs: one line at the bottom, opens up into the list */
+
+.jobs {
+  flex: none;
+  border-top: 1px solid var(--hair);
+}
+
+.jobs-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 12px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.jobs-head:hover {
+  color: var(--chalk);
+}
+
+.jobs-head > span:first-child {
+  font-weight: 500;
+}
+
+.jobs-bar {
+  position: relative;
+  flex: 1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+.jobs-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+}
+
+.jobs-list {
+  margin: 0;
+  padding: 0 12px 10px;
+  list-style: none;
+  font-size: 12px;
+}
+
+.jobs-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.jobs-list li.error .jobs-bar > span {
+  background: var(--pink);
+}
+
+.jobs-label {
+  flex: 0 1 50%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sb-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 36px;
+  padding: 0 12px;
+  border-top: 1px solid var(--hair);
+  color: var(--smoke);
+  font-size: 12.5px;
+}
+
+.sb-foot:hover {
+  color: var(--chalk);
+  background: var(--hover);
+}
+
+/* center: the chat */
+
+.center {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 380px;
+  min-height: 0;
+  background: var(--felt);
+}
+
+/* workspace pane */
+
+.ws {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--hair);
+  background: var(--panel);
+}
+
+/* hidden but kept laid out at its width, the site tabs inside keep their size and don't reload */
+.ws.collapsed {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(100%);
+}
+
+.ws-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -3px;
+  z-index: 6;
+  width: 6px;
+  cursor: col-resize;
+}
+
+.ws-resize:hover,
+body.resizing .ws-resize {
+  background: linear-gradient(90deg, transparent 2px, var(--accent) 2px, var(--accent) 3px, transparent 3px);
+}
+
+.ws-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 40px;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.ws-crumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12.5px;
+}
+
+.ws-crumb-sep {
+  color: var(--faint);
+}
+
+.ws-crumb-here {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--chalk);
+  font-weight: 500;
+}
+
+.ws-head-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+button.ws-head-btn:hover,
+.ws-tools .ui-menu-btn:hover .ws-head-btn {
+  color: var(--chalk);
+  background: var(--hover);
+}
+
+.ws-tools .ui-menu-btn {
+  width: auto;
+  height: auto;
+  padding: 0;
+  background: none;
+}
+
+/* ○Idea─●Script─●Edit─○Thumb */
+.ws-strip {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 40px;
+  padding: 0 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--hair);
+}
+
+.ws-strip-item {
+  display: flex;
+  align-items: center;
+  flex: none;
+}
+
+.ws-strip-line {
+  width: 12px;
+  height: 1px;
+  background: var(--line);
+}
+
+.ws-strip-line.done {
+  background: var(--faint);
+}
+
+.ws-stage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 6px;
+  color: var(--faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ws-stage:hover {
+  color: var(--chalk);
+  background: var(--hover);
+}
+
+.ws-stage-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.ws-stage.done {
+  color: var(--smoke);
+}
+
+.ws-stage.done .ws-stage-dot {
+  background: var(--smoke);
+  box-shadow: none;
+}
+
+.ws-stage.current {
+  color: var(--chalk);
+}
+
+.ws-stage.current .ws-stage-dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--teal-soft);
+}
+
+.ws-stage.open {
+  background: var(--raised);
+  color: var(--chalk);
+}
+
+.ws-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* pages from before the redesign sit in the pane as they are */
+.ws-body .page {
+  background: var(--panel);
+}
+
+.ws-body .chat-toggle {
+  display: none;
+}
+
+.ws-sites {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.ws-sites.on {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* a hidden tab stays hidden even inside a shown stack */
+.ws-sites .site-view.hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.ws-sitestrip {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  height: 34px;
+  padding: 0 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--hair);
+}
+
+.ws-site {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--smoke);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.ws-site:hover,
+.ws-site.temp button:hover {
+  color: var(--chalk);
+  background: var(--hover);
+}
+
+.ws-site.on {
+  background: var(--raised);
+  color: var(--chalk);
+}
+
+.ws-site.temp {
+  padding: 0 2px 0 0;
+  font-style: italic;
+}
+
+.ws-site.temp button {
+  display: grid;
+  place-items: center;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 5px;
+}
+
+.ws-site.temp svg,
+.ws-site.add svg {
+  width: 11px;
+  height: 11px;
+}
+
+.ws-placeholder {
+  display: grid;
+  place-items: center;
+}
+
+.ws-placeholder-body {
+  max-width: 340px;
+  padding: 24px;
+  text-align: center;
+}
+
+.ws-placeholder-body h2 {
+  margin: 0 0 6px;
+  font: 600 14px/1.2 var(--body);
+}
+
+.ws-placeholder-body p {
+  margin: 0 0 14px;
+  color: var(--smoke);
+}
+
+/* settings: a big sheet over the app */
+
+.settings-sheet {
+  position: relative;
+  width: min(1040px, calc(100vw - 80px));
+  height: min(760px, calc(100vh - 80px));
+  overflow: hidden;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  animation: fade-down 0.14s ease-out;
+}
+
+.modal-backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.modal {
+  border-color: var(--hair);
+  border-radius: 10px;
+}
+
+.modal h2 {
+  font: 600 15px/1.2 var(--body);
+  letter-spacing: 0;
+}
+
+/* cards and pages from before: no colored rings, just hairlines */
+
+.coming-soon-card,
+.empty {
+  border-color: var(--hair);
+}
+
+.ws-site.drop {
+  box-shadow: inset 2px 0 0 var(--accent);
+}

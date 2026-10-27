@@ -19,6 +19,7 @@ import {
   TREND_SOURCES
 } from '@shared/types'
 import { cleanIdeaBoard, cleanSchedule } from './planner/clean'
+import { cleanPipeline, cleanProjects } from './workspace/clean'
 
 const FILE_NAME = 'trenddeck.json'
 
@@ -36,8 +37,12 @@ function defaultData(): AppData {
     adblockAllow: [],
     sites: DEFAULT_SITES.map((s) => ({ ...s, id: randomUUID() })),
     threads: [],
-    ideas: []
+    ideas: [],
+    projects: [],
+    pipeline: []
   }
+  brand.pipeline = cleanPipeline(undefined)
+  brand.projects = cleanProjects(undefined, brand.pipeline, Date.now())
   return {
     version: 1,
     activeBrandId: brand.id,
@@ -120,6 +125,7 @@ function cleanBrand(raw: unknown): Brand | null {
   const ideas = Array.isArray(b.ideas)
     ? b.ideas.map(cleanIdea).filter((i): i is Idea => i !== null)
     : []
+  const pipeline = cleanPipeline(b.pipeline)
   return {
     id: b.id,
     name: b.name.slice(0, 60),
@@ -130,7 +136,10 @@ function cleanBrand(raw: unknown): Brand | null {
     sites,
     threads,
     ideas,
-    schedule: cleanSchedule(b.schedule)
+    schedule: cleanSchedule(b.schedule),
+    pipeline,
+    // brands from before projects get General, which picks up every chat they already have
+    projects: cleanProjects(b.projects, pipeline, Date.now())
   }
 }
 

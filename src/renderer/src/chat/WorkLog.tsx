@@ -84,10 +84,9 @@ export default function WorkLog({ m }: { m: ThreadMessage }): ReactNode {
           live={streaming && !m.text}
           title={
             <>
-              <span>Work log</span>
+              <span>{running || (streaming && !m.text) ? 'Working' : 'Worked'}</span>
               <span className="muted">
-                {steps.length} {steps.length === 1 ? 'step' : 'steps'}
-                {running ? ', working' : ''}
+                · {steps.length} {steps.length === 1 ? 'step' : 'steps'}
                 {failed ? `, ${failed} failed` : ''}
               </span>
             </>

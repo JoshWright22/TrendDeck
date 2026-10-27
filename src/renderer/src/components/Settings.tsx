@@ -9,7 +9,6 @@ import {
   type Brand
 } from '@shared/types'
 import { Chips, cleanKeyword, cleanSub, type ChipList } from './BrandModal'
-import { ChatToggle } from './PageHeader'
 import { CloseIcon, PlusIcon } from './Icons'
 import AgentAccess from './mcp/AgentAccess'
 import AgentsSection from '../chat/AgentsSection'
@@ -27,8 +26,7 @@ interface Props {
   onDeleteBrand: (id: string) => void
   onAddSite: () => void
   onOpenUrl: (url: string) => void
-  chatOpen: boolean
-  onToggleChat: () => void
+  onClose: () => void
 }
 
 const sectionId = (s: string): string => `settings-${s.toLowerCase().replace(/\s+/g, '-')}`
@@ -48,7 +46,7 @@ function BrandSection({ brand, editBrand, onDelete }: { brand: Brand } & Pick<Pr
 
   return (
     <>
-      <p className="form-hint">For {brand.name}. Switch brands in the title bar.</p>
+      <p className="form-hint">For {brand.name}. Switch brands in the sidebar.</p>
       <label>
         Name
         <input
@@ -105,7 +103,7 @@ function SitesSection({ brand, editBrand, onAddSite }: { brand: Brand } & Pick<P
 
   return (
     <>
-      <p className="form-hint">Every site logs in separately for each brand. Drag them in the sidebar to reorder.</p>
+      <p className="form-hint">Every site logs in separately for each brand. Drag the tabs above an open site to reorder them.</p>
       <ul className="settings-sites">
         {brand.sites.map((s) => (
           <li key={s.id}>
@@ -351,7 +349,9 @@ export default function Settings(props: Props): ReactNode {
       <header className="page-head">
         <h2>Settings</h2>
         <span className="spacer" />
-        <ChatToggle chatOpen={props.chatOpen} onToggleChat={props.onToggleChat} />
+        <button className="icon-btn" title="Close (Esc)" aria-label="Close settings" onClick={props.onClose}>
+          <CloseIcon />
+        </button>
       </header>
       <div className="settings-body">
         <nav className="settings-nav" aria-label="Settings sections">

@@ -4,9 +4,8 @@ import App from './App'
 import '@fontsource/inter/latin-400.css'
 import '@fontsource/inter/latin-500.css'
 import '@fontsource/inter/latin-600.css'
-import '@fontsource/inter-tight/latin-800.css'
-import '@fontsource/inter-tight/latin-900.css'
 import './styles.css'
+import './shell/shell.css'
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>

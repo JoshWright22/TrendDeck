@@ -19,8 +19,8 @@
   flex: none;
   width: 280px;
   padding: 14px;
-  background: #16161a;
-  border: 1px solid #2a2a33;
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 12px;
   align-self: flex-start;
 }
@@ -59,8 +59,8 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  background: #16161a;
-  border: 1px solid #2a2a33;
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 12px;
   animation: reuse-deal 200ms ease-out both;
 }
@@ -102,15 +102,15 @@
 }
 
 .reuse-page .ok {
-  color: #00bf9c;
+  color: var(--teal);
 }
 
 .reuse-page .warn {
-  color: #ffd814;
+  color: var(--yellow);
 }
 
 .reuse-page .bad {
-  color: #fa4e93;
+  color: var(--pink);
 }
 
 .reuse-review {
@@ -127,7 +127,7 @@
 
 .reuse-msg {
   margin: 0;
-  color: #00bf9c;
+  color: var(--teal);
 }
 
 .reuse-shorts {

@@ -1,17 +1,20 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { DEFAULT_SITES, hostOf, isHttpUrl, partitionFor, TAB_CAP_DEFAULT, type Brand, type Site } from '@shared/types'
+import { DEFAULT_PIPELINE, GENERAL_PROJECT_ID, generalProject, projectIdForThread } from '@shared/workspace'
 import { pickSite } from './links'
 import { useAppData } from './useAppData'
 import { useLiveTabs } from './useLiveTabs'
-import Sidebar, { type View } from './components/Sidebar'
+import Sidebar from './shell/Sidebar'
+import { useThreads } from './shell/useThreads'
 import SiteView from './components/SiteView'
 import TitleBar, { type SearchPick } from './components/TitleBar'
-import { ChatToggle } from './components/PageHeader'
-import { PAGE_VIEWS } from './pages'
-import GroupTabs from './components/GroupTabs'
+import { PanelIcon } from './components/Icons'
 import ShareTab from './components/mcp/ShareTab'
 import { useAgentEvents } from './components/mcp/useAgentEvents'
 import CodePrompt from './components/vault/CodePrompt'
+import WorkspacePane, { MAX_WS, MIN_WS, type WsView } from './workspace/WorkspacePane'
+import SiteStrip from './workspace/SiteStrip'
+import { useInbox } from './pages/inbox/useInbox'
 
 const ChatView = lazy(() => import('./chat/ChatView'))
 const Settings = lazy(() => import('./components/Settings'))
@@ -19,23 +22,41 @@ const Settings = lazy(() => import('./components/Settings'))
 const BrandModal = lazy(() => import('./components/BrandModal'))
 const SiteModal = lazy(() => import('./components/SiteModal'))
 const Onboarding = lazy(() => import('./components/Onboarding'))
-const PhoneView = lazy(() => import('./emulator/PhoneView'))
 
-type ModalState =
-  | { kind: 'brand'; id: string | null }
-  | { kind: 'site' }
-  | null
+type ModalState = { kind: 'brand'; id: string | null } | { kind: 'site' } | { kind: 'settings' } | null
 
-const HOME: View = { kind: 'chat' }
-const TRENDS: View = { kind: 'page', page: 'Trends' }
+// where each brand is: which project, which chat, what the workspace shows. not saved,
+// the app always opens on General with a new chat
+interface Place {
+  projectId: string
+  threadId: string | null
+  ws: WsView | null
+}
+
+const START: Place = { projectId: GENERAL_PROJECT_ID, threadId: null, ws: null }
+
+// the workspace pane's width and whether it's hidden, saved on this machine only
+const WS_KEY = 'trenddeck.workspace'
+function loadPane(): { width: number; collapsed: boolean } {
+  try {
+    const raw = JSON.parse(localStorage.getItem(WS_KEY) ?? '{}') as { width?: number; collapsed?: boolean }
+    const width = Number(raw.width)
+    return {
+      width: width >= MIN_WS && width <= MAX_WS ? width : Math.round(window.innerWidth * 0.42),
+      collapsed: raw.collapsed === true
+    }
+  } catch {
+    return { width: Math.round(window.innerWidth * 0.42), collapsed: false }
+  }
+}
 
 const newId = (): string => crypto.randomUUID()
 
 export default function App(): ReactNode {
   const { data, update } = useAppData()
   const [modal, setModal] = useState<ModalState>(null)
-  // what each brand has open, not saved so the app always starts on the chat
-  const [views, setViews] = useState<Record<string, View>>({})
+  const [places, setPlaces] = useState<Record<string, Place>>({})
+  const [pane, setPane] = useState(loadPane)
   // last page each site was on, so going back to a site picks up where you left it
   const lastUrl = useRef<Record<string, string>>({})
   // set from the title bar search, trends filters on it
@@ -45,26 +66,37 @@ export default function App(): ReactNode {
   // asks an open site tab to go to a url
   const [nav, setNav] = useState<{ key: string; url: string; n: number } | null>(null)
   const openUrlRef = useRef<(url: string) => void>(() => {})
+  // a chat the composer just made, it stays in the project that was open
+  const created = useRef<string | null>(null)
 
   useEffect(() => window.trenddeck.onOpenUrl((url) => openUrlRef.current(url)), [])
+  useEffect(() => localStorage.setItem(WS_KEY, JSON.stringify(pane)), [pane])
 
   const brand = data?.brands.find((b) => b.id === data.activeBrandId) ?? null
-  const picked = (brand && views[brand.id]) || HOME
+  const { threads } = useThreads(brand?.id ?? null)
+  const inbox = useInbox(brand?.id)
+  const place = (brand && places[brand.id]) || START
+  const project = brand?.projects.find((p) => p.id === place.projectId) ?? brand?.projects[0] ?? null
+  const ws: WsView = place.ws ?? { kind: 'stage', stageId: project?.stageId ?? brand?.pipeline[0]?.id ?? '' }
   const brandTemps = (brand && temps[brand.id]) || []
   const site =
-    picked.kind === 'site'
-      ? (brand?.sites.find((s) => s.id === picked.id) ?? brandTemps.find((s) => s.id === picked.id))
-      : undefined
-  // a removed site falls back to the chat
-  const view: View = picked.kind === 'site' && !site ? HOME : picked
+    ws.kind === 'site' ? (brand?.sites.find((s) => s.id === ws.id) ?? brandTemps.find((s) => s.id === ws.id)) : undefined
   const { tabs, isLive } = useLiveTabs(
     data?.brands ?? [],
     temps,
-    brand && site ? { brandId: brand.id, siteId: site.id } : null,
+    brand && site && !pane.collapsed ? { brandId: brand.id, siteId: site.id } : null,
     // nothing warms up behind the first run setup
     data?.onboarded ? (brand?.id ?? null) : null,
     data?.settings.tabCap ?? TAB_CAP_DEFAULT
   )
+
+  const setPlace = (brandId: string, fn: (p: Place) => Place): void =>
+    setPlaces((all) => ({ ...all, [brandId]: fn(all[brandId] ?? START) }))
+
+  const showWs = (brandId: string, v: WsView): void => {
+    setPlace(brandId, (p) => ({ ...p, ws: v }))
+    setPane((p) => (p.collapsed ? { ...p, collapsed: false } : p))
+  }
 
   // agents asking to open a site or save an idea
   useAgentEvents(update, (brandId, siteId, url) => {
@@ -72,7 +104,7 @@ export default function App(): ReactNode {
     // a new tab reads its start url once when it mounts, a loaded one gets sent there
     lastUrl.current[key] = url
     if (isLive(brandId, siteId)) setNav({ key, url, n: Date.now() })
-    setViews((all) => ({ ...all, [brandId]: { kind: 'site', id: siteId } }))
+    showWs(brandId, { kind: 'site', id: siteId })
   })
 
   const brandIds = data?.brands.map((b) => b.id).join(',') ?? ''
@@ -82,6 +114,11 @@ export default function App(): ReactNode {
       if (ids[i]) update((d) => ({ ...d, activeBrandId: ids[i] }))
     }
     const onKey = (e: KeyboardEvent): void => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault()
+        setPane((p) => ({ ...p, collapsed: !p.collapsed }))
+        return
+      }
       if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || !/^[1-9]$/.test(e.key)) return
       e.preventDefault()
       pick(Number(e.key) - 1)
@@ -126,8 +163,14 @@ export default function App(): ReactNode {
     update((d) => ({ ...d, brands: d.brands.map((b) => (b.id === id ? fn(b) : b)) }))
   }
 
-  const setView = (v: View): void => {
-    if (brand) setViews((all) => ({ ...all, [brand.id]: v }))
+  const openWs = (v: WsView): void => {
+    if (brand) showWs(brand.id, v)
+  }
+
+  // a stage that uses this workspace opens as that stage, otherwise it's a tool
+  const openWorkspace = (key: string): void => {
+    const stage = brand?.pipeline.find((s) => s.workspace === key)
+    openWs(stage ? { kind: 'stage', stageId: stage.id } : { kind: 'tool', key })
   }
 
   // every link in the app lands here, never in the system browser
@@ -139,17 +182,19 @@ export default function App(): ReactNode {
       lastUrl.current[key] = url
       // a tab that's already loaded, even out of view, just goes to the link
       if (isLive(brand.id, match.id)) setNav({ key, url, n: Date.now() })
-      setView({ kind: 'site', id: match.id })
+      openWs({ kind: 'site', id: match.id })
       return
     }
     const temp: Site = { id: newId(), name: hostOf(url) || 'Page', url }
     setTemps((all) => ({ ...all, [brand.id]: [...(all[brand.id] ?? []), temp] }))
-    setView({ kind: 'site', id: temp.id })
+    openWs({ kind: 'site', id: temp.id })
   }
   openUrlRef.current = openUrl
 
   const closeTemp = (id: string): void => {
-    if (brand) setTemps((all) => ({ ...all, [brand.id]: (all[brand.id] ?? []).filter((s) => s.id !== id) }))
+    if (!brand) return
+    setTemps((all) => ({ ...all, [brand.id]: (all[brand.id] ?? []).filter((s) => s.id !== id) }))
+    if (ws.kind === 'site' && ws.id === id) setPlace(brand.id, (p) => ({ ...p, ws: null }))
   }
 
   // keep a temporary tab as one of the brand's sites
@@ -158,10 +203,8 @@ export default function App(): ReactNode {
     if (!brand || !temp) return
     const key = `${brand.id}:${id}`
     editBrand(brand.id, (b) => ({ ...b, sites: [...b.sites, { ...temp, url: lastUrl.current[key] ?? temp.url }] }))
-    closeTemp(id)
+    setTemps((all) => ({ ...all, [brand.id]: (all[brand.id] ?? []).filter((s) => s.id !== id) }))
   }
-
-  const toggleChat = (): void => update((d) => ({ ...d, chatOpen: !d.chatOpen }))
 
   const saveBrand = (name: string, keywords: string[], subreddits: string[]): void => {
     if (modal?.kind !== 'brand') return
@@ -170,12 +213,25 @@ export default function App(): ReactNode {
     } else {
       const id = newId()
       const sites = DEFAULT_SITES.map((s) => ({ ...s, id: newId() }))
+      const pipeline = DEFAULT_PIPELINE.map((s) => ({ ...s }))
       update((d) => ({
         ...d,
         activeBrandId: id,
         brands: [
           ...d.brands,
-          { id, name, keywords, subreddits, adblock: true, adblockAllow: [], sites, threads: [], ideas: [] }
+          {
+            id,
+            name,
+            keywords,
+            subreddits,
+            adblock: true,
+            adblockAllow: [],
+            sites,
+            threads: [],
+            ideas: [],
+            pipeline,
+            projects: [generalProject(pipeline[0].id, Date.now())]
+          }
         ]
       }))
     }
@@ -197,7 +253,7 @@ export default function App(): ReactNode {
     if (!brand) return
     const id = newId()
     editBrand(brand.id, (b) => ({ ...b, sites: [...b.sites, { id, name, url }] }))
-    setView({ kind: 'site', id })
+    openWs({ kind: 'site', id })
     setModal(null)
   }
 
@@ -222,55 +278,99 @@ export default function App(): ReactNode {
       lastUrl.current[key] = url
       if (isLive(brand.id, siteId)) setNav({ key, url, n: Date.now() })
     }
-    setView({ kind: 'site', id: siteId })
+    openWs({ kind: 'site', id: siteId })
+  }
+
+  const openProject = (projectId: string): void => {
+    if (!brand) return
+    const p = brand.projects.find((x) => x.id === projectId)
+    // one made a moment ago isn't in this render yet, it starts on a new chat at its first stage
+    if (!p) {
+      setPlace(brand.id, () => ({ projectId, threadId: null, ws: null }))
+      return
+    }
+    // picks up its newest chat
+    const latest = threads
+      .filter((t) => !t.archived && projectIdForThread(brand.projects, t.id) === p.id)
+      .sort((a, b) => b.updatedAt - a.updatedAt)[0]
+    setPlace(brand.id, () => ({ projectId: p.id, threadId: latest?.id ?? null, ws: { kind: 'stage', stageId: p.stageId } }))
+  }
+
+  const openThread = (threadId: string | null): void => {
+    if (!brand) return
+    if (!threadId) {
+      setPlace(brand.id, (p) => ({ ...p, threadId: null }))
+      return
+    }
+    // one the composer just made isn't filed yet, it stays where it is
+    const projectId =
+      created.current === threadId ? (project?.id ?? GENERAL_PROJECT_ID) : projectIdForThread(brand.projects, threadId)
+    setPlace(brand.id, (p) => ({ ...p, projectId, threadId }))
+  }
+
+  const fileThread = (threadId: string): void => {
+    if (!brand || !project) return
+    created.current = threadId
+    if (project.id === GENERAL_PROJECT_ID) return
+    const pid = project.id
+    editBrand(brand.id, (b) => ({
+      ...b,
+      projects: b.projects.map((p) =>
+        p.id === pid ? { ...p, threadIds: [...p.threadIds.filter((t) => t !== threadId), threadId] } : p
+      )
+    }))
   }
 
   const onSearch = (pick: SearchPick): void => {
-    if (pick.kind === 'brand') {
-      update((d) => ({ ...d, activeBrandId: pick.id }))
-    } else if (pick.kind === 'url') {
-      openUrl(pick.url)
-    } else if (pick.kind === 'trends') {
+    if (pick.kind === 'brand') update((d) => ({ ...d, activeBrandId: pick.id }))
+    else if (pick.kind === 'url') openUrl(pick.url)
+    else if (pick.kind === 'trends') {
       setTrendQuery(pick.query)
-      setView(TRENDS)
-    } else {
-      setView(pick.view)
-    }
+      openWorkspace('trends')
+    } else if (pick.kind === 'workspace') openWorkspace(pick.key)
+    else if (pick.kind === 'site') openWs({ kind: 'site', id: pick.id })
+    else if (pick.kind === 'settings') setModal({ kind: 'settings' })
+    else if (pick.kind === 'project') openProject(pick.id)
+    else openThread(pick.id)
   }
 
   const editing = modal?.kind === 'brand' ? data.brands.find((b) => b.id === modal.id) : undefined
-  const PageView = view.kind === 'page' ? PAGE_VIEWS[view.page] : null
-  const siteKey = brand && site ? `${brand.id}:${site.id}` : ''
+  const siteKey = brand && site && !pane.collapsed ? `${brand.id}:${site.id}` : ''
+
+  const wsToggle = (
+    <button
+      className={`icon-btn${pane.collapsed ? '' : ' on'}`}
+      title={pane.collapsed ? 'Show workspace (Ctrl+B)' : 'Hide workspace (Ctrl+B)'}
+      aria-label="Toggle workspace"
+      aria-pressed={!pane.collapsed}
+      onClick={() => setPane((p) => ({ ...p, collapsed: !p.collapsed }))}
+    >
+      <PanelIcon />
+    </button>
+  )
 
   return (
     <div className="app">
-      <TitleBar
-        brands={data.brands}
-        brand={brand}
-        onSelectBrand={(id) => update((d) => ({ ...d, activeBrandId: id }))}
-        onEditBrand={(id) => setModal({ kind: 'brand', id })}
-        onAddBrand={() => setModal({ kind: 'brand', id: null })}
-        onPick={onSearch}
-      />
+      <TitleBar brands={data.brands} brand={brand} threads={threads} onPick={onSearch} />
       <div className="shell">
         <Sidebar
+          brands={data.brands}
           brand={brand}
-          view={view}
-          onView={setView}
+          threads={threads}
+          projectId={project?.id ?? GENERAL_PROJECT_ID}
+          threadId={place.threadId}
+          onSelectBrand={(id) => update((d) => ({ ...d, activeBrandId: id }))}
+          onAddBrand={() => setModal({ kind: 'brand', id: null })}
           onEditBrand={(id) => setModal({ kind: 'brand', id })}
-          onAddSite={() => setModal({ kind: 'site' })}
-          temps={brandTemps}
-          onRemoveSite={(id) =>
-            brand && editBrand(brand.id, (b) => ({ ...b, sites: b.sites.filter((s) => s.id !== id) }))
-          }
-          onCloseTemp={closeTemp}
-          onKeepTemp={keepTemp}
-          onMoveSite={moveSite}
-          onSettings={() => setView({ kind: 'settings' })}
+          editBrand={(fn) => brand && editBrand(brand.id, fn)}
+          onOpenProject={openProject}
+          onOpenThread={openThread}
+          onNewThread={(pid) => brand && setPlace(brand.id, (p) => ({ ...p, projectId: pid, threadId: null }))}
+          onOpenPipeline={() => project && openWs({ kind: 'stage', stageId: project.stageId })}
+          onSettings={() => setModal({ kind: 'settings' })}
         />
 
-        {/* home is the chat, it sits on the same surface as the sidebar */}
-        <main className={`main${brand && view.kind === 'chat' ? ' home' : ''}`}>
+        <main className="center">
           {!brand && (
             <div className="empty">
               <p>No brands yet</p>
@@ -279,97 +379,75 @@ export default function App(): ReactNode {
               </button>
             </div>
           )}
-          {/* sites you've visited stay loaded and hidden, so going back is instant */}
-          <div className="site-stack">
-            {tabs.map((t) => (
-              <SiteView
-                key={t.key}
-                site={t.site}
-                hidden={t.key !== siteKey}
-                partition={partitionFor(t.brandId)}
-                startUrl={lastUrl.current[t.key] ?? t.site.url}
-                onUrl={(url) => (lastUrl.current[t.key] = url)}
-                navigate={nav?.key === t.key ? nav : null}
-                right={
-                  <>
-                    <ShareTab brandId={t.brandId} siteId={t.site.id} siteName={t.site.name} />
-                    <ChatToggle chatOpen={data.chatOpen} onToggleChat={toggleChat} />
-                  </>
-                }
-              />
-            ))}
-          </div>
-          {brand && view.kind === 'settings' && (
-            <Suspense fallback={<div className="page" />}>
-              <Settings
-                data={data}
-                brand={brand}
-                update={update}
-                editBrand={editBrand}
-                onDeleteBrand={deleteBrand}
-                onAddSite={() => setModal({ kind: 'site' })}
-                onOpenUrl={openUrl}
-                chatOpen={data.chatOpen}
-                onToggleChat={toggleChat}
-              />
-            </Suspense>
-          )}
-          {brand && view.kind === 'chat' && (
-            <Suspense fallback={<div className="page" />}>
+          {brand && (
+            <Suspense fallback={<div className="cx" />}>
               <ChatView
                 key={brand.id}
                 brand={brand}
                 editBrand={(fn) => editBrand(brand.id, fn)}
                 onOpenSite={openSite}
+                openId={place.threadId}
+                onOpenId={openThread}
+                onThreadCreated={fileThread}
+                context={project?.name}
+                headerRight={wsToggle}
               />
             </Suspense>
-          )}
-          {brand && view.kind === 'phone' && (
-            <Suspense fallback={<div className="page" />}>
-              <PhoneView
-                key={brand.id}
-                brand={brand}
-                right={<ChatToggle chatOpen={data.chatOpen} onToggleChat={toggleChat} />}
-              />
-            </Suspense>
-          )}
-          {brand && PageView && view.kind === 'page' && (
-            <div className="group-view">
-              <GroupTabs
-                page={view.page}
-                onPage={(page) => setView({ kind: 'page', page })}
-                count={{ Ideas: brand.ideas.length }}
-              />
-              <div className="group-body">
-                <Suspense fallback={<div className="page" />}>
-                  <PageView
-                    key={`${brand.id}:${view.page}`}
-                    page={view.page}
-                    brand={brand}
-                    editBrand={(fn) => editBrand(brand.id, fn)}
-                    onEditBrand={() => setModal({ kind: 'brand', id: brand.id })}
-                    chatOpen={data.chatOpen}
-                    onToggleChat={toggleChat}
-                    trendQuery={trendQuery}
-                    onTrendQuery={setTrendQuery}
-                  />
-                </Suspense>
-              </div>
-            </div>
           )}
         </main>
 
-        {data.chatOpen && brand && view.kind !== 'chat' && (
-          <Suspense fallback={<aside className="chat" />}>
-            <ChatView
-              key={brand.id}
-              compact
-              brand={brand}
-              editBrand={(fn) => editBrand(brand.id, fn)}
-              onOpenSite={openSite}
-              onClose={toggleChat}
-            />
-          </Suspense>
+        {brand && project && (
+          <WorkspacePane
+            brand={brand}
+            project={project}
+            view={ws}
+            onView={openWs}
+            onSetStage={(stageId) =>
+              editBrand(brand.id, (b) => ({
+                ...b,
+                projects: b.projects.map((p) => (p.id === project.id ? { ...p, stageId } : p))
+              }))
+            }
+            collapsed={pane.collapsed}
+            onCollapse={() => setPane((p) => ({ ...p, collapsed: true }))}
+            width={pane.width}
+            onWidth={(width) => setPane((p) => ({ ...p, width }))}
+            editBrand={(fn) => editBrand(brand.id, fn)}
+            onEditBrand={() => setModal({ kind: 'brand', id: brand.id })}
+            onOpenUrl={openUrl}
+            trendQuery={trendQuery}
+            onTrendQuery={setTrendQuery}
+            siteStrip={
+              <SiteStrip
+                sites={brand.sites}
+                temps={brandTemps}
+                activeId={site?.id ?? null}
+                onSelect={(id) => openWs({ kind: 'site', id })}
+                onCloseTemp={closeTemp}
+                onKeepTemp={keepTemp}
+                onAdd={() => setModal({ kind: 'site' })}
+                onMove={moveSite}
+                health={inbox?.health}
+              />
+            }
+            sites={
+              // sites you've visited stay loaded and hidden, so going back is instant
+              <div className="site-stack">
+                {tabs.map((t) => (
+                  <SiteView
+                    key={t.key}
+                    site={t.site}
+                    hidden={t.key !== siteKey}
+                    partition={partitionFor(t.brandId)}
+                    startUrl={lastUrl.current[t.key] ?? t.site.url}
+                    onUrl={(url) => (lastUrl.current[t.key] = url)}
+                    navigate={nav?.key === t.key ? nav : null}
+                    right={<ShareTab brandId={t.brandId} siteId={t.site.id} siteName={t.site.name} />}
+                  />
+                ))}
+              </div>
+            }
+          />
         )}
       </div>
 
@@ -384,8 +462,51 @@ export default function App(): ReactNode {
           />
         )}
         {modal?.kind === 'site' && <SiteModal onSave={addSite} onClose={() => setModal(null)} />}
+        {modal?.kind === 'settings' && brand && (
+          <SettingsModal onClose={() => setModal(null)}>
+            <Settings
+              data={data}
+              brand={brand}
+              update={update}
+              editBrand={editBrand}
+              onDeleteBrand={deleteBrand}
+              onAddSite={() => setModal({ kind: 'site' })}
+              onOpenUrl={(url) => {
+                setModal(null)
+                openUrl(url)
+              }}
+              onClose={() => setModal(null)}
+            />
+          </SettingsModal>
+        )}
       </Suspense>
       <CodePrompt />
+    </div>
+  )
+}
+
+// settings sits over the app in a big sheet, esc or a click outside closes it
+function SettingsModal({ onClose, children }: { onClose: () => void; children: ReactNode }): ReactNode {
+  const close = useRef(onClose)
+  close.current = onClose
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      // a modal opened from inside settings closes first
+      if (e.key === 'Escape' && document.querySelectorAll('[aria-modal="true"]').length === 1) close.current()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+  return (
+    <div
+      className="modal-backdrop"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
+    >
+      <div className="settings-sheet" role="dialog" aria-modal="true" aria-label="Settings">
+        {children}
+      </div>
     </div>
   )
 }

@@ -7,6 +7,7 @@ import type { VaultApi } from '@shared/vault'
 import { chatApi } from './chat'
 import { inboxApi } from './inbox'
 import { emulatorApi } from './emulator'
+import { workspaceApi } from './workspace'
 
 const api: TrendDeckApi = {
   platform: process.platform,
@@ -108,3 +109,4 @@ contextBridge.exposeInMainWorld('trenddeckVault', vault)
 
 contextBridge.exposeInMainWorld('trenddeckChat', chatApi)
 contextBridge.exposeInMainWorld('trenddeckInbox', inboxApi)
+contextBridge.exposeInMainWorld('trenddeckWorkspace', workspaceApi)

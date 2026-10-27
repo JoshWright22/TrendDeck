@@ -9,7 +9,7 @@ interface ToggleProps {
 export function ChatToggle({ chatOpen, onToggleChat }: ToggleProps): ReactNode {
   return (
     <button
-      className={`icon-btn${chatOpen ? ' on' : ''}`}
+      className={`icon-btn chat-toggle${chatOpen ? ' on' : ''}`}
       title={chatOpen ? 'Hide chat' : 'Show chat'}
       aria-label="Toggle chat"
       aria-pressed={chatOpen}

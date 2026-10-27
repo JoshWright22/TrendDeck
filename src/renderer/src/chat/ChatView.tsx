@@ -1,4 +1,3 @@
-import { createPortal } from 'react-dom'
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { Brand, TrendItem, TrendSource } from '@shared/types'
 import type {
@@ -12,7 +11,7 @@ import type {
   ThreadMessage,
   ThreadSummary
 } from '@shared/chat'
-import { CloseIcon, PlusIcon, SendIcon } from '../components/Icons'
+import { CloseIcon, SendIcon } from '../components/Icons'
 import Markdown from './Markdown'
 import { EmbedCard, type EmbedActions } from './Embeds'
 import AgentSettings from './AgentSettings'
@@ -21,10 +20,10 @@ import WorkLog from './WorkLog'
 import QuestionDeck, { questionsIn, readAnswers } from './Questions'
 import UsagePopover from './UsagePopover'
 import { RisingMark } from './Marks'
-import { Dropdown, Menu } from './ui'
+import { Dropdown } from './ui'
 import { fileSize, fromMedia, onAttach } from './attachments'
 import MediaPicker from '../pages/media/MediaPicker'
-import { chat, newId, when } from './api'
+import { chat, newId } from './api'
 import { onDraft } from '../pages/voice/chatDraft'
 import './chat.css'
 
@@ -32,10 +31,14 @@ interface Props {
   brand: Brand
   editBrand: (fn: (b: Brand) => Brand) => void
   onOpenSite: (siteId: string, url?: string) => void
-  // the narrow pane on the right of other pages
-  compact?: boolean
-  onClose?: () => void
-  // extra buttons for the header, e.g. the chat pane toggle
+  // the open chat, null for a new one. the sidebar picks it, so the shell owns it
+  openId: string | null
+  onOpenId: (id: string | null) => void
+  // a first message just made this chat, the shell files it under the open project
+  onThreadCreated?: (id: string) => void
+  // shown before the chat's title, e.g. the project name
+  context?: string
+  // extra buttons for the header, e.g. the workspace toggle
   headerRight?: ReactNode
 }
 
@@ -47,8 +50,6 @@ interface Queued {
   attachments: Attachment[]
 }
 
-// the chat each brand had open, kept while the app runs so leaving the page doesn't lose it
-const lastOpen = new Map<string, string | null>()
 // follow ups per thread, kept outside the view so switching chats doesn't drop them
 const queues = new Map<string, Queued[]>()
 
@@ -146,13 +147,19 @@ const EFFORT_LABELS: Record<string, string> = {
   max: 'Max effort'
 }
 
-export default function ChatView({ brand, editBrand, onOpenSite, compact, onClose, headerRight }: Props): ReactNode {
+export default function ChatView({
+  brand,
+  editBrand,
+  onOpenSite,
+  openId,
+  onOpenId: setOpenId,
+  onThreadCreated,
+  context,
+  headerRight
+}: Props): ReactNode {
   const [agents, setAgents] = useState<AgentInfo[] | null>(null)
   const [config, setConfig] = useState<AgentConfig>({ defaultAgentId: null, custom: [] })
   const [threads, setThreads] = useState<ThreadSummary[]>([])
-  const [openId, setOpenId] = useState<string | null>(null)
-  const [sideSlot, setSideSlot] = useState<HTMLElement | null>(null)
-  useEffect(() => setSideSlot(compact ? null : document.getElementById('side-threads')), [compact])
   const [thread, setThread] = useState<Thread | null>(null)
   const [draft, setDraft] = useState('')
   const [files, setFiles] = useState<Attachment[]>([])
@@ -165,12 +172,6 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
   const [manage, setManage] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [trends, setTrends] = useState<Map<string, TrendItem>>(new Map())
-  const [showThreads, setShowThreads] = useState(false)
-  const [query, setQuery] = useState('')
-  const [hits, setHits] = useState<Set<string> | null>(null)
-  const [showArchived, setShowArchived] = useState(false)
-  const [renaming, setRenaming] = useState<string | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
   const [queued, setQueued] = useState<Queued[]>([])
   const [dragging, setDragging] = useState(false)
@@ -213,21 +214,8 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
   useEffect(() => onDraft(setDraft), [])
 
   useEffect(() => {
-    const remembered = lastOpen.get(brandId)
-    setOpenId(remembered ?? null)
-    void chat()
-      .listThreads(brandId)
-      .then((list) => {
-        setThreads(list)
-        // first time round the side pane picks up the newest chat, the main view starts fresh
-        const first = list.find((t) => !t.archived)
-        if (remembered === undefined && compact && first) setOpenId(first.id)
-      })
-  }, [brandId, compact])
-
-  useEffect(() => {
-    lastOpen.set(brandId, openId)
-  }, [brandId, openId])
+    void loadThreads()
+  }, [loadThreads])
 
   useEffect(() => {
     // each chat remembers its own agent, a pick only sticks to the chat it was made in
@@ -291,25 +279,6 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
       }),
     []
   )
-
-  // search runs in the main process so it can look inside messages too
-  useEffect(() => {
-    const q = query.trim()
-    if (!q) {
-      setHits(null)
-      return
-    }
-    let alive = true
-    const timer = setTimeout(() => {
-      void chat()
-        .searchThreads(brandId, q)
-        .then((ids) => alive && setHits(new Set(ids)))
-    }, 150)
-    return () => {
-      alive = false
-      clearTimeout(timer)
-    }
-  }, [query, brandId, threads])
 
   // trend cards look themselves up in the cached feed, only fetched once a trend card shows up
   const wantsTrends = !!thread?.messages.some((m) => m.role === 'agent' && m.text.includes('"trend"'))
@@ -381,8 +350,10 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
         attachments: sending,
         ...(thread ? {} : { model: newModels[agentId] ?? '', effort: newEfforts[agentId] ?? '' })
       })
-      if (res.threadId !== openId) setOpenId(res.threadId)
-      else void loadThread(res.threadId)
+      if (res.threadId !== openId) {
+        onThreadCreated?.(res.threadId)
+        setOpenId(res.threadId)
+      } else void loadThread(res.threadId)
     } catch (err) {
       setDraft(body)
       setFiles(sending)
@@ -451,19 +422,6 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
       .then((list) => list.length && setModelLists((m) => ({ ...m, [id]: list })))
   }
 
-  const remove = async (id: string): Promise<void> => {
-    setConfirmDelete(null)
-    queues.delete(id)
-    await chat().deleteThread(brandId, id)
-    if (openId === id) setOpenId(null)
-    void loadThreads()
-  }
-
-  const rename = async (id: string, title: string): Promise<void> => {
-    setRenaming(null)
-    if (title.trim()) await chat().renameThread(brandId, id, title)
-  }
-
   const attach = (list: Attachment[]): void =>
     setFiles((f) => [...f, ...list.filter((a) => !f.some((x) => x.id === a.id))].slice(0, 20))
 
@@ -490,11 +448,8 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
     attach(allowed.map(fromMedia))
   }
 
-  const visible = useMemo(
-    () => threads.filter((t) => (hits ? hits.has(t.id) : t.archived === showArchived)),
-    [threads, hits, showArchived]
-  )
-  const archivedCount = threads.filter((t) => t.archived).length
+  // alt+up/down steps through these
+  const visible = useMemo(() => threads.filter((t) => !t.archived), [threads])
 
   // esc closes whatever is open first. checked in the capture phase because a modal
   // closes itself on the same key and is already gone by the time onKey runs
@@ -520,9 +475,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
         input.current?.focus()
       } else if (e.key === 'Escape') {
         if (e.defaultPrevented || overlayOnEsc.current || manage) return
-        if (showThreads) setShowThreads(false)
-        else if (confirmDelete) setConfirmDelete(null)
-        else if (busy) stop()
+        if (busy) stop()
       } else if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
         const list = visible
         if (!list.length) return
@@ -586,102 +539,6 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
   // nothing sent yet: the welcome cards with the composer right under them
   const home = !noAgents && !thread?.messages.length
   const lastAgentId = [...(thread?.messages ?? [])].reverse().find((m) => m.role === 'agent')?.id
-
-  const threadList = (
-    <div className="cx-threads-wrap">
-      <input
-        className="cx-search"
-        type="search"
-        placeholder="Search chats"
-        aria-label="Search chats"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape' && query) {
-            e.preventDefault()
-            setQuery('')
-          }
-        }}
-      />
-      <div className="cx-threads" role="list" aria-label="Chats">
-        {visible.length === 0 && (
-          <p className="cx-threads-empty">{query ? 'Nothing matches' : showArchived ? 'Nothing archived' : 'No chats yet'}</p>
-        )}
-        {visible.map((t) => (
-          <div
-            key={t.id}
-            role="listitem"
-            tabIndex={0}
-            className={`cx-thread${t.id === openId ? ' active' : ''}`}
-            onClick={() => {
-              if (renaming === t.id) return
-              setOpenId(t.id)
-              setShowThreads(false)
-            }}
-            onKeyDown={(e) => {
-              if (e.target !== e.currentTarget) return
-              if (e.key === 'Enter') setOpenId(t.id)
-              if (e.key === 'F2') setRenaming(t.id)
-              if (e.key === 'Delete') setConfirmDelete(t.id)
-            }}
-          >
-            {t.busy && <RisingMark className="cx-busy-mark" />}
-            {renaming === t.id ? (
-              <input
-                className="cx-rename"
-                defaultValue={t.title}
-                aria-label="Chat name"
-                autoFocus
-                onFocus={(e) => e.target.select()}
-                onClick={(e) => e.stopPropagation()}
-                onBlur={(e) => void rename(t.id, e.target.value)}
-                onKeyDown={(e) => {
-                  e.stopPropagation()
-                  if (e.key === 'Enter') void rename(t.id, e.currentTarget.value)
-                  if (e.key === 'Escape') setRenaming(null)
-                }}
-              />
-            ) : confirmDelete === t.id ? (
-              <span className="cx-thread-confirm" onClick={(e) => e.stopPropagation()}>
-                Delete it?
-                <button className="pill danger" autoFocus onClick={() => void remove(t.id)}>
-                  Delete
-                </button>
-                <button className="pill" onClick={() => setConfirmDelete(null)}>
-                  Keep
-                </button>
-              </span>
-            ) : (
-              <>
-                <span className="cx-thread-title">{t.title}</span>
-                <span className="cx-thread-when">{when(t.updatedAt)}</span>
-                <Menu
-                  label="Chat options"
-                  className="cx-thread-menu"
-                  items={[
-                    { label: 'Rename', shortcut: 'F2', onSelect: () => setRenaming(t.id) },
-                    {
-                      label: t.archived ? 'Unarchive' : 'Archive',
-                      onSelect: () => {
-                        void chat().archiveThread(brandId, t.id, !t.archived)
-                        if (!t.archived && openId === t.id) setOpenId(null)
-                      }
-                    },
-                    { label: 'Delete', shortcut: 'Del', danger: true, onSelect: () => setConfirmDelete(t.id) }
-                  ]}
-                />
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-      {!query && (archivedCount > 0 || showArchived) && (
-        <button className="cx-archived-toggle" onClick={() => setShowArchived((s) => !s)}>
-          {showArchived ? 'Back to chats' : `Archived (${archivedCount})`}
-        </button>
-      )}
-    </div>
-  )
 
   const questionsFor = (m: ThreadMessage, i: number): ReactNode => {
     const qs = questionsIn(m.text)
@@ -791,51 +648,23 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
     )
 
   return (
-    <section className={`cx${compact ? ' compact' : ''}`} aria-label="Chat">
-      {/* the full chat keeps its list of chats in the sidebar */}
-      {!compact &&
-        sideSlot &&
-        createPortal(
-          <>
-            <button className="cx-new" onClick={() => setOpenId(null)} title={`New chat. ${SHORTCUTS}`}>
-              <PlusIcon />
-              New chat
-            </button>
-            {threadList}
-          </>,
-          sideSlot
-        )}
-
+    <section className="cx" aria-label="Chat">
       <div className={`cx-main${home ? ' home' : ''}`}>
         <header className="cx-head">
-          {compact ? (
-            <button
-              className="cx-title-btn"
-              onClick={() => setShowThreads((s) => !s)}
-              aria-expanded={showThreads}
-              title="Your chats"
-            >
-              <h3>{thread?.title ?? 'Chat'}</h3>
-              <span className="muted small">{threads.filter((t) => !t.archived).length}</span>
-            </button>
-          ) : (
-            <h2>{thread?.title ?? 'New chat'}</h2>
-          )}
+          <h2 title={SHORTCUTS}>
+            {context && (
+              <>
+                <span className="cx-head-context">{context}</span>
+                <span className="cx-head-sep" aria-hidden="true">
+                  ·
+                </span>
+              </>
+            )}
+            <span className="cx-head-title">{thread?.title ?? 'New chat'}</span>
+          </h2>
           <span className="spacer" />
-          {compact && (
-            <button className="icon-btn" title="New chat (Ctrl+Shift+N)" aria-label="New chat" onClick={() => setOpenId(null)}>
-              <PlusIcon />
-            </button>
-          )}
           {headerRight}
-          {onClose && (
-            <button className="icon-btn" title="Hide chat" aria-label="Hide chat" onClick={onClose}>
-              <CloseIcon />
-            </button>
-          )}
         </header>
-
-        {compact && showThreads && <div className="cx-threads-pop">{threadList}</div>}
 
         <div className="cx-messages" ref={scroller} onScroll={onScroll}>
           <div className="cx-column">
@@ -940,7 +769,7 @@ export default function ChatView({ brand, editBrand, onOpenSite, compact, onClos
             <textarea
               ref={input}
               value={draft}
-              rows={compact ? 2 : 3}
+              rows={3}
               placeholder={
                 !agentId
                   ? 'Set up an agent to start chatting'

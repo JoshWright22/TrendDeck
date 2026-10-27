@@ -20,6 +20,16 @@ export function useAppData(): { data: AppData | null; update: Update } {
     }
   }, [])
 
+  // main saved a change itself, e.g. an agent edited a pipeline. take it as is, no save back
+  useEffect(
+    () =>
+      window.trenddeckWorkspace.onDataChanged((d) => {
+        loaded.current = d
+        setData(d)
+      }),
+    []
+  )
+
   useEffect(() => {
     if (!data || data === loaded.current) return
     void window.trenddeck.saveData(data)

@@ -18,6 +18,7 @@ import { dropVoice, setupVoice } from './voice'
 import { dropInboxBrand, setupInbox } from './inbox'
 import { setupReuse } from './reuse'
 import { dropBrandPhone, setupEmulator } from './emulator'
+import { setupWorkspace } from './workspace'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -187,6 +188,7 @@ setupVoice()
 setupHiddenSites(syncMute)
 setupInbox()
 setupEmulator()
+setupWorkspace()
 
 void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()
