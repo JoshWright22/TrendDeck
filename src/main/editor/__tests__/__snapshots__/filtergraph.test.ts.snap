@@ -1,0 +1,80 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`filter graph > matches the snapshot for a full edit > filter 1`] = `
+"color=c=black:s=640x360:r=30/1:d=6,format=yuv420p[base];
+[0:v]setpts=PTS-STARTPTS,fps=30/1,setpts=PTS+0/TB,scale=w='trunc(max(2,480*(if(lt(t,0),100,if(lt(t,2),100+30*((t-0)/2),130)))/100)/2)*2':h='trunc(max(2,360*(if(lt(t,0),100,if(lt(t,2),100+30*((t-0)/2),130)))/100)/2)*2':eval=frame,setsar=1,format=rgba[c0];
+[base][c0]overlay=x='(W-w)/2':y='(H-h)/2':eval=frame:eof_action=pass:format=auto:enable='between(t,0,2.25)'[v1];
+[1:v]setpts=PTS-STARTPTS,fps=30/1,setpts=PTS+1.75/TB,scale=480:360,setsar=1,eq=contrast='1+(20)/100':saturation='(50)/100':eval=init,format=rgba,fade=t=in:st=1.75:d=0.5:alpha=1[c2];
+[v1][c2]overlay=x='(W-w)/2':y='(H-h)/2':eval=init:eof_action=pass:format=auto:enable='between(t,1.75,4)'[v3];
+[2:v]setpts=PTS-STARTPTS,setpts=PTS/2,fps=30/1,setpts=PTS+4/TB,scale=480:360,setsar=1,format=rgba,fade=t=out:st=4.6:d=0.2:alpha=1[c4];
+[v3][c4]overlay=x='(W-w)/2':y='(H-h)/2':eval=init:eof_action=pass:format=auto:enable='between(t,4,5)'[v5];
+color=c=0x203040@1:s=320x180:r=30/1:d=1.4,format=rgba[g6];
+[3:v]setpts=PTS-STARTPTS,fps=30/1,scale=100:100,format=rgba[l7];
+[g6][l7]overlay=x='160-w/2':y='90-h/2':eof_action=pass:format=rgb[g8];
+[g8]drawbox=x=140:y=70:w=40:h=40:color=0xFF0000@0.8:t=fill[g9];
+[g9]setpts=PTS+4.6/TB,scale=640:360,setsar=1,format=rgba,fade=t=in:st=4.8:d=0.2:alpha=1[c10];
+color=c=0x000000@1:s=640x360:r=30/1:d=0.4,format=rgba,setpts=PTS+4.6/TB,fade=t=in:st=4.6:d=0.2:alpha=1,fade=t=out:st=4.8:d=0.2:alpha=1,trim=start=0,setpts=PTS-0/TB[s11];
+[v5][s11]overlay=eof_action=pass:format=auto[v12];
+[v12][c10]overlay=x='(W-w)/2':y='(H-h)/2':eval=init:eof_action=pass:format=auto:enable='between(t,4.6,6)'[v13];
+color=c=black@0:s=640x360:r=30/1:d=2.5,format=rgba[g14];
+[g14]drawtext=fontfile='C\\:/Fonts/Inter-Bold.ttf':textfile='C\\:/tmp/job/text0.txt':expansion=none:fontsize=40:fontcolor=0xFFFFFF@1:x='320-text_w/2':y='180-text_h/2':borderw=4:bordercolor=0x000000@1:box=1:boxcolor=0x000000@0.5:boxborderw=10[g15];
+[g15]setpts=PTS+0.5/TB,scale=640:360,setsar=1,format=rgba,fade=t=in:st=0.5:d=0.3:alpha=1[c16];
+[v13][c16]overlay=x='(W-w)/2':y='(H-h)/2':eval=init:eof_action=pass:format=auto:enable='between(t,0.5,3)'[v17];
+[v17]ass=filename='C\\:/tmp/job/captions.ass':fontsdir='C\\:/Fonts'[v18];
+[v18]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,format=yuv420p[vout];
+anullsrc=r=48000:cl=stereo,atrim=duration=6[ab19];
+[4:a]asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[a20];
+[5:a]asetpts=PTS-STARTPTS,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume='0.501187':eval=once,adelay=delays=96000S:all=1[a21];
+[6:a]asetpts=PTS-STARTPTS,atempo=2,aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,adelay=delays=192000S:all=1[a22];
+[ab19][a20][a21][a22]amix=inputs=4:duration=first:dropout_transition=0:normalize=0[am23];
+[am23]anull[aout]"
+`;
+
+exports[`filter graph > matches the snapshot for a full edit > inputs 1`] = `
+[
+  "-ss",
+  "0",
+  "-t",
+  "2.25",
+  "-i",
+  "C:\\media\\clip.mp4",
+  "-ss",
+  "1.25",
+  "-t",
+  "2.25",
+  "-i",
+  "C:\\media\\clip.mp4",
+  "-ss",
+  "0",
+  "-t",
+  "2",
+  "-i",
+  "C:\\media\\clip.mp4",
+  "-loop",
+  "1",
+  "-framerate",
+  "30/1",
+  "-t",
+  "1.4",
+  "-i",
+  "C:/media/logo.png",
+  "-ss",
+  "0",
+  "-t",
+  "2",
+  "-i",
+  "C:\\media\\clip.mp4",
+  "-ss",
+  "1.5",
+  "-t",
+  "2",
+  "-i",
+  "C:\\media\\clip.mp4",
+  "-ss",
+  "0",
+  "-t",
+  "2",
+  "-i",
+  "C:\\media\\clip.mp4",
+]
+`;
