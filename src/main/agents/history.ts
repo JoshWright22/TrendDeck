@@ -216,7 +216,11 @@ async function keepRemoved(brandId: string, threads: Thread[]): Promise<void> {
 export async function removeThread(brandId: string, threadId: string): Promise<void> {
   const threads = await threadsFor(brandId)
   const i = threads.findIndex((t) => t.id === threadId)
-  if (i >= 0) await keepRemoved(brandId, threads.splice(i, 1))
+  if (i >= 0) {
+    await keepRemoved(brandId, [threads[i]])
+    const current = threads.findIndex((thread) => thread.id === threadId)
+    if (current >= 0) threads.splice(current, 1)
+  }
   await persist(brandId)
 }
 
@@ -237,8 +241,8 @@ export function persist(brandId: string): Promise<void> {
 
 export async function dropChats(brandId: string): Promise<void> {
   if (!ID_PATTERN.test(brandId)) return
-  await keepRemoved(brandId, await threadsFor(brandId)).catch(() => {})
-  loaded.delete(brandId)
   await (queues.get(brandId) ?? Promise.resolve()).catch(() => {})
+  await keepRemoved(brandId, await threadsFor(brandId))
   await fs.rm(file(brandId), { force: true })
+  loaded.delete(brandId)
 }

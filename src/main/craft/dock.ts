@@ -1,12 +1,6 @@
 import { screen, type BrowserWindow } from 'electron'
 import type { CraftDock } from '@shared/craft'
 
-// keeps a craft app's window exactly over TrendDeck's workspace pane. the app stays its own
-// process and window: TrendDeck becomes its owner (so it sits above TrendDeck, minimizes with it
-// and never covers other apps), its title bar and resize border go, and main moves it whenever
-// the pane or the TrendDeck window moves. all through user32 with koffi. if any of that fails the
-// app is left as a normal window next to TrendDeck
-
 type Fn = (...args: unknown[]) => unknown
 
 interface User32 {
@@ -15,6 +9,9 @@ interface User32 {
   IsWindowVisible: Fn
   IsWindow: Fn
   GetWindow: Fn
+  GetParent: Fn
+  SetParent: Fn
+  ClientToScreen: Fn
   GetWindowLongPtrW: Fn
   SetWindowLongPtrW: Fn
   SetWindowPos: Fn
@@ -37,7 +34,6 @@ const hooks = new Map<string, unknown>()
 const GW_OWNER = 4
 const GWL_STYLE = -16
 const GWL_EXSTYLE = -20
-const GWLP_HWNDPARENT = -8
 const WS_CAPTION = 0x00c00000
 const WS_THICKFRAME = 0x00040000
 const WS_SYSMENU = 0x00080000
@@ -46,6 +42,8 @@ const WS_MAXIMIZEBOX = 0x00010000
 const WS_EX_APPWINDOW = 0x00040000
 const WS_MAXIMIZE = 0x01000000
 const WS_MINIMIZE = 0x20000000
+const WS_CHILD = 0x40000000
+const WS_POPUP = 0x80000000
 const WS_EX_TOOLWINDOW = 0x00000080
 const WS_EX_NOACTIVATE = 0x08000000
 const SWP_NOSIZE = 0x1
@@ -73,6 +71,7 @@ function user32(): User32 | null {
     const lib = koffi.load('user32.dll')
     // named types, the signatures below refer to them by name
     koffi.struct('CRAFT_RECT', { left: 'long', top: 'long', right: 'long', bottom: 'long' })
+    koffi.struct('CRAFT_POINT', { x: 'long', y: 'long' })
     koffi.proto('bool __stdcall CraftEnumProc(intptr_t hwnd, intptr_t lParam)')
     const showProto = koffi.proto('void __stdcall CraftWinEventProc(intptr_t hook, uint32_t event, intptr_t hwnd, int32_t idObject, int32_t idChild, uint32_t thread, uint32_t time)')
     u32 = {
@@ -81,6 +80,9 @@ function user32(): User32 | null {
       IsWindowVisible: lib.func('bool __stdcall IsWindowVisible(intptr_t hwnd)'),
       IsWindow: lib.func('bool __stdcall IsWindow(intptr_t hwnd)'),
       GetWindow: lib.func('intptr_t __stdcall GetWindow(intptr_t hwnd, uint32_t cmd)'),
+      GetParent: lib.func('intptr_t __stdcall GetParent(intptr_t hwnd)'),
+      SetParent: lib.func('intptr_t __stdcall SetParent(intptr_t hwnd, intptr_t parent)'),
+      ClientToScreen: lib.func('bool __stdcall ClientToScreen(intptr_t hwnd, _Inout_ CRAFT_POINT *point)'),
       GetWindowLongPtrW: lib.func('intptr_t __stdcall GetWindowLongPtrW(intptr_t hwnd, int index)'),
       SetWindowLongPtrW: lib.func('intptr_t __stdcall SetWindowLongPtrW(intptr_t hwnd, int index, intptr_t value)'),
       SetWindowPos: lib.func('bool __stdcall SetWindowPos(intptr_t hwnd, intptr_t after, int x, int y, int cx, int cy, uint32_t flags)'),
@@ -162,6 +164,9 @@ interface Docked {
   hwnd: number | null
   style: number
   exStyle: number
+  parent: number
+  original: { left: number; top: number; right: number; bottom: number } | null
+  sweptAt: number
   bounds: CraftDock['bounds']
   visible: boolean
   // the part of bounds that can be seen, the window is cut to it
@@ -197,7 +202,7 @@ export function setHost(win: BrowserWindow): void {
 // starts docking an app that was just launched. the window is looked for until it shows up
 export function attach(appId: string, pid: number): void {
   if (!user32()) return
-  docked.set(appId, { appId, pid, hwnd: null, style: 0, exStyle: 0, bounds: null, visible: false, clip: null, region: '', placed: null, hidden: false, strays: [] })
+  docked.set(appId, { appId, pid, hwnd: null, style: 0, exStyle: 0, parent: 0, original: null, sweptAt: 0, bounds: null, visible: false, clip: null, region: '', placed: null, hidden: false, strays: [] })
   unhook(appId)
   try {
     const h = user32()!.SetWinEventHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_SHOW, 0, showCallback, pid, 0, WINEVENT_OUTOFCONTEXT)
@@ -256,12 +261,20 @@ function grab(e: Docked): boolean {
   e.placed = null
   e.style = Number(u.GetWindowLongPtrW(hwnd, GWL_STYLE))
   e.exStyle = Number(u.GetWindowLongPtrW(hwnd, GWL_EXSTYLE))
+  e.parent = Number(u.GetParent(hwnd))
+  e.original = { left: 0, top: 0, right: 0, bottom: 0 }
+  u.GetWindowRect(hwnd, e.original)
   try {
-    u.SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, hwndOf(host))
-    u.SetWindowLongPtrW(hwnd, GWL_STYLE, e.style & ~(WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX))
+    u.SetWindowLongPtrW(hwnd, GWL_STYLE, ((e.style & ~(WS_POPUP | WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_MAXIMIZE | WS_MINIMIZE)) | WS_CHILD) >>> 0)
     u.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, e.exStyle & ~WS_EX_APPWINDOW)
+    u.SetParent(hwnd, hwndOf(host))
+    if (Number(u.GetParent(hwnd)) !== hwndOf(host)) throw new Error('The editor rejected native child hosting')
     u.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_ASYNCWINDOWPOS)
   } catch (err) {
+    u.SetParent(hwnd, e.parent)
+    u.SetWindowLongPtrW(hwnd, GWL_STYLE, e.style)
+    u.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, e.exStyle)
+    e.hwnd = null
     console.error('craft: docking failed, the app stays a normal window', err)
     docked.delete(e.appId)
     return false
@@ -310,6 +323,8 @@ function cut(e: Docked, t: { x: number; y: number; w: number; h: number }): void
 function hideStrays(e: Docked): void {
   const u = user32()
   if (!u || !e.hwnd) return
+  if (Date.now() - e.sweptAt < 1000) return
+  e.sweptAt = Date.now()
   for (const h of strayWindows(e.pid, e.hwnd)) {
     u.ShowWindowAsync(h, SW_HIDE)
     if (!e.strays.includes(h)) e.strays.push(h)
@@ -337,7 +352,9 @@ function place(e: Docked): void {
   if (!same) {
     // a maximized or minimized app (from its own title bar buttons) ignores a move until it's restored
     if (Number(u.GetWindowLongPtrW(e.hwnd, GWL_STYLE)) & (WS_MAXIMIZE | WS_MINIMIZE)) u.ShowWindowAsync(e.hwnd, SW_RESTORE)
-    u.SetWindowPos(e.hwnd, 0, t.x, t.y, t.w, t.h, SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS)
+    const origin = { x: 0, y: 0 }
+    if (!host || !u.ClientToScreen(hwndOf(host), origin)) return
+    u.SetWindowPos(e.hwnd, 0, t.x - origin.x, t.y - origin.y, t.w, t.h, SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS)
     e.placed = t
   }
   cut(e, t)
@@ -355,10 +372,11 @@ export function release(appId: string): void {
   const u = user32()
   if (!u || !e?.hwnd || !u.IsWindow(e.hwnd)) return
   try {
-    u.SetWindowLongPtrW(e.hwnd, GWLP_HWNDPARENT, 0)
+    u.SetParent(e.hwnd, e.parent)
     u.SetWindowLongPtrW(e.hwnd, GWL_STYLE, e.style)
     u.SetWindowLongPtrW(e.hwnd, GWL_EXSTYLE, e.exStyle)
-    u.SetWindowPos(e.hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_ASYNCWINDOWPOS)
+    const original = e.original
+    u.SetWindowPos(e.hwnd, 0, original?.left ?? 0, original?.top ?? 0, original ? original.right - original.left : 960, original ? original.bottom - original.top : 640, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_ASYNCWINDOWPOS)
     if (e.region) u.SetWindowRgn(e.hwnd, 0, true)
     u.ShowWindowAsync(e.hwnd, SW_SHOWNOACTIVATE)
     for (const h of e.strays) if (u.IsWindow(h)) u.ShowWindowAsync(h, SW_SHOWNOACTIVATE)

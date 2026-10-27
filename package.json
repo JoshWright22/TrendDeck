@@ -1,7 +1,7 @@
 {
   "name": "trenddeck",
   "productName": "TrendDeck",
-  "version": "0.3.0-beta.10",
+  "version": "0.3.0-beta.11",
   "description": "Desktop marketing app for creators. One workspace per brand, every site logged in.",
   "license": "MIT",
   "author": "Josh Wright",
@@ -16,6 +16,7 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test:gateway": "esbuild scripts/gateway-test.ts --bundle --platform=node --format=esm --outfile=out/test/gateway-test.mjs --log-level=warning && node out/test/gateway-test.mjs",
+    "test:craft-native": "node scripts/craft-native-test.cjs",
     "test": "vitest run",
     "secret:scan": "node scripts/secret-scan.cjs",
     "postinstall": "install-electron"

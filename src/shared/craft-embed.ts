@@ -9,18 +9,14 @@ import type { ProjectFileRef, ReviewBox } from './cards'
 
 export type EmbedSize = 'inline' | 'large' | 'fill'
 
-// the stage's height for a size: 16:9 of the chat column inline, most of the chat's visible height
-// large, all of it filled. never more than fits, the native window only shows when all of it does
-// the editors need about 640 by 400 to be usable, so the stage is never shorter than this. when the
-// chat shows less than that, the window is cut to what can be seen instead of being squeezed
 export const MIN_STAGE_HEIGHT = 420
 
 export function stageHeight(size: EmbedSize, width: number, room: number): number {
-  const inline = Math.max(MIN_STAGE_HEIGHT, Math.round((width * 9) / 16))
-  const max = Math.floor(room)
-  if (size === 'fill') return Math.max(MIN_STAGE_HEIGHT, max)
-  if (size === 'large') return Math.max(inline, Math.round(max * 0.9))
-  return inline
+  const available = Number.isFinite(room) ? Math.max(1, Math.floor(room)) : MIN_STAGE_HEIGHT
+  const preferred = Math.max(MIN_STAGE_HEIGHT, Math.round((Math.max(0, Number.isFinite(width) ? width : 0) * 2) / 3))
+  if (size === 'fill') return available
+  if (size === 'large') return Math.min(available, Math.max(preferred, Math.round(available * 0.9)))
+  return Math.min(preferred, available)
 }
 
 

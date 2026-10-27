@@ -29,11 +29,10 @@
   color: var(--chalk);
 }
 
-/* square, like the native window that docks over it; its height comes from stageHeight() */
 .cx-embed-stage {
   position: relative;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  min-height: 1px;
   overflow: hidden;
   background: #000;
 }
@@ -217,4 +216,31 @@
 
 html[data-embed-fill] .cx-project-progress {
   display: none;
+}
+
+html[data-embed-fill] .cx-column {
+  max-width: none;
+  padding: 0 0 12px;
+}
+
+.cx-msg:has(.cx-embed),
+.cx-msg-agent-wrap:has(.cx-embed) {
+  animation: none;
+  transform: none;
+}
+
+.cx-embed.size-fill {
+  padding: 0;
+  border-right: 0;
+  border-left: 0;
+  border-radius: 0;
+}
+
+.cx-embed.size-fill > :not(.cx-embed-stage) {
+  margin-right: 16px;
+  margin-left: 16px;
+}
+
+.cx-embed.size-fill > .cx-embed-head-row {
+  padding-top: 10px;
 }

@@ -23,7 +23,7 @@ const fileName = (p: string | null): string | null => (p ? (p.split(/[\\/]/).pop
 const SIZES: { id: EmbedSize; label: string }[] = [
   { id: 'inline', label: 'Inline' },
   { id: 'large', label: 'Large' },
-  { id: 'fill', label: 'Fill' }
+  { id: 'fill', label: 'Whole chat' }
 ]
 
 function scroller(el: HTMLElement | null): HTMLElement | null {
@@ -39,7 +39,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   const owner = useEmbedOwner()
   const rootRef = useRef<HTMLElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const [size, setSize] = useState<EmbedSize>('inline')
+  const [size, setSize] = useState<EmbedSize>('fill')
   const [height, setHeight] = useState(0)
   const [still, setStill] = useState<string | null>(stills.get(card.id) ?? null)
   const [busy, setBusy] = useState(false)
@@ -98,7 +98,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   // a still for when the window isn't here (and under it, for when it hides while scrolling)
   const lastAsk = useRef(0)
   useEffect(() => {
-    if (!api || cantRun || installKind === undefined) return
+    if (!api || cantRun || installKind === undefined || live) return
     if (!runningHere && !isOwner && stills.has(card.id)) return
     const wait = Math.max(0, 2500 - (Date.now() - lastAsk.current))
     const t = window.setTimeout(() => {
@@ -114,7 +114,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     }, wait)
     return () => clearTimeout(t)
     // the card changes on every edit the agent makes
-  }, [api, card.id, card.updatedAt, isOwner, runningHere, cantRun, installKind, a.brand.id])
+  }, [api, card.id, card.updatedAt, isOwner, runningHere, cantRun, installKind, a.brand.id, live])
 
   // FilmCraft that can't run: the newest render plays here instead, as a preview
   useEffect(() => {
@@ -131,17 +131,19 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
       const stage = stageRef.current
       if (!stage) return
       // the card's own rows above and below the stage, and a little air
-      const chrome = root.getBoundingClientRect().height - stage.getBoundingClientRect().height
-      const room = (sc?.clientHeight ?? window.innerHeight) - Math.min(chrome, 160) - 24
+      const chrome = size === 'fill'
+        ? (root.querySelector('.cx-embed-head-row')?.getBoundingClientRect().height ?? 40)
+        : root.getBoundingClientRect().height - stage.getBoundingClientRect().height
+      const room = Math.max(1, (sc?.clientHeight ?? window.innerHeight) - chrome - 24)
       setHeight(stageHeight(size, stage.getBoundingClientRect().width, room))
     }
     measure()
-    if (size !== 'inline') root.scrollIntoView({ block: 'nearest' })
+    if (size !== 'inline' && isOwner) root.scrollIntoView({ block: 'start' })
     const ro = new ResizeObserver(measure)
     ro.observe(root)
     if (sc) ro.observe(sc)
     return () => ro.disconnect()
-  }, [size])
+  }, [size, isOwner])
 
   const run = async (fn: () => Promise<{ ok: boolean; note: string } | void>): Promise<void> => {
     if (busy) return

@@ -217,16 +217,24 @@ describe('one undo group per reply', () => {
 })
 
 describe('embed size', () => {
-  it('is 16:9 of the column inline but never shorter than the editor needs', () => {
-    expect(stageHeight('inline', 772, 500)).toBe(434)
+  it('uses editor proportions rather than a video aspect ratio and stays within the viewport', () => {
+    expect(stageHeight('inline', 772, 600)).toBe(515)
     expect(stageHeight('inline', 600, 500)).toBe(MIN_STAGE_HEIGHT)
-    // a short chat cuts the window instead of squeezing it
-    expect(stageHeight('inline', 772, 200)).toBe(434)
+    expect(stageHeight('inline', 772, 200)).toBe(200)
   })
   it('grows with the chat for large and fill', () => {
     expect(stageHeight('large', 772, 800)).toBe(720)
     expect(stageHeight('fill', 772, 800)).toBe(800)
-    expect(stageHeight('fill', 772, 300)).toBe(MIN_STAGE_HEIGHT)
-    expect(stageHeight('large', 772, 300)).toBe(434)
+    expect(stageHeight('fill', 772, 300)).toBe(300)
+    expect(stageHeight('large', 772, 300)).toBe(300)
+  })
+  it('never exceeds the available height at narrow widths or display scaling', () => {
+    for (const size of ['inline', 'large', 'fill'] as const) {
+      for (const room of [1, 120, 240, 400, 800]) {
+        expect(stageHeight(size, 360, room)).toBeLessThanOrEqual(room)
+        expect(stageHeight(size, 360, room)).toBeGreaterThan(0)
+      }
+      expect(Number.isFinite(stageHeight(size, NaN, NaN))).toBe(true)
+    }
   })
 })

@@ -41,7 +41,7 @@ function covered(r: Rect): boolean {
 export function useDock(appId: string, box: RefObject<HTMLElement | null>, active: boolean, priority = 0): void {
   useEffect(() => {
     const api = craftApi()
-    if (!api) return
+    if (!api || !active) return
     const target = Symbol(appId)
     let timer = 0
     const send = (d: CraftDock): void => {
@@ -68,10 +68,8 @@ export function useDock(appId: string, box: RefObject<HTMLElement | null>, activ
       const whole = containedBy(b, seen)
       send({ appId, bounds, visible, clip: visible && !whole ? clip : null })
     }
-    // many changes come in a burst, measure once a frame. a timer, not requestAnimationFrame,
-    // which stops while other windows cover TrendDeck
     const soon = (): void => {
-      if (!timer) timer = window.setTimeout(measure, 16)
+      if (!timer) timer = window.requestAnimationFrame(measure)
     }
     measure()
     const ro = new ResizeObserver(soon)
@@ -85,13 +83,15 @@ export function useDock(appId: string, box: RefObject<HTMLElement | null>, activ
     document.addEventListener('scroll', soon, true)
     // a sliding pane moves without a resize or a mutation on every frame
     document.addEventListener('transitionend', soon, true)
+    document.addEventListener('animationend', soon, true)
     return () => {
-      if (timer) clearTimeout(timer)
+      if (timer) window.cancelAnimationFrame(timer)
       ro.disconnect()
       mo.disconnect()
       window.removeEventListener('resize', soon)
       document.removeEventListener('scroll', soon, true)
       document.removeEventListener('transitionend', soon, true)
+      document.removeEventListener('animationend', soon, true)
       targets.remove(target)
     }
   }, [appId, box, active, priority])

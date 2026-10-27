@@ -49,6 +49,7 @@ import { fileSize, fromMedia, onAttach } from './attachments'
 import MediaPicker from '../pages/media/MediaPicker'
 import { chat, newId } from './api'
 import { onDraft } from '../pages/voice/chatDraft'
+import { useChatDraft } from './useChatDraft'
 import './chat.css'
 
 interface Props {
@@ -226,7 +227,7 @@ export default function ChatView({
   const [config, setConfig] = useState<AgentConfig>({ defaultAgentId: null, custom: [] })
   const [threads, setThreads] = useState<ThreadSummary[]>([])
   const [thread, setThread] = useState<Thread | null>(null)
-  const [draft, setDraft] = useState('')
+  const [draft, setDraft, draftSaved] = useChatDraft(brand.id, openId, project?.id ?? 'general')
   const [files, setFiles] = useState<Attachment[]>([])
   const [picked, setPicked] = useState<string | null>(null)
   // model picked before the chat exists, per agent
@@ -289,7 +290,7 @@ export default function ChatView({
   }, [loadAgents])
 
   // a message drafted somewhere else, like "learn my voice", lands in the box unsent
-  useEffect(() => onDraft(setDraft), [])
+  useEffect(() => onDraft(setDraft), [setDraft])
 
   useEffect(() => {
     void loadThreads()
@@ -1131,6 +1132,7 @@ export default function ChatView({
             </p>
           )}
           <div className={`cx-box${approval ? ' approving' : ''}`}>
+            {!draftSaved && <p className="cx-error" role="alert">This draft could not be saved on this device. Copy it before closing TrendDeck.</p>}
             {approval && (
               <ApprovalPanel
                 key={approval.id}

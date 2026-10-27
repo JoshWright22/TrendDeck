@@ -1,5 +1,7 @@
 # Delivery workflow
 
+- Before editing TrendDeck, review the user's feedback across the locally saved chats in `%APPDATA%/TrendDeck/chats/`, including archived and removed chats. Redact sensitive values before displaying excerpts. Do not commit, upload or publish the user's chat history.
+
 - Before every push to a public repository, run a redacted secret scan of working files and outgoing commits. Stop on findings or scanner failure; never bypass it. Use blank strings for credential examples instead of realistic key-shaped literals.
 - This checkout uses `npm run secret:scan` and `.githooks/pre-push`. Gitleaks must be installed; set `GITLEAKS_BIN` when it is not on PATH. Enable the hook with `git config core.hooksPath .githooks` when setting up a new checkout.
 

@@ -9,7 +9,20 @@ Calls made while moving review, suggestions, progress, storage and context into 
 - A FilmCraft tool whose name or command says render, export or preview puts the newest video it wrote (two folders deep) in the chat as a card, once per file per turn. This uses `onToolCalled` in the gateway.
 - What you do on a card goes straight to the agent: a steer while a reply runs, otherwise a new message. The composer and its files are left alone.
 
-## Video review
+## Native editor containment and sizing
+
+- On Windows the Craft editor is now reparented with `SetParent` and `WS_CHILD`, rather than kept as a floating owned top-level window. It remains a separate native application, not an HTML/iframe editor. Unsupported native hosting must not be described as a web embed.
+- The active editor defaults to **Whole chat**: the message column's width cap is removed, the stage uses the chat viewport's available height, and the composer remains below it. Inline/Large remain optional. Editor windows are resized, not stretched from a video-shaped screenshot.
+- Inactive cards do not install dock observers. Native stray-window enumeration is throttled, live editing does not trigger still captures, and message entrance transforms are disabled around native editor surfaces.
+- `npm run test:craft-native` verifies actual cross-process Windows child parenting, viewport bounds, clipping, zoom geometry and restoration using disposable off-screen fixture windows. This does not prove every third-party Craft build works.
+
+## Retaining your feedback
+
+- Sent chats are stored locally. Removed chats are archived before removal; if the archive cannot be saved, deletion is refused.
+- Unsent composer text is saved locally per brand/chat (and per project for new chats), restored after reopening, and removed when the composer clears. Storage failure displays a warning. Drafts are not sent to agents until submitted.
+- Local chat history is private user data, not repository content. Review it for the user's feedback before making future TrendDeck changes; never publish the history.
+
+## Video review controls
 
 - Project files play through the existing `td-media:` protocol as `td-media://project/<brand>/<project>/<file>`, so the CSP doesn't change. Only video, image and audio files inside a known project folder are served, with no links.
 - Comments go out as a readable list plus a `trenddeck-review` json block (`formatReview` and `parseReview` in `@shared/cards`). Frames you drew a box on are saved as PNGs with the box outlined, in `<user data>/cards/frames/<brand>/`, and the agent sees them with `review_frame_get`.
