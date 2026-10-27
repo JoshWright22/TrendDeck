@@ -3,6 +3,8 @@ productName: TrendDeck
 directories:
   output: release
   buildResources: resources
+# writes resources/shell.json and the app code update next to the installer
+afterPack: scripts/after-pack.cjs
 files:
   - out/**
   - resources/**

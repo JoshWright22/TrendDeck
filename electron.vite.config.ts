@@ -33,7 +33,11 @@ export default defineConfig({
     resolve: { alias: shared },
     build: {
       rollupOptions: {
+        // electron's own fs without .asar support, for reading and writing update archives
+        external: ['original-fs'],
         input: {
+          // the launcher, picks the installed or a downloaded copy of the app code, see boot.ts
+          boot: resolve('src/main/boot.ts'),
           index: resolve('src/main/index.ts'),
           // the ad blocker parses its lists off the main thread
           'adblock-worker': resolve('src/main/adblock-worker.ts')

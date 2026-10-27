@@ -28,5 +28,7 @@ jobs:
             release/TrendDeck-Setup.exe
             release/TrendDeck-Setup.exe.blockmap
             release/latest.yml
+            release/app-update.json
+            release/TrendDeck-app-*.asar
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true

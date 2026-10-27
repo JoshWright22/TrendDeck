@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { ID_PATTERN, isHttpUrl, partitionFor, type AppData } from '@shared/types'
 import { styleSite } from './site-style'
 import { setupUpdater } from './updater'
+import { bootInfo } from './boot-state'
 import { loadData, saveData } from './store'
 import { dropTrends, setupTrends } from './trends'
 import { attachBrand, blocksPopup, setupAdblock, startAdblock } from './adblock'
@@ -79,6 +80,8 @@ function createWindow(): void {
   })
 
   win.once('ready-to-show', () => {
+    // a downloaded update that got this far works, boot.ts keeps using it
+    bootInfo()?.markGood()
     win.show()
     // the ad blocker engine is big, give the first paint a head start
     setTimeout(startAdblock, 1000)

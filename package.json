@@ -1,7 +1,7 @@
 {
   "name": "trenddeck",
   "productName": "TrendDeck",
-  "version": "0.2.10",
+  "version": "0.3.0-beta.1",
   "description": "Desktop marketing app for creators. One workspace per brand, every site logged in.",
   "license": "MIT",
   "author": "Josh Wright",
@@ -9,7 +9,7 @@
     "type": "git",
     "url": "https://github.com/JoshWright22/TrendDeck.git"
   },
-  "main": "./out/main/index.js",
+  "main": "./out/main/boot.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "npm run typecheck && electron-vite build",
