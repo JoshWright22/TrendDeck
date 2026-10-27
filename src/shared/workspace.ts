@@ -25,6 +25,9 @@ export interface Project {
   status: ProjectStatus
   // chat threads (agents/history.ts) that belong to it. a thread sits in at most one project
   threadIds: string[]
+  // its folder for files, Documents\TrendDeck\<brand>\<project>\. set by main the first time
+  // something needs it, see main/craft/paths.ts
+  folder?: string
 }
 
 // every brand has this one. threads no other project lists count as its threads,

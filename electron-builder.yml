@@ -17,6 +17,9 @@ files:
 asarUnpack:
   - node_modules/ffmpeg-static/**
   - node_modules/ffprobe-static/**
+  # koffi's native module (user32 calls for docking the craft apps) can't load from inside app.asar
+  - node_modules/koffi/**
+  - node_modules/@koromix/**
 win:
   target: nsis
   icon: resources/icon.ico

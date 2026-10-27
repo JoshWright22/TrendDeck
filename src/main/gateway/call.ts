@@ -5,10 +5,33 @@ import { decide } from './decide'
 import { getPolicy } from './policy'
 import { redact, redactText } from './redact'
 import { knownSecrets } from './secrets'
-import { annotationsFor, ImageResult, ToolError, type GatewayTool, type ToolResult, type Turn } from './types'
+import { annotationsFor, ContentResult, ImageResult, ToolError, type GatewayTool, type ToolResult, type Turn } from './types'
 import { validateArgs } from './validate'
 
 const tools = new Map<string, GatewayTool>()
+// tools that come and go, e.g. the craft apps' own tools once an app is installed.
+// asked on every list and call, so tools/list always shows what's there now
+const sources: (() => GatewayTool[])[] = []
+
+export function registerToolSource(fn: () => GatewayTool[]): void {
+  sources.push(fn)
+}
+
+function dynamicTools(): GatewayTool[] {
+  const out: GatewayTool[] = []
+  for (const fn of sources) {
+    try {
+      for (const t of fn()) if (!tools.has(t.name)) out.push(t)
+    } catch (err) {
+      console.error('a gateway tool source failed', err)
+    }
+  }
+  return out
+}
+
+function findTool(name: string): GatewayTool | undefined {
+  return tools.get(name) ?? dynamicTools().find((t) => t.name === name)
+}
 
 export function registerTools(list: GatewayTool[]): void {
   for (const t of list) {
@@ -18,7 +41,7 @@ export function registerTools(list: GatewayTool[]): void {
 }
 
 export function allTools(): GatewayTool[] {
-  return [...tools.values()]
+  return [...tools.values(), ...dynamicTools()]
 }
 
 export function toolInfo(): ToolInfo[] {
@@ -77,7 +100,7 @@ function denyText(tool: GatewayTool, decision: AuditDecision, note: string): str
 export async function callGatewayTool(turn: Turn, name: string, rawArgs: unknown): Promise<ToolResult> {
   const started = Date.now()
   const known = await knownSecrets(turn.brandId)
-  const tool = tools.get(name)
+  const tool = findTool(name)
   const audit = (risk: Risk | null, args: Record<string, unknown>, decision: AuditDecision, ok: boolean, result: string): void => {
     appendAudit({
       brandId: turn.brandId,
@@ -95,7 +118,9 @@ export async function callGatewayTool(turn: Turn, name: string, rawArgs: unknown
   const rawObj = rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs) ? (rawArgs as Record<string, unknown>) : {}
 
   if (!tool) {
-    const msg = `no tool called ${name}. tools: ${[...tools.keys()].join(', ')}`
+    const msg = `no tool called ${name}. tools: ${allTools()
+      .map((t) => t.name)
+      .join(', ')}`
     audit(null, rawObj, 'invalid', false, `unknown tool`)
     return text(msg, true)
   }
@@ -153,6 +178,13 @@ export async function callGatewayTool(turn: Turn, name: string, rawArgs: unknown
           { type: 'text', text: redactText(result.note, known) }
         ]
       }
+    }
+    if (result instanceof ContentResult) {
+      const content = result.content.map((c) => (c.type === 'text' ? { type: 'text' as const, text: redactText(c.text, known) } : c))
+      const textPart = content.filter((c) => c.type === 'text').map((c) => (c as { text: string }).text).join('\n')
+      const images = content.length - content.filter((c) => c.type === 'text').length
+      audit(tool.risk, args, decision, !result.isError, `${images ? `${images} image(s). ` : ''}${textPart}`)
+      return result.isError ? { content, isError: true } : { content }
     }
     const body = typeof result === 'string' ? redactText(result, known) : JSON.stringify(redact(result, known), null, 2)
     audit(tool.risk, args, decision, true, body)

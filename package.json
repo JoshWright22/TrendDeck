@@ -28,14 +28,17 @@
     "electron-updater": "^6.8.9",
     "ffmpeg-static": "^5.3.0",
     "ffprobe-static": "^3.1.0",
+    "koffi": "^3.3.4",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "yauzl": "^3.4.0"
   },
   "devDependencies": {
     "@types/ffprobe-static": "^2.0.3",
     "@types/node": "^24.19.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/yauzl": "^3.4.0",
     "@vitejs/plugin-react": "^5.2.0",
     "electron": "^44.7.0",
     "electron-vite": "^5.0.0",

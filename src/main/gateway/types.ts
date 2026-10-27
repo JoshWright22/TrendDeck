@@ -15,6 +15,15 @@ export class ImageResult {
   ) {}
 }
 
+// a tool that hands back mcp content as is, text and images, e.g. a craft app's own tools.
+// the text parts still go through redaction
+export class ContentResult {
+  constructor(
+    readonly content: ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[],
+    readonly isError = false
+  ) {}
+}
+
 export interface GatewayTool {
   name: string
   // short and plain, for approval cards and the audit list

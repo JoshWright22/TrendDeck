@@ -10,6 +10,7 @@ import { emulatorApi } from './emulator'
 import { workspaceApi } from './workspace'
 import './gateway'
 import { editorApi } from './editor'
+import { craftApi } from './craft'
 
 const api: TrendDeckApi = {
   platform: process.platform,
@@ -113,3 +114,4 @@ contextBridge.exposeInMainWorld('trenddeckChat', chatApi)
 contextBridge.exposeInMainWorld('trenddeckInbox', inboxApi)
 contextBridge.exposeInMainWorld('trenddeckWorkspace', workspaceApi)
 contextBridge.exposeInMainWorld('trenddeckEditor', editorApi)
+contextBridge.exposeInMainWorld('trenddeckCraft', craftApi)

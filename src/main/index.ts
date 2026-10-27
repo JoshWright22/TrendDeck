@@ -22,6 +22,7 @@ import { setupReuse } from './reuse'
 import { dropBrandPhone, setupEmulator } from './emulator'
 import { setupWorkspace } from './workspace'
 import { setupEditor } from './editor'
+import { craftHost, setupCraft } from './craft'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -79,6 +80,9 @@ function createWindow(): void {
       webviewTag: true
     }
   })
+
+  // craft apps dock over this window's workspace pane
+  craftHost(win)
 
   win.once('ready-to-show', () => {
     // a downloaded update that got this far works, boot.ts keeps using it
@@ -196,6 +200,7 @@ setupHiddenSites(syncMute)
 setupInbox()
 setupEmulator()
 setupWorkspace()
+setupCraft()
 
 void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()

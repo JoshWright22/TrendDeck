@@ -32,6 +32,13 @@ async function collect(brandId: string): Promise<string[]> {
   return [...out]
 }
 
+// other live secrets main holds, e.g. the craft apps' control tokens
+const sources: (() => string[])[] = []
+
+export function registerSecretSource(fn: () => string[]): void {
+  sources.push(fn)
+}
+
 export async function knownSecrets(brandId: string): Promise<string[]> {
   const hit = cache.get(brandId)
   let values = hit && Date.now() - hit.at < TTL_MS ? hit.values : null
@@ -40,7 +47,7 @@ export async function knownSecrets(brandId: string): Promise<string[]> {
     cache.set(brandId, { at: Date.now(), values })
   }
   // tokens change every turn, never cached
-  return [...values, ...liveTokens()]
+  return [...values, ...liveTokens(), ...sources.flatMap((fn) => fn())]
 }
 
 export function forgetSecrets(brandId?: string): void {

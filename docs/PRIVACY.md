@@ -34,6 +34,16 @@ All of it is in the app's user data folder:
 | Reply drafts | `gateway/replies/<brand id>.json` | inbox replies an agent drafted |
 | Pipeline | `pipeline/<brand id>.json` | the brand's content stages and the runs going through them |
 | Phone | `android/` | the Android tools if TrendDeck set them up, and one phone per brand with its apps and logins |
+| Project folders | `folder` on each project in `trenddeck.json` | where that project's files are, see below |
+
+Two more places, outside the user data folder:
+
+| What | Where | Notes |
+|---|---|---|
+| Craft apps | `%LOCALAPPDATA%\TrendDeck\craft\<app>\<version>\` | the editors you installed, each with its settings, presets and crash recovery next to it (portable mode), `current.json`, `tools.json` (the app's tool list for agents) and `releases.json` (the last GitHub answer) |
+| Project files | `Documents\TrendDeck\<brand>\<project>\` | footage, the craft apps' project files and exports for each project. Made the first time a craft app opens on that project, plain files you can open anywhere |
+
+Deleting a brand doesn't delete its project folders or the craft apps, those are your files. Uninstalling a craft app removes its folder under `craft`, not your project files.
 
 Deleting a brand deletes its logins, its saved logins, its trends cache, its agent access data, its chats, its voice, its inbox, its media library, its posts, its phone, its agent rules and audit log, and its pipeline. Deleting the folder deletes everything.
 
@@ -44,6 +54,7 @@ Nothing goes out unless it's one of these.
 - **Sites you open.** A site tab is a normal browser tab in that brand's session. The site sees what it would see in any browser.
 - **Trends.** When the Trends page loads, or every 10 minutes while the app is open if the open brand's feed is over 3 hours old, the app asks Reddit, YouTube, Google Trends and TikTok for your keywords and subreddits. It uses the brand's own session, so if you're logged in those sites see the searches on your account. With a YouTube key set, the key goes to Google with the YouTube requests. TikTok's general list is fetched even with no keywords. There's no switch to turn trends off yet.
 - **Update check.** A few seconds after the app starts and every 6 hours, it asks GitHub for the latest version file. That's the whole request, nothing about you or your brands goes with it. If there's a new version it downloads from GitHub and installs when you quit. Turn off Settings > Update automatically and it never checks. Running from source never checks.
+- **Craft apps.** 20 seconds after start and every 6 hours, the app asks GitHub for the latest release of each of the 13 craft apps (`api.github.com/repos/storytold/<app>/releases/latest`), 13 small requests with nothing about you in them. When you install one, or an installed one has an update and Update automatically is on, its zip and `SHA256SUMS.txt` come from GitHub's release download servers. With Update automatically off it still asks which version is newest but downloads nothing until you press Install. The apps themselves are separate programs; TrendDeck starts them with no account and they don't need the network to edit.
 - **Ad block lists.** About once a day the app downloads the public ad and tracker lists. The request has no data about you or your brands.
 - **Links.** Clicking a trend, idea or chat link opens it in a tab inside the app on that brand's session.
 - **Spellcheck on Linux.** Chromium downloads its spellcheck dictionary from Google the first time you type in a text box. On Windows and macOS it uses the system spellchecker and nothing is downloaded.
@@ -79,6 +90,11 @@ You can save one login per brand and site in Settings > Saved logins. Nothing is
 - If the site asks for a two-factor code, the app asks you in its own window and types it in. The code doesn't go to the agent.
 - A saved login is only typed into its own site, or the sign-in page you set for it. Anywhere else the app stops.
 - Every sign-in is logged with the site, time and result, never the login itself. The log is in Settings > Saved logins.
+
+## Craft apps and agents
+
+- An agent can use a craft app's tools only for a project in the brand its chat is for. Every file path it passes is checked to be inside that project's folder, anything else is refused before the app sees it. What the app sends back (project contents, rendered frames, screenshots of its window) goes to the agent's provider like any other tool result.
+- Each open craft app window has its own control port on `127.0.0.1` and, where the app supports one, a new random token that only TrendDeck and that app's own bridge know. Agents and the TrendDeck window never see it. Some craft apps have no token on their control port (see `docs/DECISIONS-craft.md`); while one of those is open, other programs running as you on this computer could drive it.
 
 ## The local agent server
 

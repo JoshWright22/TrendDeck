@@ -1,0 +1,289 @@
+import { screen, type BrowserWindow } from 'electron'
+import type { CraftDock } from '@shared/craft'
+
+// keeps a craft app's window exactly over TrendDeck's workspace pane. the app stays its own
+// process and window: TrendDeck becomes its owner (so it sits above TrendDeck, minimizes with it
+// and never covers other apps), its title bar and resize border go, and main moves it whenever
+// the pane or the TrendDeck window moves. all through user32 with koffi. if any of that fails the
+// app is left as a normal window next to TrendDeck
+
+type Fn = (...args: unknown[]) => unknown
+
+interface User32 {
+  EnumWindows: Fn
+  GetWindowThreadProcessId: Fn
+  IsWindowVisible: Fn
+  IsWindow: Fn
+  GetWindow: Fn
+  GetWindowLongPtrW: Fn
+  SetWindowLongPtrW: Fn
+  SetWindowPos: Fn
+  ShowWindowAsync: Fn
+  PostMessageW: Fn
+  GetWindowRect: Fn
+  GetWindowTextLengthW: Fn
+}
+
+const GW_OWNER = 4
+const GWL_STYLE = -16
+const GWL_EXSTYLE = -20
+const GWLP_HWNDPARENT = -8
+const WS_CAPTION = 0x00c00000
+const WS_THICKFRAME = 0x00040000
+const WS_SYSMENU = 0x00080000
+const WS_MINIMIZEBOX = 0x00020000
+const WS_MAXIMIZEBOX = 0x00010000
+const WS_EX_APPWINDOW = 0x00040000
+const WS_MAXIMIZE = 0x01000000
+const WS_MINIMIZE = 0x20000000
+const WS_EX_TOOLWINDOW = 0x00000080
+const WS_EX_NOACTIVATE = 0x08000000
+const SWP_NOSIZE = 0x1
+const SWP_NOMOVE = 0x2
+const SWP_NOZORDER = 0x4
+const SWP_NOACTIVATE = 0x10
+const SWP_FRAMECHANGED = 0x20
+const SWP_NOOWNERZORDER = 0x200
+// the app's ui thread could be busy, never wait on it
+const SWP_ASYNCWINDOWPOS = 0x4000
+const SW_HIDE = 0
+const SW_SHOWNOACTIVATE = 4
+const SW_RESTORE = 9
+const WM_CLOSE = 0x0010
+
+let u32: User32 | null | undefined
+
+function user32(): User32 | null {
+  if (u32 !== undefined) return u32
+  u32 = null
+  if (process.platform !== 'win32') return null
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const koffi = require('koffi') as typeof import('koffi')
+    const lib = koffi.load('user32.dll')
+    // named types, the signatures below refer to them by name
+    koffi.struct('CRAFT_RECT', { left: 'long', top: 'long', right: 'long', bottom: 'long' })
+    koffi.proto('bool __stdcall CraftEnumProc(intptr_t hwnd, intptr_t lParam)')
+    u32 = {
+      EnumWindows: lib.func('bool __stdcall EnumWindows(CraftEnumProc *cb, intptr_t lParam)'),
+      GetWindowThreadProcessId: lib.func('uint32_t __stdcall GetWindowThreadProcessId(intptr_t hwnd, _Out_ uint32_t *pid)'),
+      IsWindowVisible: lib.func('bool __stdcall IsWindowVisible(intptr_t hwnd)'),
+      IsWindow: lib.func('bool __stdcall IsWindow(intptr_t hwnd)'),
+      GetWindow: lib.func('intptr_t __stdcall GetWindow(intptr_t hwnd, uint32_t cmd)'),
+      GetWindowLongPtrW: lib.func('intptr_t __stdcall GetWindowLongPtrW(intptr_t hwnd, int index)'),
+      SetWindowLongPtrW: lib.func('intptr_t __stdcall SetWindowLongPtrW(intptr_t hwnd, int index, intptr_t value)'),
+      SetWindowPos: lib.func('bool __stdcall SetWindowPos(intptr_t hwnd, intptr_t after, int x, int y, int cx, int cy, uint32_t flags)'),
+      ShowWindowAsync: lib.func('bool __stdcall ShowWindowAsync(intptr_t hwnd, int cmd)'),
+      PostMessageW: lib.func('bool __stdcall PostMessageW(intptr_t hwnd, uint32_t msg, uintptr_t wp, intptr_t lp)'),
+      GetWindowRect: lib.func('bool __stdcall GetWindowRect(intptr_t hwnd, _Out_ CRAFT_RECT *rect)'),
+      GetWindowTextLengthW: lib.func('int __stdcall GetWindowTextLengthW(intptr_t hwnd)')
+    }
+  } catch (err) {
+    console.error('craft: docking is off, user32 could not be loaded', err)
+    u32 = null
+  }
+  return u32
+}
+
+export function dockSupported(): boolean {
+  return user32() !== null
+}
+
+// the process's main window: visible, top level, titled, a real size. winit apps also have a
+// hidden message window ("Winit Thread Event Target", a layered tool window) and d3d and IME
+// helpers, none of those count. the biggest one wins
+function windowsOf(pid: number): number[] {
+  const u = user32()
+  if (!u) return []
+  const found: { hwnd: number; area: number }[] = []
+  u.EnumWindows((hwnd: number) => {
+    const out = [0]
+    u.GetWindowThreadProcessId(hwnd, out)
+    if (out[0] !== pid || !u.IsWindowVisible(hwnd) || u.GetWindow(hwnd, GW_OWNER)) return true
+    if (!(u.GetWindowTextLengthW(hwnd) as number)) return true
+    if (Number(u.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)) & (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE)) return true
+    const r = { left: 0, top: 0, right: 0, bottom: 0 }
+    u.GetWindowRect(hwnd, r)
+    const w = r.right - r.left
+    const h = r.bottom - r.top
+    if (w >= 200 && h >= 150) found.push({ hwnd: Number(hwnd), area: w * h })
+    return true
+  }, 0)
+  return found.sort((a, b) => b.area - a.area).map((f) => f.hwnd)
+}
+
+function hwndOf(win: BrowserWindow): number {
+  const buf = win.getNativeWindowHandle()
+  return buf.length >= 8 ? Number(buf.readBigUInt64LE(0)) : buf.readUInt32LE(0)
+}
+
+interface Docked {
+  appId: string
+  pid: number
+  hwnd: number | null
+  style: number
+  exStyle: number
+  bounds: CraftDock['bounds']
+  visible: boolean
+  // where it was last put, in screen pixels
+  placed: { x: number; y: number; w: number; h: number } | null
+  hidden: boolean
+}
+
+const docked = new Map<string, Docked>()
+let host: BrowserWindow | null = null
+let timer: NodeJS.Timeout | null = null
+
+// the TrendDeck window everything docks to. its moves, resizes and minimizes move the apps
+export function setHost(win: BrowserWindow): void {
+  if (host === win) return
+  host = win
+  const follow = (): void => placeAll()
+  for (const ev of ['move', 'moved', 'resize', 'resized', 'maximize', 'unmaximize', 'restore', 'show', 'enter-full-screen', 'leave-full-screen'] as const) {
+    win.on(ev as 'move', follow)
+  }
+  win.on('minimize', () => placeAll())
+  win.on('hide', () => placeAll())
+  win.webContents.on('zoom-changed', follow)
+  // an owner going away takes its owned windows with it, so they're let go first
+  win.on('close', () => releaseAll())
+}
+
+// starts docking an app that was just launched. the window is looked for until it shows up
+export function attach(appId: string, pid: number): void {
+  if (!user32()) return
+  docked.set(appId, { appId, pid, hwnd: null, style: 0, exStyle: 0, bounds: null, visible: false, placed: null, hidden: false })
+  ensureTimer()
+}
+
+export function setDock(d: CraftDock): void {
+  const e = docked.get(d.appId)
+  if (!e) return
+  e.bounds = d.bounds
+  e.visible = d.visible
+  place(e)
+}
+
+function ensureTimer(): void {
+  if (timer) return
+  // finds windows that just appeared and puts back ones the app moved itself
+  timer = setInterval(() => {
+    if (!docked.size) {
+      clearInterval(timer!)
+      timer = null
+      return
+    }
+    placeAll()
+  }, 500)
+}
+
+function placeAll(): void {
+  for (const e of docked.values()) place(e)
+}
+
+function grab(e: Docked): boolean {
+  const u = user32()
+  if (!u || !host || host.isDestroyed()) return false
+  if (e.hwnd && u.IsWindow(e.hwnd)) return true
+  const hwnd = windowsOf(e.pid)[0]
+  if (!hwnd) return false
+  e.hwnd = hwnd
+  e.placed = null
+  e.style = Number(u.GetWindowLongPtrW(hwnd, GWL_STYLE))
+  e.exStyle = Number(u.GetWindowLongPtrW(hwnd, GWL_EXSTYLE))
+  try {
+    u.SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, hwndOf(host))
+    u.SetWindowLongPtrW(hwnd, GWL_STYLE, e.style & ~(WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX))
+    u.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, e.exStyle & ~WS_EX_APPWINDOW)
+    u.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_ASYNCWINDOWPOS)
+  } catch (err) {
+    console.error('craft: docking failed, the app stays a normal window', err)
+    docked.delete(e.appId)
+    return false
+  }
+  return true
+}
+
+// the pane's css rect to screen pixels: zoom, the window's content origin, then the display's scale
+function target(e: Docked): { x: number; y: number; w: number; h: number } | null {
+  if (!host || host.isDestroyed() || !e.bounds) return null
+  const zoom = host.webContents.getZoomFactor()
+  const c = host.getContentBounds()
+  const dip = {
+    x: Math.round(c.x + e.bounds.x * zoom),
+    y: Math.round(c.y + e.bounds.y * zoom),
+    width: Math.max(1, Math.round(e.bounds.width * zoom)),
+    height: Math.max(1, Math.round(e.bounds.height * zoom))
+  }
+  const r = process.platform === 'win32' ? screen.dipToScreenRect(host, dip) : dip
+  return { x: r.x, y: r.y, w: r.width, h: r.height }
+}
+
+function place(e: Docked): void {
+  const u = user32()
+  if (!u || !grab(e) || !e.hwnd) return
+  const hostShown = !!host && !host.isDestroyed() && host.isVisible() && !host.isMinimized()
+  const t = hostShown && e.visible ? target(e) : null
+  if (!t) {
+    if (!e.hidden) {
+      u.ShowWindowAsync(e.hwnd, SW_HIDE)
+      e.hidden = true
+    }
+    return
+  }
+  const rect = { left: 0, top: 0, right: 0, bottom: 0 }
+  u.GetWindowRect(e.hwnd, rect)
+  const now = { x: rect.left, y: rect.top, w: rect.right - rect.left, h: rect.bottom - rect.top }
+  const same = now.x === t.x && now.y === t.y && now.w === t.w && now.h === t.h
+  if (e.hidden) {
+    u.ShowWindowAsync(e.hwnd, SW_SHOWNOACTIVATE)
+    e.hidden = false
+  }
+  if (!same) {
+    // a maximized or minimized app (from its own title bar buttons) ignores a move until it's restored
+    if (Number(u.GetWindowLongPtrW(e.hwnd, GWL_STYLE)) & (WS_MAXIMIZE | WS_MINIMIZE)) u.ShowWindowAsync(e.hwnd, SW_RESTORE)
+    u.SetWindowPos(e.hwnd, 0, t.x, t.y, t.w, t.h, SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS)
+    e.placed = t
+  }
+}
+
+// gives the window back as a normal one: title bar, border, no owner, on screen
+export function release(appId: string): void {
+  const e = docked.get(appId)
+  docked.delete(appId)
+  const u = user32()
+  if (!u || !e?.hwnd || !u.IsWindow(e.hwnd)) return
+  try {
+    u.SetWindowLongPtrW(e.hwnd, GWLP_HWNDPARENT, 0)
+    u.SetWindowLongPtrW(e.hwnd, GWL_STYLE, e.style)
+    u.SetWindowLongPtrW(e.hwnd, GWL_EXSTYLE, e.exStyle)
+    u.SetWindowPos(e.hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_ASYNCWINDOWPOS)
+    u.ShowWindowAsync(e.hwnd, SW_SHOWNOACTIVATE)
+  } catch {
+    // it's closing anyway
+  }
+}
+
+export function releaseAll(): void {
+  for (const id of [...docked.keys()]) release(id)
+}
+
+export function forget(appId: string): void {
+  docked.delete(appId)
+}
+
+export function isDocked(appId: string): boolean {
+  return !!docked.get(appId)?.hwnd
+}
+
+// asks the app to close the way its close button does, so it can ask to save first.
+// works whether or not it's docked
+export function askClose(pid: number): boolean {
+  const u = user32()
+  if (!u) return false
+  const e = [...docked.values()].find((d) => d.pid === pid && d.hwnd && u.IsWindow(d.hwnd))
+  const hwnd = e?.hwnd ?? windowsOf(pid)[0]
+  if (!hwnd) return false
+  u.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+  return true
+}

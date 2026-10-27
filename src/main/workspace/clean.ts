@@ -1,3 +1,4 @@
+import { isAbsolute } from 'node:path'
 import { ID_PATTERN } from '@shared/types'
 import {
   GENERAL_PROJECT_ID,
@@ -37,7 +38,8 @@ function cleanProject(raw: unknown, stageIds: Set<string>, firstStage: string): 
     // a stage that was taken out of the pipeline puts the project back on the first one
     stageId: typeof p.stageId === 'string' && stageIds.has(p.stageId) ? p.stageId : firstStage,
     status,
-    threadIds: threadIds.slice(0, MAX_THREADS_PER_PROJECT)
+    threadIds: threadIds.slice(0, MAX_THREADS_PER_PROJECT),
+    ...(typeof p.folder === 'string' && isAbsolute(p.folder) && p.folder.length <= 1000 ? { folder: p.folder } : {})
   }
 }
 
