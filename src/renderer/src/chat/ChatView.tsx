@@ -41,6 +41,7 @@ import WorkLog from './WorkLog'
 import QuestionDeck, { questionsIn, readAnswers } from './Questions'
 import UsagePopover from './UsagePopover'
 import ApprovalPanel, { type ApprovalChoice } from './ApprovalPanel'
+import { shortAnswer } from '@shared/voice-decision'
 import PendingQuestion, { providerAnswers } from './PendingQuestion'
 import PlanCard from './PlanCard'
 import { isApproval, pendingFor, resolveLocal, setFocus, syncThread, usePendingState, type PendingItem } from './pending'
@@ -653,6 +654,13 @@ export default function ChatView({
   const dictation = useDictation({
     onPartial: setPartial,
     onText: (text, t, audio) => {
+      // an approval waiting and a short yes or no: that answers it, by your own voice only
+      const said = approval ? shortAnswer(text) : null
+      if (said) {
+        setNotice(said === 'allow' ? `Approved by voice: ${text}` : `Denied by voice: ${text}`)
+        void respond(said === 'allow' ? 'approve' : 'deny')
+        return
+      }
       // hands-free while a reply runs: what you say goes straight in as a steer
       if (dictation.config?.handsFree && busy && thread) {
         dictated.current.push({ t, offset: 0, audio })

@@ -25,6 +25,8 @@ import { broadcast } from '../gateway/wait'
 import { list, obj, oneOf, str } from '../gateway/validate'
 import { initRepository, saveCheckpoint, serialize } from '../production-storage/git'
 import { getData } from '../store'
+import { threadsFor } from '../agents/history'
+import { saidYesOrNo } from '@shared/voice-decision'
 import { isBrandFile, memoryBlock, readBrandFile, readCadence, writeBrandFile, writeCadence, writeKeptRule, appendLearningLine, MAX_BRAND_FILE } from './files'
 import { cleanProposal, frictionText, newEvent, parseFriction, rulesLeft, wrapUpPrompt } from './rules'
 
@@ -354,6 +356,31 @@ export const BRAND_MEMORY_TOOLS: GatewayTool[] = [
       }
       await addCard(card)
       return `shown as card ${card.id}. ${BRAND_FILE_TITLES[args.file]} is saved only if the creator keeps it, their answer comes back as a message`
+    }
+  },
+  {
+    name: 'brand_file_decide',
+    title: 'Keep or drop a brand file card for the creator',
+    risk: 'edit',
+    description:
+      "Presses Keep or Drop on a brand file card when the creator said so in their latest message, typed or dictated (\"keep both\", \"approve the voice guide\", \"drop that one\"). Only for cards they had already seen when they wrote it. Never on your own judgment: when they didn't clearly say, leave it to their click.",
+    inputSchema: obj({ cardId: str('the brand file card id', 64, 1), decision: oneOf('what the creator said', ['keep', 'drop']) }, ['cardId', 'decision']),
+    run: async (turn, args) => {
+      brandOf(turn)
+      const card = await getCard(turn.brandId, String(args.cardId))
+      if (!card || card.type !== 'brand-file') throw new ToolError('no brand file card with that id')
+      if (card.state !== 'proposed') return `that card was already ${card.state}`
+      // the creator's newest message has to come after the card and say yes or no
+      const thread = (await threadsFor(turn.brandId)).find((t) => t.id === turn.threadId)
+      const said = [...(thread?.messages ?? [])].reverse().find((m) => m.role === 'user')
+      if (!said || said.at <= card.at) throw new ToolError("the creator hasn't answered since this card was shown, leave it for them to click")
+      if (!saidYesOrNo(said.text)) throw new ToolError("the creator's latest message doesn't say to keep or drop it, leave it for them to click")
+      if (args.decision === 'drop') {
+        await dropFile(turn.brandId, card.id)
+        return `dropped ${card.file}`
+      }
+      await keepFile(turn.brandId, card.id, card.content)
+      return `kept ${card.file}, it's saved in the brand folder`
     }
   },
   {
