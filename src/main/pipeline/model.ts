@@ -74,6 +74,12 @@ export function cleanStages(raw: unknown): PipelineStage[] {
   return out
 }
 
+// saved pipelines from before progress moved into the chat: the old Research stage that opened
+// the trends page goes. an empty result means the caller falls back to the defaults
+export function migrateStages(stages: PipelineStage[]): PipelineStage[] {
+  return stages.filter((s) => !(s.id === 'research' && s.workspace === 'trends'))
+}
+
 export function defaultStages(): PipelineStage[] {
   return DEFAULT_STAGES.map((s) => ({ ...s, config: { ...s.config } }))
 }

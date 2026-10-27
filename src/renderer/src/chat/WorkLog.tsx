@@ -86,7 +86,7 @@ export default function WorkLog({ m }: { m: ThreadMessage }): ReactNode {
             <>
               <span>{running || (streaming && !m.text) ? 'Working' : 'Worked'}</span>
               <span className="muted">
-                · {steps.length} {steps.length === 1 ? 'step' : 'steps'}
+                {steps.length} {steps.length === 1 ? 'step' : 'steps'}
                 {failed ? `, ${failed} failed` : ''}
               </span>
             </>

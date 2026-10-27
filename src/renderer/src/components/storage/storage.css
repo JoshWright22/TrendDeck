@@ -1,0 +1,31 @@
+.settings-form {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.settings-remote-name {
+  font-weight: 500;
+}
+
+.settings-radio {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.settings-radio legend {
+  margin-bottom: 4px;
+  color: var(--smoke);
+}
+
+.settings code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--raised);
+  font: 12px ui-monospace, Consolas, monospace;
+}

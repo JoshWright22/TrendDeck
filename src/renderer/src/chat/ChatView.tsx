@@ -26,6 +26,8 @@ import { CloseIcon, SendIcon } from '../components/Icons'
 import Markdown from './Markdown'
 import { EmbedCard, type EmbedActions } from './Embeds'
 import MediaReview from './MediaReview'
+import CardList from './cards/CardList'
+import { useCards, type CardActions } from './cards/useCards'
 import { Dictation } from './Dictation'
 import AgentSettings from './AgentSettings'
 import SetupSteps from './SetupSteps'
@@ -206,6 +208,8 @@ export default function ChatView({
   openRef.current = openId
 
   const brandId = brand.id
+  // cards the agent's tools put in this chat: videos to review, suggestions, copies, history
+  const cards = useCards(brandId, openId)
 
   const loadAgents = useCallback(async (rescan = false) => {
     setScanning(true)
@@ -509,6 +513,28 @@ export default function ChatView({
     }
   }
 
+  // what a card says goes straight to the agent: into the running reply, or as a new message.
+  // the composer and its files are left alone
+  const sendToAgent = async (text: string): Promise<void> => {
+    const body = text.trim()
+    if (!body) return
+    if (!agentId) throw new Error('Set up an agent first.')
+    if (busy && thread) {
+      const res = await chat().steer(brandId, thread.id, body, agentId)
+      if (res.mode === 'queued') {
+        setNotice(`${agentName(agentId)} can't take messages mid reply, so it's queued for when this one is done`)
+        setQueued(await chat().listQueue(brandId, thread.id))
+      } else if (res.mode === 'sent') void loadThread(thread.id)
+      return
+    }
+    const res = await chat().send(brandId, openId, body, agentId, {})
+    if (res.threadId !== openId) {
+      onThreadCreated?.(res.threadId)
+      setOpenId(res.threadId)
+    } else void loadThread(res.threadId)
+  }
+  const cardActions: CardActions = { brand, project, sendToAgent, hasAgent: !!agentId }
+
   const stop = (): void => {
     if (thread && busy) void chat().stop(brandId, thread.id)
   }
@@ -655,7 +681,8 @@ export default function ChatView({
   const embedFor = (m: ThreadMessage): EmbedFn => {
     const actions: EmbedActions = {
       ...baseActions,
-      onMediaFeedback: (text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); input.current?.focus() },
+      onSendToAgent: agentId ? sendToAgent : null,
+      project,
       decision: (card) => m.decisions?.[card],
       // nothing can be approved while the reply is still coming in
       onDecide:
@@ -736,7 +763,7 @@ export default function ChatView({
                   {a.status === 'allowed' ? 'Allowed' : a.status === 'denied' ? 'Denied' : 'Expired'}
                 </span>
                 <span className="cx-approvals-title">{a.title}</span>
-                {a.feedback && <span className="muted">· {a.feedback}</span>}
+                {a.feedback && <span className="muted">{a.feedback}</span>}
               </li>
             ))}
         </ul>
@@ -751,6 +778,7 @@ export default function ChatView({
         </div>
       ) : null}
       {questionsFor(m, i)}
+      <CardList cards={cards.filter((c) => c.messageId === m.id)} a={cardActions} />
       {m.status === 'error' && <p className="cx-error">{m.error || 'Something went wrong'}</p>}
       {m.id === lastAgentId && m.status !== 'streaming' && (
         <div className="cx-msg-tools">
@@ -815,8 +843,8 @@ export default function ChatView({
           ) : null}
         </div>
         {m.attachments?.filter((file) => file.media).map((file) => (
-          <MediaReview key={`${brandId}:${file.id}`} brandId={brandId} mediaId={file.id}
-            onFeedback={(text) => { setDraft((current) => current ? `${current}\n\n${text}` : text); input.current?.focus() }} />
+          <MediaReview key={`${brandId}:${file.id}`} brandId={brandId} mediaId={file.id} project={project}
+            onSend={agentId ? sendToAgent : null} />
         ))}
         {!busy && (
           <button className="cx-tool cx-edit-btn" onClick={() => setEditing({ id: m.id, text: m.text })}>
@@ -834,9 +862,9 @@ export default function ChatView({
             {context && (
               <>
                 <span className="cx-head-context">{context}</span>
-                <span className="cx-head-sep" aria-hidden="true">
-                  ·
-                </span>
+                <svg className="cx-head-sep" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                  <path d="M3.5 2l3 3-3 3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
               </>
             )}
             <span className="cx-head-title">{thread?.title ?? 'New chat'}</span>
@@ -845,7 +873,7 @@ export default function ChatView({
           {headerRight}
         </header>
 
-        {project && <ProjectProgress key={`progress:${brand.id}:${project.id}`} brand={brand} project={project} />}
+        {project && <ProjectProgress key={`progress:${brand.id}:${project.id}`} brand={brand} project={project} actions={cardActions} />}
         {project && <CraftChat key={`${brand.id}:${project.id}`} brand={brand} project={project} onActivate={onInlineCraft} />}
         <div className="cx-messages" ref={scroller} onScroll={onScroll}>
           <div className="cx-column">
@@ -879,6 +907,12 @@ export default function ChatView({
                   ))}
                 </div>
               </div>
+            )}
+            {thread && (
+              <CardList
+                cards={cards.filter((c) => !c.messageId || !thread.messages.some((m) => m.id === c.messageId))}
+                a={cardActions}
+              />
             )}
             {asked.map((item) => (
               <PendingQuestion

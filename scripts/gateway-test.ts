@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { cleanPolicy, decide, defaultPolicy } from '../src/main/gateway/decide'
 import { redact, redactText, REDACTED } from '../src/main/gateway/redact'
 import { int, list, obj, oneOf, str, validateArgs } from '../src/main/gateway/validate'
-import { advanceRun, applyChanges, cleanStage, defaultStages, diffStages, newRun, PipelineError, setStage, syncRun } from '../src/main/pipeline/model'
+import { advanceRun, applyChanges, cleanStage, cleanStages, defaultStages, diffStages, migrateStages, newRun, PipelineError, setStage, syncRun } from '../src/main/pipeline/model'
 
 let passed = 0
 function test(name: string, fn: () => void): void {
@@ -127,31 +127,32 @@ test('bad policy input is cleaned', () => {
 test('a new run starts at the first stage', () => {
   const stages = defaultStages()
   const r = newRun('r1', 'b1', stages, { title: 'x' }, 1)
-  assert.equal(r.currentStageId, 'research')
-  assert.equal(r.stageStates.research.status, 'running')
+  assert.equal(r.currentStageId, 'idea')
+  assert.equal(r.stageStates.idea.status, 'running')
+  assert.equal(r.stageStates.research, undefined)
   assert.equal(r.stageStates.post.status, 'pending')
 })
 test('advance finishes the stage and starts the next', () => {
   const stages = defaultStages()
   let r = newRun('r1', 'b1', stages, {}, 1)
   r = advanceRun(r, stages, { notes: 'found 3', artifacts: ['idea-1'] }, 2)
-  assert.equal(r.stageStates.research.status, 'done')
-  assert.deepEqual(r.stageStates.research.artifacts, ['idea-1'])
+  assert.equal(r.stageStates.idea.status, 'done')
+  assert.deepEqual(r.stageStates.idea.artifacts, ['idea-1'])
+  assert.equal(r.currentStageId, 'script')
+  assert.equal(r.stageStates.script.status, 'running')
+  r = advanceRun(r, stages, { skip: true }, 3)
+  assert.equal(r.stageStates.script.status, 'skipped')
+  r = advanceRun(r, stages, { toStageId: 'idea' }, 4)
   assert.equal(r.currentStageId, 'idea')
   assert.equal(r.stageStates.idea.status, 'running')
-  r = advanceRun(r, stages, { skip: true }, 3)
-  assert.equal(r.stageStates.idea.status, 'skipped')
-  r = advanceRun(r, stages, { toStageId: 'research' }, 4)
-  assert.equal(r.currentStageId, 'research')
-  assert.equal(r.stageStates.research.status, 'running')
 })
 test('setting a stage running makes it current, finishing the last ends the run', () => {
   const stages = defaultStages().slice(0, 2)
   let r = newRun('r1', 'b1', stages, {}, 1)
-  r = setStage(r, stages, 'idea', { status: 'running' }, 2)
+  r = setStage(r, stages, 'script', { status: 'running' }, 2)
+  assert.equal(r.currentStageId, 'script')
+  r = setStage(r, stages, 'script', { status: 'done' }, 3)
   assert.equal(r.currentStageId, 'idea')
-  r = setStage(r, stages, 'idea', { status: 'done' }, 3)
-  assert.equal(r.currentStageId, 'research')
   r = advanceRun(r, stages, {}, 4)
   assert.equal(r.currentStageId, null)
   assert.throws(() => advanceRun(r, stages), PipelineError)
@@ -160,13 +161,13 @@ test('setting a stage running makes it current, finishing the last ends the run'
 test('changes apply in order and show as a diff', () => {
   const before = defaultStages()
   const after = applyChanges(before, [
-    { op: 'add', stage: { label: 'Cover art', kind: 'thumbnail', workspace: 'media', config: { size: '1280x720' }, auto: false }, index: 4 },
+    { op: 'add', stage: { label: 'Cover art', kind: 'thumbnail', workspace: 'photocraft', config: { size: '1280x720' }, auto: false }, index: 4 },
     { op: 'remove', stageId: 'engage' },
     { op: 'move', stageId: 'review', index: 0 },
     { op: 'configure', stageId: 'post', patch: { auto: true, config: { platforms: 'youtube,tiktok' } } }
   ])
   assert.equal(after[0].id, 'review')
-  assert.equal(after.find((s) => s.id === 'cover-art')?.workspace, 'media')
+  assert.equal(after.find((s) => s.id === 'cover-art')?.workspace, 'photocraft')
   assert.ok(!after.some((s) => s.id === 'engage'))
   assert.equal(after.find((s) => s.id === 'post')?.auto, true)
   const lines = diffStages(before, after)
@@ -181,20 +182,20 @@ test('changes apply in order and show as a diff', () => {
 test('bad changes are refused', () => {
   const s = defaultStages()
   assert.throws(() => applyChanges(s, [{ op: 'remove', stageId: 'nope' }]), PipelineError)
-  assert.throws(() => applyChanges(s.slice(0, 1), [{ op: 'remove', stageId: 'research' }]), /at least one stage/)
-  assert.throws(() => applyChanges(s, [{ op: 'configure', stageId: 'research', patch: { label: '' } }]), PipelineError)
+  assert.throws(() => applyChanges(s.slice(0, 1), [{ op: 'remove', stageId: 'idea' }]), /at least one stage/)
+  assert.throws(() => applyChanges(s, [{ op: 'configure', stageId: 'idea', patch: { label: '' } }]), PipelineError)
 })
 test('adding a stage with a taken id gets a new one', () => {
-  const after = applyChanges(defaultStages(), [{ op: 'add', stage: { label: 'Research', kind: 'research', workspace: 'trends', config: {}, auto: true } }])
-  assert.equal(after[after.length - 1].id, 'research-2')
+  const after = applyChanges(defaultStages(), [{ op: 'add', stage: { label: 'Idea', kind: 'idea', workspace: 'none', config: {}, auto: true } }])
+  assert.equal(after[after.length - 1].id, 'idea-2')
 })
 test('runs follow the pipeline when stages change', () => {
   const stages = defaultStages()
   const r = newRun('r1', 'b1', stages, {}, 1)
-  const fewer = stages.filter((s) => s.id !== 'research')
+  const fewer = stages.filter((s) => s.id !== 'idea')
   const synced = syncRun(r, fewer)
-  assert.equal(synced.currentStageId, 'idea')
-  assert.ok(synced.stageStates.research, 'old state kept')
+  assert.equal(synced.currentStageId, 'script')
+  assert.ok(synced.stageStates.idea, 'old state kept')
 })
 
 test('stages saved with the old editor open filmcraft, craft keys are kept', () => {
@@ -206,6 +207,26 @@ test('stages saved with the old editor open filmcraft, craft keys are kept', () 
   assert.equal(d.find((s) => s.id === 'edit')?.workspace, 'filmcraft')
   assert.equal(d.find((s) => s.id === 'thumbnail')?.workspace, 'photocraft')
   assert.equal(d.find((s) => s.id === 'captions')?.workspace, 'filmcraft')
+})
+
+test('the default pipeline has no research stage and opens only craft apps or obs', () => {
+  const d = defaultStages()
+  assert.ok(!d.some((s) => s.id === 'research' || s.workspace === 'trends'))
+  for (const s of d) assert.ok(['none', 'obs', 'filmcraft', 'photocraft'].includes(s.workspace), `${s.id} opens ${s.workspace}`)
+})
+test('saved pipelines lose the old research stage that opened trends, nothing else', () => {
+  const saved = cleanStages([
+    { id: 'research', label: 'Research', kind: 'research', workspace: 'trends', config: {}, auto: true },
+    { id: 'idea', label: 'Idea', kind: 'idea', workspace: 'ideas', config: {}, auto: false },
+    { id: 'research-2', label: 'Research', kind: 'research', workspace: 'trends', config: {}, auto: true },
+    { id: 'edit', label: 'Edit', kind: 'edit', workspace: 'filmcraft', config: {}, auto: false }
+  ])
+  assert.deepEqual(migrateStages(saved).map((s) => s.id), ['idea', 'research-2', 'edit'])
+  // a research stage the user pointed somewhere else stays
+  const own = cleanStages([{ id: 'research', label: 'Research', kind: 'research', workspace: 'none', config: {}, auto: true }])
+  assert.equal(migrateStages(own).length, 1)
+  // only research left: empty, the caller falls back to the defaults
+  assert.deepEqual(migrateStages(saved.slice(0, 1)), [])
 })
 
 console.log(`gateway tests: ${passed} passed`)

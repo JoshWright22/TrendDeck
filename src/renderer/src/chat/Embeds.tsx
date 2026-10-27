@@ -4,6 +4,7 @@ import { ExternalIcon } from '../components/Icons'
 import { CardCorners } from './Marks'
 import { safeHref } from './api'
 import type { Decision } from '@shared/chat'
+import type { Project } from '@shared/workspace'
 import MediaReview from './MediaReview'
 
 // cards the agent can drop into a reply. it writes a fenced block with the
@@ -103,7 +104,9 @@ export function parseEmbed(raw: string): Embed | null {
 }
 
 export interface EmbedActions {
-  onMediaFeedback: (text: string) => void
+  // to the agent, null when there's none
+  onSendToAgent: ((text: string) => Promise<void>) | null
+  project?: Project
   brand: Brand
   trends: Map<string, TrendItem>
   savedTitles: Set<string>
@@ -395,7 +398,16 @@ export function EmbedCard({
   }
   switch (e.type) {
     case 'video':
-      return <MediaReview key={`${actions.brand.id}:${e.mediaId}:${e.revision ?? ''}`} brandId={actions.brand.id} mediaId={e.mediaId} revision={e.revision} onFeedback={actions.onMediaFeedback} />
+      return (
+        <MediaReview
+          key={`${actions.brand.id}:${e.mediaId}:${e.revision ?? ''}`}
+          brandId={actions.brand.id}
+          mediaId={e.mediaId}
+          revision={e.revision}
+          project={actions.project}
+          onSend={actions.onSendToAgent}
+        />
+      )
     case 'trend':
       return <TrendEmbed e={e} a={actions} />
     case 'idea':

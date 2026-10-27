@@ -215,11 +215,18 @@
   margin: 12px 0;
 }
 
-.cx-project-progress { display: flex; flex-wrap: wrap; flex: none; align-items: center; gap: 6px 12px; padding: 12px 16px; border-bottom: 1px solid var(--hair); font-size: 12px; }
-.cx-project-progress > div { display: grid; gap: 4px; flex: 1; }
-.cx-project-progress strong { color: var(--chalk); font-weight: 500; }
-.cx-project-progress span, .cx-project-progress p { color: var(--smoke); }
-.cx-project-progress p { margin: 0; flex-basis: 100%; }
+.cx-project-progress { display: grid; flex: none; gap: 8px; max-height: 45vh; overflow: auto; padding: 12px 16px; border-bottom: 1px solid var(--hair); font-size: 12px; }
+.cx-progress-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.cx-progress-title { display: grid; gap: 2px; min-width: 200px; }
+.cx-progress-title strong { color: var(--chalk); font-size: 13px; font-weight: 500; }
+.cx-project-progress .muted, .cx-progress-notes { color: var(--smoke); }
+.cx-progress-notes { margin: 0; }
+.cx-progress-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.cx-progress-steps li { display: grid; gap: 1px; min-width: 84px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; }
+.cx-progress-step-name { display: inline-flex; align-items: center; gap: 5px; color: var(--smoke); }
+.cx-progress-steps li.is-running .cx-progress-step-name, .cx-progress-steps li.is-waiting_user .cx-progress-step-name { color: var(--accent); font-weight: 500; }
+.cx-progress-steps li.is-running, .cx-progress-steps li.is-waiting_user { border-color: var(--line-strong); background: var(--raised); }
+.cx-progress-steps li.is-pending .cx-progress-step-name, .cx-progress-steps li.is-skipped .cx-progress-step-name { color: var(--faint); }
 
 .cx-secure-login input {
   width: 100%;
@@ -572,14 +579,9 @@
 }
 
 .cx-kind {
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--teal-soft);
-  color: var(--teal);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 10px;
+  color: var(--smoke);
+  font-weight: 500;
+  font-size: 12px;
 }
 
 .cx-trend .cx-kind {
@@ -816,9 +818,7 @@
 
 .cx-home-brand {
   color: var(--smoke);
-  font: 700 12px/1 var(--body);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font: 500 13px/1.2 var(--body);
 }
 
 /* before the first message the composer sits right under the welcome, pickers and all */
@@ -2028,9 +2028,8 @@
 }
 
 .cx-home-brand {
-  color: var(--faint);
+  color: var(--smoke);
   font-weight: 500;
-  letter-spacing: 0.04em;
 }
 
 .cx-starter {
@@ -2087,9 +2086,7 @@
   display: block;
   margin-bottom: 2px;
   color: var(--faint);
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 12px;
 }
 
 .cx-notice {

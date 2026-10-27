@@ -17,15 +17,11 @@ export const STAGE_KINDS = [
 ] as const
 export type StageKind = (typeof STAGE_KINDS)[number]
 
-// which view the right pane opens for a stage, a key from renderer/src/workspace/registry.tsx.
-// any plain key is allowed so new workspaces don't need a type change. an unknown one shows a
-// placeholder. these are the ones that exist, listed for the agent's tool docs
+// which tool the right pane opens for a stage, a key from renderer/src/workspace/registry.tsx.
+// the pane only docks the Craft apps and OBS now, everything else happens in the chat. any plain
+// key is allowed so new ones don't need a type change, an unknown one shows a placeholder.
+// these are the ones that exist, listed for the agent's tool docs
 export const WORKSPACES = [
-  'trends',
-  'ideas',
-  'writer',
-  'voice',
-  'media',
   // the Craft apps, docked over the pane. the four with their own keys, the rest as craft:<id>
   'filmcraft',
   'photocraft',
@@ -40,12 +36,8 @@ export const WORKSPACES = [
   'craft:gridcraft',
   'craft:cadcraft',
   'craft:figcraft',
-  'schedule',
-  'posting',
-  'shorts',
-  'inbox',
-  'analytics',
-  'sites',
+  // OBS for recording
+  'obs',
   'phone',
   'none'
 ] as const
@@ -193,17 +185,16 @@ export interface PipelineApi {
 
 // the starting pipeline for a brand that never set one
 export const DEFAULT_STAGES: readonly PipelineStage[] = [
-  { id: 'research', label: 'Research', kind: 'research', workspace: 'trends', config: {}, auto: true },
-  { id: 'idea', label: 'Idea', kind: 'idea', workspace: 'ideas', config: {}, auto: false },
-  { id: 'script', label: 'Script', kind: 'script', workspace: 'writer', config: {}, auto: true },
-  { id: 'record', label: 'Record', kind: 'record', workspace: 'media', config: {}, auto: false },
+  { id: 'idea', label: 'Idea', kind: 'idea', workspace: 'none', config: {}, auto: false },
+  { id: 'script', label: 'Script', kind: 'script', workspace: 'none', config: {}, auto: true },
+  { id: 'record', label: 'Record', kind: 'record', workspace: 'obs', config: {}, auto: false },
   { id: 'edit', label: 'Edit', kind: 'edit', workspace: 'filmcraft', config: {}, auto: false },
   { id: 'thumbnail', label: 'Thumbnail', kind: 'thumbnail', workspace: 'photocraft', config: {}, auto: false },
   { id: 'captions', label: 'Captions', kind: 'captions', workspace: 'filmcraft', config: {}, auto: true },
-  { id: 'schedule', label: 'Schedule', kind: 'schedule', workspace: 'schedule', config: {}, auto: true },
-  { id: 'post', label: 'Post', kind: 'post', workspace: 'posting', config: {}, auto: false },
-  { id: 'engage', label: 'Replies', kind: 'engage', workspace: 'inbox', config: {}, auto: false },
-  { id: 'review', label: 'Review', kind: 'review', workspace: 'analytics', config: {}, auto: true }
+  { id: 'schedule', label: 'Schedule', kind: 'schedule', workspace: 'none', config: {}, auto: true },
+  { id: 'post', label: 'Post', kind: 'post', workspace: 'none', config: {}, auto: false },
+  { id: 'engage', label: 'Replies', kind: 'engage', workspace: 'none', config: {}, auto: false },
+  { id: 'review', label: 'Review', kind: 'review', workspace: 'none', config: {}, auto: true }
 ]
 
 declare global {

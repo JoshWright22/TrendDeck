@@ -1,0 +1,214 @@
+/* your own MCP servers in settings. grays only, red only for errors */
+
+.mcp-servers .settings-sites.mcp-list li.mcp-server {
+  display: block;
+  padding: 10px 12px;
+}
+
+.mcp-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 8px;
+}
+
+.mcp-label {
+  flex: none;
+  color: var(--chalk);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mcp-status {
+  flex: none;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.mcp-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-bottom: 6px;
+}
+
+.mcp-line {
+  margin: 0 0 6px;
+  font-size: 12px;
+}
+
+.mcp-line.form-error {
+  margin: 0 0 6px;
+}
+
+.mcp-tools {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mcp-servers .row-actions .btn {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.mcp-form {
+  margin: 4px 0 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--felt);
+}
+
+.mcp-list .mcp-form {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.mcp-seg {
+  display: inline-flex;
+  margin-bottom: 12px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.mcp-seg button {
+  padding: 4px 14px;
+  border-radius: 999px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.mcp-seg button.on {
+  background: var(--card);
+  color: var(--felt);
+}
+
+.mcp-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.settings .mcp-form input:disabled {
+  color: var(--smoke);
+}
+
+.mcp-args {
+  display: block;
+  width: 100%;
+  margin-top: 5px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--felt);
+  color: var(--chalk);
+  font: 12px ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  resize: vertical;
+  user-select: text;
+}
+
+.mcp-args:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
+.mcp-sub {
+  margin: 4px 0 6px;
+  color: var(--smoke);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.mcp-pairs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.mcp-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings .mcp-pair input:not([type='checkbox']) {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 6px 8px;
+}
+
+.settings .mcp-pair input.mcp-pair-key-input {
+  flex: 0 0 34%;
+}
+
+.mcp-pair-key {
+  flex: 0 0 34%;
+  overflow: hidden;
+  color: var(--chalk);
+  font: 12px ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mcp-pair-hidden {
+  flex: 1;
+  font-size: 12px;
+}
+
+.mcp-pair .btn {
+  flex: none;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.settings label.toggle-row.mcp-secret {
+  flex: none;
+  font-size: 12px;
+}
+
+.mcp-pair .row-close {
+  opacity: 1;
+}
+
+.mcp-add-row {
+  align-self: flex-start;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.mcp-form-hint {
+  margin: 0 0 12px;
+}
+
+.mcp-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.mcp-presets li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.mcp-preset-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}

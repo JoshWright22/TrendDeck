@@ -1,8 +1,6 @@
 import { lazy, type ComponentType, type ReactNode } from 'react'
 import type { Brand } from '@shared/types'
 import type { PipelineStage, Project } from '@shared/workspace'
-import type { Page } from '../components/ComingSoon'
-import { PAGE_VIEWS } from '../pages'
 import { craftAppOf, craftName, OWN_KEYS } from './craft/apps'
 
 // what every stage workspace gets. a workspace is any component, the right pane mounts it
@@ -47,28 +45,6 @@ export function toolWorkspaces(): [string, WorkspaceDef][] {
   return [...registry].filter(([, d]) => d.tool)
 }
 
-// the pages from before the redesign, shown as they were. their chat toggle is hidden in css,
-// the chat is always open next to them now
-function fromPage(page: Page): ComponentType<WorkspaceProps> {
-  const View = PAGE_VIEWS[page]
-  function PageWorkspace(p: WorkspaceProps): ReactNode {
-    return (
-      <View
-        key={`${p.brand.id}:${page}`}
-        page={page}
-        brand={p.brand}
-        editBrand={p.editBrand}
-        onEditBrand={p.onEditBrand}
-        chatOpen
-        onToggleChat={() => {}}
-        trendQuery={p.trendQuery}
-        onTrendQuery={p.onTrendQuery}
-      />
-    )
-  }
-  return PageWorkspace
-}
-
 const PhoneView = lazy(() => import('../emulator/PhoneView'))
 
 function PhoneWorkspace({ brand }: WorkspaceProps): ReactNode {
@@ -92,29 +68,7 @@ function craftDef(key: string): WorkspaceDef | undefined {
   return { label: craftName(appId), component: View }
 }
 
-registerWorkspace('ideas', { label: 'Ideas', component: fromPage('Ideas'), tool: true })
-registerWorkspace('writer', { label: 'Writer', component: fromPage('Writer'), tool: true })
-registerWorkspace('media', { label: 'Media', component: fromPage('Media'), tool: true })
-registerWorkspace('schedule', { label: 'Schedule', component: fromPage('Schedule'), tool: true })
-registerWorkspace('posting', { label: 'Post queue', component: fromPage('Posting'), tool: true })
-registerWorkspace('analytics', { label: 'My stats', component: fromPage('Analytics'), tool: true })
-registerWorkspace('trends', { label: 'Trends', component: fromPage('Trends'), tool: true })
-registerWorkspace('voice', { label: 'Brand voice', component: fromPage('Voice'), tool: true })
-registerWorkspace('shorts', { label: 'Shorts', component: fromPage('Shorts'), tool: true })
-registerWorkspace('inbox', { label: 'Inbox', component: fromPage('Inbox'), tool: true })
 registerWorkspace('phone', { label: 'Phone', component: PhoneWorkspace, tool: true })
+// the pane docks the Craft apps and OBS (registered by the OBS pane as 'obs'). the old pages
+// (ideas, writer, media, trends and the rest) are gone from it, the agent does that work in chat
 for (const k of OWN_KEYS) registerWorkspace(k, craftDef(k)!)
-
-// the old page names, for the title bar search and anything else that still speaks pages
-export const PAGE_WORKSPACE: Record<Page, string> = {
-  Trends: 'trends',
-  Ideas: 'ideas',
-  Voice: 'voice',
-  Media: 'media',
-  Schedule: 'schedule',
-  Writer: 'writer',
-  Analytics: 'analytics',
-  Posting: 'posting',
-  Shorts: 'shorts',
-  Inbox: 'inbox'
-}

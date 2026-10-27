@@ -34,7 +34,7 @@ async function handle(turn: Turn, req: RpcRequest): Promise<unknown> {
     case 'ping':
       return {}
     case 'tools/list':
-      return { tools: mcpToolList() }
+      return { tools: mcpToolList(turn) }
     case 'tools/call':
       return callGatewayTool(turn, String(req.params?.name ?? ''), req.params?.arguments)
     case 'resources/list':

@@ -1,0 +1,93 @@
+/* settings, context section. grays only, red for errors */
+
+.context-settings h4 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 18px 0 8px;
+  color: var(--chalk);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.context-settings h4:first-of-type {
+  margin-top: 4px;
+}
+
+.context-settings h4 .ctx-count {
+  color: var(--smoke);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ctx-folder {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--chalk);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.context-settings .row-actions {
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.ctx-status {
+  margin: 0 0 10px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.ctx-list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.ctx-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--chalk);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ctx-size {
+  flex: none;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.ctx-rule {
+  flex: 1;
+  min-width: 0;
+}
+
+.ctx-rule-text {
+  color: var(--chalk);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.ctx-rule-from {
+  margin-top: 2px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.settings .settings-sites.ctx-rules input.ctx-input {
+  flex: 1;
+  width: auto;
+  margin: 0;
+}
+
+.context-settings .btn.small {
+  padding: 4px 10px;
+  font-size: 12px;
+}

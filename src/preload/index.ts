@@ -19,6 +19,9 @@ import { emulatorApi } from './emulator'
 import { workspaceApi } from './workspace'
 import './gateway'
 import { craftApi } from './craft'
+import { cardsApi, storageApi } from './cards'
+import { contextApi } from './context'
+import { mcpServersApi } from './mcp-servers'
 import './qc'
 
 const api: TrendDeckApi = {
@@ -126,3 +129,7 @@ contextBridge.exposeInMainWorld('trenddeckChat', chatApi)
 contextBridge.exposeInMainWorld('trenddeckInbox', inboxApi)
 contextBridge.exposeInMainWorld('trenddeckWorkspace', workspaceApi)
 contextBridge.exposeInMainWorld('trenddeckCraft', craftApi)
+contextBridge.exposeInMainWorld('trenddeckCards', cardsApi)
+contextBridge.exposeInMainWorld('trenddeckStorage', storageApi)
+contextBridge.exposeInMainWorld('trenddeckContext', contextApi)
+contextBridge.exposeInMainWorld('trenddeckMcpServers', mcpServersApi)

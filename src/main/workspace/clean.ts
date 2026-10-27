@@ -8,7 +8,7 @@ import {
   type Project,
   type ProjectStatus
 } from '@shared/workspace'
-import { cleanStages, defaultStages } from '../pipeline/model'
+import { cleanStages, defaultStages, migrateStages } from '../pipeline/model'
 
 const MAX_PROJECTS = 2000
 const MAX_THREADS_PER_PROJECT = 1000
@@ -16,7 +16,7 @@ const MAX_THREADS_PER_PROJECT = 1000
 // a brand with no pipeline, or an empty or broken one, gets the default.
 // the stage rules live with the pipeline engine so the agent and the ui agree on them
 export function cleanPipeline(raw: unknown): PipelineStage[] {
-  const stages = cleanStages(raw)
+  const stages = migrateStages(cleanStages(raw))
   return stages.length ? stages : defaultStages()
 }
 

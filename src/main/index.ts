@@ -26,6 +26,10 @@ import { dropBrandPhone, setupEmulator } from './emulator'
 import { setupWorkspace } from './workspace'
 import { craftHost, setupCraft } from './craft'
 import { setupQc } from './qc'
+import { dropCards, setupCards } from './cards'
+import { dropStorageBrand, setupStorageSettings } from './production-storage'
+import { dropContextBrand, setupContext } from './context'
+import { dropMcpServersBrand, setupMcpServers } from './mcp-servers'
 
 const PARTITION_PREFIX = 'persist:brand-'
 if (process.platform === 'win32') app.setAppUserModelId('com.joshwright.trenddeck')
@@ -197,6 +201,10 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   await dropInboxBrand(brandId)
   await dropBrandPhone(brandId)
   await dropGatewayBrand(brandId)
+  await dropCards(brandId)
+  await dropStorageBrand(brandId)
+  await dropContextBrand(brandId)
+  await dropMcpServersBrand(brandId)
 })
 
 setupTrends()
@@ -212,6 +220,10 @@ setupInbox()
 setupEmulator()
 setupWorkspace()
 setupCraft()
+setupCards()
+setupStorageSettings()
+setupContext()
+setupMcpServers()
 
 void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()

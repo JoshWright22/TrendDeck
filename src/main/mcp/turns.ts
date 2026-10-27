@@ -11,6 +11,8 @@ export interface Turn {
   sharedSiteId: string | null
   // the chat thread this message is in, for the audit log. null when the caller didn't say
   threadId: string | null
+  // the reply being written, so cards the agent's tools make land under it. null when unknown
+  messageId?: string | null
   startedAt: number
 }
 
@@ -50,7 +52,10 @@ export function armedShare(): { brandId: string; siteId: string } | null {
   return armed
 }
 
-export function openTurn(brandId: string, opts: { shareSiteId?: string | null; threadId?: string | null } = {}): Turn {
+export function openTurn(
+  brandId: string,
+  opts: { shareSiteId?: string | null; threadId?: string | null; messageId?: string | null } = {}
+): Turn {
   let shared = opts.shareSiteId ?? null
   if (!shared && armed?.brandId === brandId) shared = armed.siteId
   if (armed) {
@@ -63,6 +68,7 @@ export function openTurn(brandId: string, opts: { shareSiteId?: string | null; t
     brandId,
     sharedSiteId: shared,
     threadId: opts.threadId ?? null,
+    messageId: opts.messageId ?? null,
     startedAt: Date.now()
   }
   turns.set(turn.id, turn)

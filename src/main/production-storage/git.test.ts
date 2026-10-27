@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { commitMetadata, initRepository, repositoryDiff, repositoryStatus } from './git'
+import { commitChanges, commitMetadata, initRepository, repositoryDiff, repositoryHistory, repositoryStatus, restoreCommit, saveCheckpoint } from './git'
 import { executable, runProcess } from './process'
 import { IGNORE_POLICY } from './safety'
 
@@ -57,5 +57,31 @@ describe('real metadata Git operations', () => {
     const existing = await temporary()
     await runProcess(await executable('git'), ['init', '--template=', '.'], existing)
     await expect(initRepository(existing)).rejects.toThrow(/created by/)
+  })
+})
+
+describe('project history for the chat card', () => {
+  it('saves checkpoints of changed text files, lists them, shows a diff and restores', async () => {
+    const root = await temporary()
+    await fs.writeFile(join(root, 'script.md'), 'Intro one\n')
+    await fs.writeFile(join(root, 'take.mp4'), 'not media content')
+    await saveCheckpoint(root, 'First script')
+    await fs.writeFile(join(root, 'script.md'), 'Intro two\n')
+    await fs.writeFile(join(root, 'captions.srt'), '1\n00:00:01,000 --> 00:00:02,000\nHi\n')
+    let h = await repositoryHistory(root)
+    expect(h.changed.sort()).toEqual(['captions.srt', 'script.md'])
+    await saveCheckpoint(root, 'Second script')
+    h = await repositoryHistory(root)
+    expect(h.entries.map((e) => e.message)).toEqual(['Second script', 'First script'])
+    expect(h.entries[1].files).toContain('script.md')
+    expect(h.entries.every((e) => !e.files.includes('take.mp4'))).toBe(true)
+    expect(h.changed).toEqual([])
+    await expect(saveCheckpoint(root, 'Nothing')).rejects.toThrow(/Nothing changed/)
+    expect(await commitChanges(root, h.entries[0].commit)).toContain('+Intro two')
+    await restoreCommit(root, h.entries[1].commit)
+    expect(await fs.readFile(join(root, 'script.md'), 'utf8')).toBe('Intro one\n')
+    // added since, so it stays
+    expect(await fs.readFile(join(root, 'captions.srt'), 'utf8')).toContain('Hi')
+    await expect(restoreCommit(root, 'not-a-commit')).rejects.toThrow(/not valid/)
   })
 })

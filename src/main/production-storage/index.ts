@@ -3,9 +3,33 @@ import { projectFolder } from '../craft/paths'
 import { brandOf } from '../gateway/tools/common'
 import { ToolError, type GatewayTool, type Turn } from '../gateway/types'
 import { list, obj, str } from '../gateway/validate'
+import type { HistoryCard, StorageCard } from '@shared/cards'
+import { addCard, changeCard, newCardId } from '../cards/store'
 import { copyMedia, storageRemotes } from './cloud'
-import { commitMetadata, initRepository, repositoryDiff, repositoryStatus, serialize } from './git'
+import { commitMetadata, hasRepository, initRepository, repositoryDiff, repositoryHistory, repositoryStatus, serialize } from './git'
+import { remoteKind, REMOTE_NAMES } from './remotes'
 import { noSymlinks, StorageError } from './safety'
+import { remoteLabels, storageSettings } from './settings'
+
+export { setupStorageSettings, dropStorageBrand } from './settings'
+
+// a history card for the chat: the project's checkpoints and what changed since the last one
+export async function historyCard(base: Pick<HistoryCard, 'brandId' | 'threadId' | 'messageId'>, projectId: string, root: string): Promise<HistoryCard> {
+  const now = Date.now()
+  // a project with no history yet still gets a card, saving the first checkpoint starts one
+  const { entries, changed } = (await hasRepository(root)) ? await repositoryHistory(root, 20) : { entries: [], changed: [] }
+  return {
+    ...base,
+    id: newCardId(),
+    at: now,
+    updatedAt: now,
+    type: 'history',
+    projectId,
+    entries,
+    changed,
+    note: entries.length ? '' : 'No checkpoints yet.'
+  }
+}
 
 const projectId = str("Project ID in this brand; defaults to this thread's project.", 100, 1)
 const fileList = list('Explicit project-relative text metadata files; never media or credentials.', str('Metadata path', 240, 1), 50, 1)
@@ -62,16 +86,66 @@ export const STORAGE_TOOLS: GatewayTool[] = [
   },
   {
     name: 'storage_remotes', title: 'Available cloud storage', risk: 'read',
-    description: 'List names and provider types only of user-configured rclone Drive, S3, B2 and OneDrive remotes. No credential/config output or native OAuth. Missing rclone returns setup instructions.',
+    description: "List names and kinds only of the user's cloud remotes (Google Drive, Dropbox, OneDrive, Amazon S3, Cloudflare R2, Backblaze B2, through rclone), and this brand's default destination and what happens to originals after a checked copy. No credentials or config output. Missing rclone returns setup instructions.",
     inputSchema: obj({ projectId }),
-    run: (turn, args) => scoped(turn, args, async (root) => ({ remotes: await storageRemotes(root), note: 'Configure accounts with rclone config outside chat. Native OAuth is not implemented.' }))
+    run: (turn, args) => scoped(turn, args, async (root) => {
+      const settings = await storageSettings(turn.brandId)
+      const labels = await remoteLabels()
+      const remotes = (await storageRemotes(root)).map((r) => {
+        const kind = remoteKind(r, labels)
+        return { name: r.name, kind: kind ? REMOTE_NAMES[kind] : r.provider }
+      })
+      return {
+        remotes,
+        defaultDestination: settings.defaultDestination || null,
+        afterCopy: settings.afterCopy === 'archive' ? 'originals go to the Recycle Bin after the cloud copy checks out' : 'originals stay on this computer',
+        note: 'The user sets up remotes in Settings, Storage. Never ask for keys or passwords in chat.'
+      }
+    })
   },
   {
     name: 'storage_copy', title: 'Copy selected media to cloud', risk: 'publish', alwaysAsk: true,
-    mustAsk: async () => 'Uploading selected brand media to the chosen configured cloud destination requires explicit approval every time.',
-    summarize: (_turn, args) => `Copy ${(args.mediaIds as string[]).length} media item(s) to ${String(args.destination)} in brand/project subfolders, without sync or deletion`,
-    description: 'Copy up to 100 selected media IDs from this brand with agentAllowed enabled, through an installed user-configured rclone remote. Destination is remote:folder. Creates brand/project/media-ID subfolders; immutable copies never sync, delete or overwrite different existing objects. No credentials or arbitrary local paths accepted.',
-    inputSchema: obj({ projectId, mediaIds: list('Permitted media IDs in this brand.', str('Media ID', 100, 1), 100, 1), destination: str('Configured rclone remote:folder/subfolder; no URL or credentials.', 300, 1) }, ['mediaIds', 'destination']),
-    run: (turn, args) => scoped(turn, args, (root, project) => copyMedia(root, turn.brandId, project, args.mediaIds as string[], args.destination))
+    mustAsk: async (turn) => (await storageSettings(turn.brandId)).afterCopy === 'archive'
+      ? 'Uploading selected brand media to the cloud needs your OK every time. This brand moves originals to the Recycle Bin after the cloud copy checks out.'
+      : 'Uploading selected brand media to the chosen configured cloud destination requires explicit approval every time.',
+    summarize: async (turn, args) => `Copy ${(args.mediaIds as string[]).length} media item(s) to ${String(args.destination ?? ((await storageSettings(turn.brandId)).defaultDestination || 'the default destination'))} in brand/project subfolders, without sync or deletion`,
+    description: "Copy up to 100 selected media IDs from this brand with agentAllowed enabled, through one of the user's rclone remotes. Destination is remote:folder; leave it out for the brand's default. Creates brand/project/media-ID subfolders; immutable copies never sync, delete or overwrite different existing objects. Each copy is checked against the cloud; when the brand is set to archive, a checked original goes to the Recycle Bin. A storage card in the chat shows progress. No credentials or arbitrary local paths accepted.",
+    inputSchema: obj({ projectId, mediaIds: list('Permitted media IDs in this brand.', str('Media ID', 100, 1), 100, 1), destination: str('Configured rclone remote:folder/subfolder; no URL or credentials. Leave out for the default.', 300, 1) }, ['mediaIds']),
+    run: (turn, args) => scoped(turn, args, async (root, project) => {
+      const settings = await storageSettings(turn.brandId)
+      const destination = typeof args.destination === 'string' ? args.destination : settings.defaultDestination
+      if (!destination) throw new StorageError('No destination. Pass one, or ask the user to pick a default in Settings, Storage.')
+      const ids = [...new Set(args.mediaIds as string[])]
+      const now = Date.now()
+      const card: StorageCard = {
+        id: newCardId(), brandId: turn.brandId, threadId: turn.threadId, messageId: turn.messageId ?? null, at: now, updatedAt: now,
+        type: 'storage', destination, total: ids.length, copied: 0, verified: 0, archived: 0, status: 'running', note: ''
+      }
+      await addCard(card)
+      try {
+        const out = await copyMedia(root, turn.brandId, project, ids, destination, {
+          archive: settings.afterCopy === 'archive',
+          onProgress: (p) => void changeCard(turn.brandId, card.id, (c) => { if (c.type === 'storage') Object.assign(c, p) })
+        })
+        await changeCard(turn.brandId, card.id, (c) => {
+          if (c.type !== 'storage') return
+          Object.assign(c, { copied: out.copied.length, verified: out.verified.length, archived: out.archived.length, status: out.ok ? 'done' : 'failed', note: out.note })
+        })
+        return { ...out, card: card.id }
+      } catch (error) {
+        await changeCard(turn.brandId, card.id, (c) => { if (c.type === 'storage') Object.assign(c, { status: 'failed', note: error instanceof StorageError ? error.message : 'The copy could not start.' }) })
+        throw error
+      }
+    })
+  },
+  {
+    name: 'git_history', title: 'Show project history', risk: 'read',
+    description: "Shows the project's checkpoints (git commits of its scripts, captions and notes; never media) as a history card in the chat, where the user can see what changed and restore a checkpoint. Also returns them to you.",
+    inputSchema: obj({ projectId }),
+    run: (turn, args) => scoped(turn, args, async (root, project) => {
+      const card = await historyCard({ brandId: turn.brandId, threadId: turn.threadId, messageId: turn.messageId ?? null }, project, root)
+      await addCard(card)
+      return { card: card.id, checkpoints: card.entries.map((e) => ({ commit: e.commit.slice(0, 12), message: e.message, at: new Date(e.at).toISOString(), files: e.files })), changedSinceLast: card.changed }
+    })
   }
 ]

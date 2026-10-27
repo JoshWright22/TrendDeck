@@ -10,18 +10,19 @@ import { validateArgs } from './validate'
 
 const tools = new Map<string, GatewayTool>()
 // tools that come and go, e.g. the craft apps' own tools once an app is installed.
-// asked on every list and call, so tools/list always shows what's there now
-const sources: (() => GatewayTool[])[] = []
+// asked on every list and call, so tools/list always shows what's there now. a source gets the
+// turn when there is one, e.g. a user's own MCP server only lists for brands it's on for
+const sources: ((turn?: Turn) => GatewayTool[])[] = []
 
-export function registerToolSource(fn: () => GatewayTool[]): void {
+export function registerToolSource(fn: (turn?: Turn) => GatewayTool[]): void {
   sources.push(fn)
 }
 
-function dynamicTools(): GatewayTool[] {
+function dynamicTools(turn?: Turn): GatewayTool[] {
   const out: GatewayTool[] = []
   for (const fn of sources) {
     try {
-      for (const t of fn()) if (!tools.has(t.name)) out.push(t)
+      for (const t of fn(turn)) if (!tools.has(t.name) && !out.some((o) => o.name === t.name)) out.push(t)
     } catch (err) {
       console.error('a gateway tool source failed', err)
     }
@@ -29,8 +30,26 @@ function dynamicTools(): GatewayTool[] {
   return out
 }
 
-function findTool(name: string): GatewayTool | undefined {
-  return tools.get(name) ?? dynamicTools().find((t) => t.name === name)
+function findTool(name: string, turn?: Turn): GatewayTool | undefined {
+  return tools.get(name) ?? dynamicTools(turn).find((t) => t.name === name)
+}
+
+// told after a tool ran fine, e.g. a FilmCraft export puts its video in the chat
+type AfterCall = (turn: Turn, name: string, args: Record<string, unknown>, startedAt: number) => void
+const afterCalls: AfterCall[] = []
+
+export function onToolCalled(fn: AfterCall): void {
+  afterCalls.push(fn)
+}
+
+function calledFine(turn: Turn, name: string, args: Record<string, unknown>, startedAt: number): void {
+  for (const fn of afterCalls) {
+    try {
+      fn(turn, name, args, startedAt)
+    } catch (err) {
+      console.error('a gateway after-call hook failed', err)
+    }
+  }
 }
 
 export function registerTools(list: GatewayTool[]): void {
@@ -40,8 +59,8 @@ export function registerTools(list: GatewayTool[]): void {
   }
 }
 
-export function allTools(): GatewayTool[] {
-  return [...tools.values(), ...dynamicTools()]
+export function allTools(turn?: Turn): GatewayTool[] {
+  return [...tools.values(), ...dynamicTools(turn)]
 }
 
 export function toolInfo(): ToolInfo[] {
@@ -56,8 +75,8 @@ export function toolInfo(): ToolInfo[] {
 }
 
 // what tools/list sends
-export function mcpToolList(): Record<string, unknown>[] {
-  return allTools().map((t) => ({
+export function mcpToolList(turn?: Turn): Record<string, unknown>[] {
+  return allTools(turn).map((t) => ({
     name: t.name,
     title: t.title,
     description: t.description,
@@ -100,7 +119,7 @@ function denyText(tool: GatewayTool, decision: AuditDecision, note: string): str
 export async function callGatewayTool(turn: Turn, name: string, rawArgs: unknown): Promise<ToolResult> {
   const started = Date.now()
   const known = await knownSecrets(turn.brandId)
-  const tool = findTool(name)
+  const tool = findTool(name, turn)
   const audit = (risk: Risk | null, args: Record<string, unknown>, decision: AuditDecision, ok: boolean, result: string): void => {
     appendAudit({
       brandId: turn.brandId,
@@ -118,7 +137,7 @@ export async function callGatewayTool(turn: Turn, name: string, rawArgs: unknown
   const rawObj = rawArgs && typeof rawArgs === 'object' && !Array.isArray(rawArgs) ? (rawArgs as Record<string, unknown>) : {}
 
   if (!tool) {
-    const msg = `no tool called ${name}. tools: ${allTools()
+    const msg = `no tool called ${name}. tools: ${allTools(turn)
       .map((t) => t.name)
       .join(', ')}`
     audit(null, rawObj, 'invalid', false, `unknown tool`)
@@ -170,6 +189,7 @@ export async function callGatewayTool(turn: Turn, name: string, rawArgs: unknown
     }
 
     const result = await tool.run(turn, args)
+    if (!(result instanceof ContentResult && result.isError)) calledFine(turn, tool.name, args, started)
     if (result instanceof ImageResult) {
       audit(tool.risk, args, decision, true, `image, ${result.png.length} bytes. ${result.note}`)
       return {

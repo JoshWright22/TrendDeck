@@ -12,12 +12,17 @@ import { forgetSecrets } from './secrets'
 import { CONTENT_TOOLS } from './tools/content'
 import { PUBLISH_TOOLS } from './tools/publish'
 import { qcTools } from '../qc/tools'
+import { STORAGE_TOOLS } from '../production-storage'
+import { CONTEXT_TOOLS } from '../context'
 
 export { callGatewayTool, mcpToolList, toolInfo } from './call'
 
 // every tool an agent can call, in the order tools/list shows them
 registerTools([...SITE_TOOLS, ...CONTENT_TOOLS, ...PUBLISH_TOOLS, ...PIPELINE_TOOLS])
 registerTools(qcTools())
+// project history and cloud copies, then the brand's docs, past videos and style memory
+registerTools(STORAGE_TOOLS)
+registerTools(CONTEXT_TOOLS)
 
 const isId = (v: unknown): v is string => typeof v === 'string' && ID_PATTERN.test(v)
 // approvals and policy only from the app window, a site tab never gets to say yes

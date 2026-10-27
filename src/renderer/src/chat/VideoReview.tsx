@@ -1,284 +1,414 @@
-import { useEffect, useId, useRef, useState, type PointerEvent, type ReactNode } from 'react'
-import {
-  clampReviewTime, formatVideoReviewFeedback, formatReviewTime, reviewLoopTarget,
-  reviewRegionFromDrag, updateReviewRange,
-  type VideoReviewFrame, type VideoReviewRange, type VideoReviewRegion
-} from './VideoReview.helpers'
+import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from 'react'
+import type { ReviewBox, ReviewComment } from '@shared/cards'
+import { reviewTime } from '@shared/cards'
+import { clampReviewTime, reviewLoopTarget, reviewRegionFromDrag, type VideoReviewRange } from './VideoReview.helpers'
 import './VideoReview.css'
 
 export type { VideoReviewFrame, VideoReviewRange, VideoReviewRegion } from './VideoReview.helpers'
 
+// a comment before it goes out: the frame (with the box outlined on it) is still a data url,
+// the card saves it in main and swaps in the frame id
+export interface DraftComment extends ReviewComment {
+  frameDataUrl?: string
+}
+
 export interface VideoReviewProps {
   src: string
   name: string
-  clipId: string
-  revision?: string
-  onFeedback: (text: string) => void | Promise<void>
-  onFrame?: (frame: VideoReviewFrame) => void | Promise<void>
+  // the part the agent pointed at, highlighted to start with
+  initialRange?: { from: number | null; to: number | null } | null
+  onSend: (comments: DraftComment[]) => Promise<void>
+  // extra buttons next to the transport, e.g. open in FilmCraft
+  actions?: (time: number) => ReactNode
+  sendLabel?: string
 }
 
-interface CapturedFrame {
-  canvas: HTMLCanvasElement
-  dataUrl: string
-  timeSeconds: number
-}
+// the highlight drawn on the timeline, null for none
+type Mark = VideoReviewRange | null
 
 export function VideoReview(props: VideoReviewProps): ReactNode {
-  return <VideoReviewSession key={JSON.stringify([props.src, props.clipId, props.revision])} {...props} />
+  return <VideoReviewSession key={props.src} {...props} />
 }
 
-function VideoReviewSession({ src, name, clipId, revision, onFeedback, onFrame }: VideoReviewProps): ReactNode {
+// the frame as a png with the box outlined, white with a dark edge so it shows on anything
+function grabFrame(video: HTMLVideoElement, box: ReviewBox | null): string | null {
+  if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) return null
+  const canvas = document.createElement('canvas')
+  canvas.width = video.videoWidth
+  canvas.height = video.videoHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.drawImage(video, 0, 0)
+  if (box) {
+    const line = Math.max(2, Math.round(canvas.width / 400))
+    ctx.lineWidth = line * 2
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)'
+    ctx.strokeRect(box.x, box.y, box.width, box.height)
+    ctx.lineWidth = line
+    ctx.strokeStyle = '#ffffff'
+    ctx.strokeRect(box.x, box.y, box.width, box.height)
+  }
+  try {
+    return canvas.toDataURL('image/png')
+  } catch {
+    return null
+  }
+}
+
+function VideoReviewSession({ src, name, initialRange, onSend, actions, sendLabel }: VideoReviewProps): ReactNode {
   const id = useId()
   const videoRef = useRef<HTMLVideoElement>(null)
-  const dragRef = useRef<{ pointerId: number; start: { x: number; y: number }; previous: VideoReviewRegion | null } | null>(null)
-  const mountedRef = useRef(true)
-  const busyRef = useRef(false)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const drag = useRef<{ pointerId: number; start: number; moved: boolean } | null>(null)
+  const boxDrag = useRef<{ pointerId: number; start: { x: number; y: number } } | null>(null)
+  const alive = useRef(true)
   const [duration, setDuration] = useState(0)
   const [time, setTime] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const [range, setRange] = useState<VideoReviewRange>({ startSeconds: 0, endSeconds: 0 })
+  const [mark, setMark] = useState<Mark>(null)
   const [loop, setLoop] = useState(false)
+  const [drawing, setDrawing] = useState(false)
+  const [box, setBox] = useState<ReviewBox | null>(null)
+  const [withFrame, setWithFrame] = useState(false)
   const [text, setText] = useState('')
-  const [frame, setFrame] = useState<CapturedFrame | null>(null)
-  const [region, setRegion] = useState<VideoReviewRegion | null>(null)
+  const [comments, setComments] = useState<DraftComment[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [mediaError, setMediaError] = useState('')
   const [status, setStatus] = useState('')
-  const ready = duration > 0 && !mediaError
-  const canLoop = range.endSeconds > range.startSeconds
+  const ready = duration > 0
+  const canLoop = !!mark && mark.endSeconds > mark.startSeconds
 
-  useEffect(() => {
-    mountedRef.current = true
-    return () => { mountedRef.current = false }
-  }, [])
+  useEffect(() => () => void (alive.current = false), [])
 
+  // stays inside the highlight while loop is on
   useEffect(() => {
-    if (!loop || !playing || !canLoop) return
-    let request = 0
+    if (!loop || !playing || !mark || !canLoop) return
+    let req = 0
     const tick = (): void => {
-      const video = videoRef.current
-      if (video && !video.paused && !video.seeking) {
-        const target = reviewLoopTarget(video.currentTime, range)
-        if (target !== null) video.currentTime = target
+      const v = videoRef.current
+      if (v && !v.paused && !v.seeking) {
+        const t = reviewLoopTarget(v.currentTime, mark)
+        if (t !== null) v.currentTime = t
       }
-      request = requestAnimationFrame(tick)
+      req = requestAnimationFrame(tick)
     }
-    request = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(request)
-  }, [loop, playing, canLoop, range])
+    req = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(req)
+  }, [loop, playing, mark, canLoop])
 
-  async function play(): Promise<void> {
-    const video = videoRef.current
-    if (!video) return
-    try {
-      if (loop && canLoop) {
-        const target = reviewLoopTarget(video.currentTime, range)
-        if (target !== null) video.currentTime = target
-      }
-      await video.play()
-    } catch {
-      if (mountedRef.current) setError('Playback could not start. Try the native video controls.')
-    }
+  const seek = (t: number): void => {
+    const v = videoRef.current
+    if (!v || !ready) return
+    v.currentTime = clampReviewTime(t, duration)
+    setTime(v.currentTime)
   }
 
-  function seek(value: number): void {
-    const video = videoRef.current
-    if (!video || !ready) return
-    video.currentTime = clampReviewTime(value, duration)
-    setTime(video.currentTime)
+  const play = async (): Promise<void> => {
+    const v = videoRef.current
+    if (!v) return
+    setDrawing(false)
+    if (loop && mark && canLoop) {
+      const t = reviewLoopTarget(v.currentTime, mark)
+      if (t !== null) v.currentTime = t
+    }
+    await v.play().catch(() => alive.current && setError("This video won't play here. It may use a format the app can't show."))
   }
 
-  function captureFrame(): void {
-    const video = videoRef.current
-    if (!video || video.readyState < 2 || video.seeking || !video.videoWidth || !video.videoHeight) {
-      setError('Wait for the current frame to finish loading before capturing.')
-      return
-    }
-    video.pause()
-    try {
-      const canvas = document.createElement('canvas')
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      const context = canvas.getContext('2d')
-      if (!context) throw new Error('Canvas unavailable')
-      context.drawImage(video, 0, 0)
-      setFrame({ canvas, dataUrl: canvas.toDataURL('image/png'), timeSeconds: video.currentTime })
-      setRegion(null)
-      setError('')
-      setStatus('Frame captured. Optionally select a region. The video is unchanged.')
-    } catch {
-      setError('This source does not allow frame capture. You can still send timestamped feedback.')
-    }
-  }
+  const pause = (): void => videoRef.current?.pause()
 
-  function pointerPosition(event: PointerEvent<HTMLDivElement>): { x: number; y: number } {
-    const bounds = event.currentTarget.getBoundingClientRect()
-    return {
-      x: (event.clientX - bounds.left) / bounds.width * (frame?.canvas.width ?? 0),
-      y: (event.clientY - bounds.top) / bounds.height * (frame?.canvas.height ?? 0)
+  // ---- the timeline: click to seek, drag to highlight a range ----
+  const timeAt = (e: PointerEvent<HTMLDivElement>): number => {
+    const r = (trackRef.current ?? e.currentTarget).getBoundingClientRect()
+    return clampReviewTime(((e.clientX - r.left) / Math.max(1, r.width)) * duration, duration)
+  }
+  const onTrackDown = (e: PointerEvent<HTMLDivElement>): void => {
+    if (!ready || e.button !== 0) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    drag.current = { pointerId: e.pointerId, start: timeAt(e), moved: false }
+  }
+  const onTrackMove = (e: PointerEvent<HTMLDivElement>): void => {
+    const d = drag.current
+    if (!d || d.pointerId !== e.pointerId) return
+    const t = timeAt(e)
+    if (!d.moved && Math.abs(t - d.start) < duration / 200) return
+    d.moved = true
+    setMark({ startSeconds: Math.min(d.start, t), endSeconds: Math.max(d.start, t) })
+  }
+  const onTrackUp = (e: PointerEvent<HTMLDivElement>): void => {
+    const d = drag.current
+    if (!d || d.pointerId !== e.pointerId) return
+    drag.current = null
+    if (!d.moved) seek(timeAt(e))
+    else {
+      const t = timeAt(e)
+      seek(Math.min(d.start, t))
     }
   }
 
-  function moveRegion(event: PointerEvent<HTMLDivElement>): void {
-    if (!frame || dragRef.current?.pointerId !== event.pointerId) return
-    setRegion(reviewRegionFromDrag(dragRef.current.start, pointerPosition(event), frame.canvas.width, frame.canvas.height))
+  // ---- the box on a paused frame ----
+  const boxPoint = (e: PointerEvent<HTMLDivElement>): { x: number; y: number } => {
+    const v = videoRef.current!
+    const r = e.currentTarget.getBoundingClientRect()
+    // the video keeps its aspect inside the element, find the picture's own rect
+    const scale = Math.min(r.width / v.videoWidth, r.height / v.videoHeight)
+    const w = v.videoWidth * scale
+    const h = v.videoHeight * scale
+    const left = r.left + (r.width - w) / 2
+    const top = r.top + (r.height - h) / 2
+    return { x: ((e.clientX - left) / w) * v.videoWidth, y: ((e.clientY - top) / h) * v.videoHeight }
+  }
+  const boxStyle = (): CSSProperties | undefined => {
+    const v = videoRef.current
+    if (!box || !v || !v.videoWidth) return undefined
+    const r = v.getBoundingClientRect()
+    const scale = Math.min(r.width / v.videoWidth, r.height / v.videoHeight)
+    const offX = (r.width - v.videoWidth * scale) / 2
+    const offY = (r.height - v.videoHeight * scale) / 2
+    return { left: offX + box.x * scale, top: offY + box.y * scale, width: box.width * scale, height: box.height * scale }
   }
 
-  function changeRegion(edge: keyof VideoReviewRegion, value: number): void {
-    if (!frame || !Number.isFinite(value)) return
-    const width = frame.canvas.width
-    const height = frame.canvas.height
-    const next = { ...(region ?? { x: 0, y: 0, width, height }), [edge]: Math.round(value) }
-    next.x = Math.max(0, Math.min(width - 1, next.x))
-    next.y = Math.max(0, Math.min(height - 1, next.y))
-    next.width = Math.max(1, Math.min(width - next.x, next.width))
-    next.height = Math.max(1, Math.min(height - next.y, next.height))
-    setRegion(next)
+  const addComment = (): void => {
+    const v = videoRef.current
+    const body = text.trim()
+    if (!v || !body || !ready) return
+    const from = mark ? mark.startSeconds : v.currentTime
+    const to = mark ? mark.endSeconds : v.currentTime
+    const c: DraftComment = { from, to, text: body }
+    if (box || withFrame) {
+      if (!mark) v.pause()
+      const url = grabFrame(v, box)
+      if (url) {
+        c.frameDataUrl = url
+        c.box = box
+        c.frameWidth = v.videoWidth
+        c.frameHeight = v.videoHeight
+      } else setError("The frame couldn't be captured, the comment goes without it.")
+    }
+    setComments((list) => [...list, c].sort((a, b) => a.from - b.from))
+    setText('')
+    setBox(null)
+    setDrawing(false)
+    setWithFrame(false)
+    setStatus('')
   }
 
-  async function send(kind: 'feedback' | 'frame'): Promise<void> {
-    if (busyRef.current) return
-    busyRef.current = true
+  const sendAll = async (): Promise<void> => {
+    if (!comments.length || busy) return
     setBusy(true)
     setError('')
-    setStatus('')
     try {
-      if (kind === 'feedback') {
-        await onFeedback(formatVideoReviewFeedback({ clipId, revision, name, text, range, duration }))
-        if (mountedRef.current) {
-          setText('')
-          setStatus('Feedback sent. No edits have been applied to the video.')
-        }
-      } else {
-        if (!frame || !onFrame) throw new Error('Frame sharing is not connected.')
-        const source = frame.canvas
-        let dataUrl = frame.dataUrl
-        if (region) {
-          const crop = document.createElement('canvas')
-          crop.width = region.width
-          crop.height = region.height
-          const context = crop.getContext('2d')
-          if (!context) throw new Error('Frame cropping is unavailable.')
-          context.drawImage(source, region.x, region.y, region.width, region.height, 0, 0, region.width, region.height)
-          dataUrl = crop.toDataURL('image/png')
-        }
-        await onFrame({
-          clipId, ...(revision !== undefined ? { revision } : {}),
-          dataUrl, timeSeconds: frame.timeSeconds,
-          width: region?.width ?? source.width, height: region?.height ?? source.height,
-          sourceWidth: source.width, sourceHeight: source.height,
-          ...(region ? { region: { ...region } } : {})
-        })
-        if (mountedRef.current) setStatus('Frame shared. No edits have been applied to the video.')
-      }
-    } catch (cause) {
-      if (mountedRef.current) setError(cause instanceof Error ? cause.message : 'Could not send. Your draft is preserved; try again.')
+      await onSend(comments)
+      if (!alive.current) return
+      setComments([])
+      setStatus('Sent to your agent. Nothing in the video changed yet.')
+    } catch (err) {
+      if (alive.current) setError(err instanceof Error ? err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : "Couldn't send. Your comments are still here.")
     } finally {
-      busyRef.current = false
-      if (mountedRef.current) setBusy(false)
+      if (alive.current) setBusy(false)
     }
   }
 
+  const pct = (t: number): string => `${ready ? (t / duration) * 100 : 0}%`
+
   return (
-    <section className="video-review" aria-label={`Review ${name}`} aria-busy={busy}
-      onKeyDown={(event) => {
-        event.stopPropagation()
-        if (event.key === 'Enter' && event.target instanceof HTMLInputElement) event.preventDefault()
-      }}>
-      <header className="video-review-heading">
-        <strong>{name}</strong>
-        {revision !== undefined && <span>Revision {revision}</span>}
-      </header>
-      <video ref={videoRef} src={src} controls playsInline preload="metadata" aria-label={name}
-        onLoadedMetadata={(event) => {
-          const loadedDuration = event.currentTarget.duration
-          if (!Number.isFinite(loadedDuration) || loadedDuration <= 0) {
-            setMediaError('This video has no finite duration and cannot be reviewed.')
-            return
-          }
-          setDuration(loadedDuration)
-          setRange({ startSeconds: 0, endSeconds: loadedDuration })
-          setMediaError('')
-        }}
-        onTimeUpdate={(event) => setTime(event.currentTarget.currentTime)}
-        onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
-        onEnded={() => { if (loop && canLoop) { seek(range.startSeconds); void play() } }}
-        onError={() => { setMediaError('The video could not be loaded. Check the attachment URL and supported format.'); setPlaying(false) }}
-      />
-      {mediaError && <p className="video-review-error" role="alert">{mediaError}</p>}
+    <section className="video-review" aria-label={`Review ${name}`} aria-busy={busy} onKeyDown={(e) => e.stopPropagation()}>
+      <div className={`video-review-stage${drawing ? ' drawing' : ''}`}>
+        <video
+          ref={videoRef}
+          src={src}
+          playsInline
+          preload="metadata"
+          aria-label={name}
+          crossOrigin="anonymous"
+          onClick={() => (drawing ? undefined : playing ? pause() : void play())}
+          onLoadedMetadata={(e) => {
+            const d = e.currentTarget.duration
+            if (!Number.isFinite(d) || d <= 0) {
+              setError("This file has no length the app can read, so it can't be reviewed.")
+              return
+            }
+            setDuration(d)
+            const f = initialRange?.from
+            const t = initialRange?.to
+            if (typeof f === 'number') {
+              const a = clampReviewTime(f, d)
+              const b = typeof t === 'number' ? clampReviewTime(t, d) : a
+              if (b > a) setMark({ startSeconds: a, endSeconds: b })
+              e.currentTarget.currentTime = a
+            }
+          }}
+          onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onError={() => {
+            setPlaying(false)
+            setError("The video couldn't be loaded. It may have moved or use a format the app can't play.")
+          }}
+        />
+        {drawing && (
+          <div
+            className="video-review-draw"
+            aria-label="Drag to draw a box on the frame"
+            onPointerDown={(e) => {
+              if (e.button !== 0) return
+              e.currentTarget.setPointerCapture(e.pointerId)
+              boxDrag.current = { pointerId: e.pointerId, start: boxPoint(e) }
+            }}
+            onPointerMove={(e) => {
+              const b = boxDrag.current
+              const v = videoRef.current
+              if (!b || b.pointerId !== e.pointerId || !v) return
+              const r = reviewRegionFromDrag(b.start, boxPoint(e), v.videoWidth, v.videoHeight)
+              if (r) setBox(r)
+            }}
+            onPointerUp={() => {
+              boxDrag.current = null
+            }}
+          />
+        )}
+        {box && <div className="video-review-box" style={boxStyle()} />}
+      </div>
+
       <div className="video-review-transport">
-        <button type="button" disabled={!ready} onClick={() => playing ? videoRef.current?.pause() : void play()}>{playing ? 'Pause' : 'Play'}</button>
-        <output aria-label="Playback position">{formatReviewTime(time)} / {formatReviewTime(duration)}</output>
-        <button type="button" disabled={!ready || busy} onClick={captureFrame}>Capture frame</button>
+        <button type="button" disabled={!ready} onClick={() => (playing ? pause() : void play())}>
+          {playing ? 'Pause' : 'Play'}
+        </button>
+        <output aria-label="Playback position" className="video-review-time">
+          {reviewTime(time)} of {reviewTime(duration)}
+        </output>
+        <span className="spacer" />
+        {actions?.(time)}
       </div>
-      <label className="video-review-scrub">
-        <span>Playhead</span>
-        <input type="range" min={0} max={duration || 0} step="0.001" value={Math.min(time, duration)} disabled={!ready}
-          aria-valuetext={formatReviewTime(time)} onChange={(event) => seek(event.currentTarget.valueAsNumber)} />
-      </label>
-      <fieldset className="video-review-range" disabled={!ready || busy}>
-        <legend>Feedback range · seconds</legend>
-        {(['startSeconds', 'endSeconds'] as const).map((edge) => (
-          <div className="video-review-edge" key={edge}>
-            <label htmlFor={`${id}-${edge}`}>{edge === 'startSeconds' ? 'Start' : 'End'}</label>
-            <input id={`${id}-${edge}`} type="number" min={0} max={duration} step="0.001" value={range[edge]}
-              onChange={(event) => setRange(updateReviewRange(range, edge, event.currentTarget.valueAsNumber, duration))} />
-            <button type="button" onClick={() => setRange(updateReviewRange(range, edge, videoRef.current?.currentTime ?? time, duration))}>Use playhead for {edge === 'startSeconds' ? 'start' : 'end'}</button>
-          </div>
+
+      <div
+        ref={trackRef}
+        className="video-review-track"
+        role="slider"
+        tabIndex={0}
+        aria-label="Timeline. Click to jump, drag to highlight a part"
+        aria-valuemin={0}
+        aria-valuemax={duration}
+        aria-valuenow={time}
+        aria-valuetext={reviewTime(time)}
+        onPointerDown={onTrackDown}
+        onPointerMove={onTrackMove}
+        onPointerUp={onTrackUp}
+        onPointerCancel={() => (drag.current = null)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowRight') seek(time + (e.shiftKey ? 1 : 1 / 30))
+          else if (e.key === 'ArrowLeft') seek(time - (e.shiftKey ? 1 : 1 / 30))
+          else if (e.key === ' ') {
+            e.preventDefault()
+            if (playing) pause()
+            else void play()
+          } else return
+          e.preventDefault()
+        }}
+      >
+        {mark && <div className="video-review-mark" style={{ left: pct(mark.startSeconds), width: `calc(${pct(mark.endSeconds)} - ${pct(mark.startSeconds)})` }} />}
+        {comments.map((c, i) => (
+          <div key={i} className="video-review-pin" style={{ left: pct(c.from) }} title={`${reviewTime(c.from)} ${c.text}`} />
         ))}
-        <div className="video-review-range-actions">
-          <label><input type="checkbox" checked={loop} disabled={!canLoop} onChange={(event) => setLoop(event.currentTarget.checked)} /> Loop selected range</label>
-          <button type="button" onClick={() => { seek(range.startSeconds); void play() }}>Play from start</button>
-        </div>
-        <span className="video-review-hint">{formatReviewTime(range.startSeconds)} – {formatReviewTime(range.endSeconds)}{!canLoop ? ' · A single timestamp; select an end to loop.' : ''}</span>
-      </fieldset>
-      {frame && <fieldset className="video-review-capture" disabled={busy}>
-        <legend>Frame at {formatReviewTime(frame.timeSeconds)}</legend>
-        <p className="video-review-hint">Drag to select a region, or use the pixel controls. {onFrame ? 'Share the frame separately from text feedback.' : 'Frame preview only; attachment sharing is not connected.'}</p>
-        <div className="video-review-frame" style={{ pointerEvents: busy ? 'none' : undefined }}
-          onPointerDown={(event) => {
-            if (event.button !== 0 || busy || dragRef.current) return
-            event.preventDefault()
-            event.currentTarget.setPointerCapture(event.pointerId)
-            dragRef.current = { pointerId: event.pointerId, start: pointerPosition(event), previous: region }
-          }}
-          onPointerMove={moveRegion}
-          onPointerUp={(event) => {
-            if (dragRef.current?.pointerId !== event.pointerId) return
-            moveRegion(event)
-            dragRef.current = null
-            event.currentTarget.releasePointerCapture(event.pointerId)
-          }}
-          onPointerCancel={() => { if (dragRef.current) setRegion(dragRef.current.previous); dragRef.current = null }}
-          onLostPointerCapture={() => { if (dragRef.current) setRegion(dragRef.current.previous); dragRef.current = null }}>
-          <img src={frame.dataUrl} alt={`Captured frame from ${name} at ${formatReviewTime(frame.timeSeconds)}`} draggable={false} />
-          {region && <div className="video-review-region" style={{ left: `${region.x / frame.canvas.width * 100}%`, top: `${region.y / frame.canvas.height * 100}%`, width: `${region.width / frame.canvas.width * 100}%`, height: `${region.height / frame.canvas.height * 100}%` }} />}
-        </div>
-        <div className="video-review-region-fields">
-          {(['x', 'y', 'width', 'height'] as const).map((edge) => <label key={edge}>
-            {edge === 'x' ? 'Left' : edge === 'y' ? 'Top' : edge === 'width' ? 'Width' : 'Height'} (px)
-            <input type="number" step={1} min={edge === 'x' || edge === 'y' ? 0 : 1}
-              max={edge === 'x' ? frame.canvas.width - 1 : edge === 'y' ? frame.canvas.height - 1 : edge === 'width' ? frame.canvas.width - (region?.x ?? 0) : frame.canvas.height - (region?.y ?? 0)}
-              value={region?.[edge] ?? (edge === 'width' ? frame.canvas.width : edge === 'height' ? frame.canvas.height : 0)}
-              onChange={(event) => changeRegion(edge, event.currentTarget.valueAsNumber)} />
-          </label>)}
-        </div>
-        <div className="video-review-range-actions">
-          {onFrame && <button type="button" onClick={() => void send('frame')}>Share frame</button>}
-          <button type="button" onClick={() => setRegion(null)}>Use full frame</button>
-          <button type="button" onClick={() => { setFrame(null); setRegion(null) }}>Remove frame</button>
-        </div>
-      </fieldset>}
-      <div className="video-review-feedback">
-        <label htmlFor={`${id}-feedback`}>Feedback for selected range</label>
-        <textarea id={`${id}-feedback`} rows={3} value={text} disabled={busy}
-          placeholder="Describe what should change…" onChange={(event) => { setText(event.currentTarget.value); setStatus('') }} />
-        <button className="video-review-send" type="button" disabled={!ready || !clipId.trim() || !text.trim() || busy}
-          onClick={() => void send('feedback')}>{busy ? 'Sending…' : 'Send feedback'}</button>
+        <div className="video-review-head" style={{ left: pct(time) }} />
       </div>
-      {error && <p className="video-review-error" role="alert">{error}</p>}
-      <p className="video-review-status" role="status">{status}</p>
+
+      <div className="video-review-row">
+        {mark ? (
+          <>
+            <span>
+              Highlighted {reviewTime(mark.startSeconds)} to {reviewTime(mark.endSeconds)}
+            </span>
+            <label className="video-review-check">
+              <input type="checkbox" checked={loop} disabled={!canLoop} onChange={(e) => setLoop(e.currentTarget.checked)} /> Loop it
+            </label>
+            <button type="button" onClick={() => setMark(null)}>
+              Clear
+            </button>
+          </>
+        ) : (
+          <span className="video-review-hint">Drag on the timeline to highlight a part, or comment on the frame you're on.</span>
+        )}
+      </div>
+
+      <div className="video-review-feedback">
+        <label htmlFor={`${id}-comment`}>
+          {mark ? `Comment on ${reviewTime(mark.startSeconds)} to ${reviewTime(mark.endSeconds)}` : `Comment at ${reviewTime(time)}`}
+        </label>
+        <textarea
+          id={`${id}-comment`}
+          rows={2}
+          value={text}
+          disabled={busy || !ready}
+          placeholder="What should change here?"
+          onChange={(e) => setText(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+              e.preventDefault()
+              addComment()
+            }
+          }}
+        />
+        <div className="video-review-row">
+          <button
+            type="button"
+            disabled={!ready || busy}
+            aria-pressed={drawing}
+            onClick={() => {
+              if (!drawing) pause()
+              setDrawing(!drawing)
+            }}
+          >
+            {drawing ? 'Done drawing' : box ? 'Redraw box' : 'Draw a box'}
+          </button>
+          {box && (
+            <button type="button" onClick={() => setBox(null)}>
+              Remove box
+            </button>
+          )}
+          <label className="video-review-check">
+            <input type="checkbox" checked={withFrame || !!box} disabled={!!box} onChange={(e) => setWithFrame(e.currentTarget.checked)} /> Send the frame
+          </label>
+          <span className="spacer" />
+          <button type="button" disabled={!text.trim() || !ready || busy} onClick={addComment}>
+            Add comment
+          </button>
+        </div>
+      </div>
+
+      {comments.length > 0 && (
+        <ol className="video-review-comments" aria-label="Your comments">
+          {comments.map((c, i) => (
+            <li key={i}>
+              <button type="button" className="video-review-at" onClick={() => seek(c.from)} title="Jump there">
+                {c.to > c.from ? `${reviewTime(c.from)} to ${reviewTime(c.to)}` : reviewTime(c.from)}
+              </button>
+              <span className="video-review-text">{c.text}</span>
+              {c.frameDataUrl && <img src={c.frameDataUrl} alt={`Frame at ${reviewTime(c.from)}`} />}
+              <button type="button" className="video-review-remove" aria-label="Remove comment" onClick={() => setComments((l) => l.filter((_, j) => j !== i))}>
+                Remove
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+      {comments.length > 0 && (
+        <div className="video-review-row">
+          <span className="spacer" />
+          <button type="button" className="video-review-send" disabled={busy} onClick={() => void sendAll()}>
+            {busy ? 'Sending' : (sendLabel ?? `Send ${comments.length} comment${comments.length === 1 ? '' : 's'} to your agent`)}
+          </button>
+        </div>
+      )}
+      {error && (
+        <p className="video-review-error" role="alert">
+          {error}
+        </p>
+      )}
+      {status && (
+        <p className="video-review-status" role="status">
+          {status}
+        </p>
+      )}
     </section>
   )
 }

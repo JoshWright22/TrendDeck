@@ -141,3 +141,88 @@ export async function commitMetadata(root: string, requested: string[], message:
     await fs.unlink(`${index}.lock`).catch(() => {})
   }
 }
+
+// ---- the history card: checkpoints, what changed, restore ----
+
+const COMMIT = /^[a-f0-9]{7,64}$/
+
+export interface HistoryItem {
+  commit: string
+  message: string
+  at: number
+  files: string[]
+}
+
+export async function hasRepository(root: string): Promise<boolean> {
+  return exists(join(root, '.git'))
+}
+
+export async function repositoryHistory(root: string, limit = 20): Promise<{ entries: HistoryItem[]; changed: string[] }> {
+  await checkGitDirectory(root)
+  const hasHead = await exists(join(root, '.git', 'refs', 'heads', 'main')) || await exists(join(root, '.git', 'packed-refs'))
+  const entries: HistoryItem[] = []
+  if (hasHead) {
+    const raw = await git(root, ['log', `--max-count=${Math.max(1, Math.min(100, limit))}`, '--no-renames', '--name-only', '--format=%x1e%H%x1f%ct%x1f%s'])
+    for (const block of raw.split('\x1e').filter((b) => b.trim())) {
+      const [head, ...rest] = block.split('\n')
+      const [commit, ct, message] = head.split('\x1f')
+      if (!COMMIT.test(commit ?? '')) continue
+      const files = rest.map((l) => l.trim()).filter(Boolean).slice(0, 50)
+      entries.push({ commit, message: (message ?? '').slice(0, 200), at: Number(ct) * 1000 || 0, files })
+    }
+  }
+  const status = await git(root, ['status', '--porcelain=v1', '-z', '--untracked-files=all', '--no-renames'])
+  const changed: string[] = []
+  for (const record of status.split('\0').filter(Boolean)) {
+    try {
+      changed.push(metadataPath(record.slice(3)))
+    } catch {
+      // not something the history keeps
+    }
+    if (changed.length >= 50) break
+  }
+  return { entries, changed }
+}
+
+// a checkpoint of every changed or new text file the history keeps, at most 50
+export async function saveCheckpoint(root: string, message: string): Promise<unknown> {
+  if (!(await exists(join(root, '.git')))) await initRepository(root)
+  const { changed } = await repositoryHistory(root, 1)
+  const tracked = await trackedFiles(root)
+  const files = [...new Set([...changed])].filter((f) => f !== '.gitignore')
+  if (!files.length && tracked.length > 1) throw new StorageError('Nothing changed since the last checkpoint.')
+  if (!files.length) throw new StorageError('No scripts, captions or notes in this project yet. Text files like .md, .txt, .srt and .json are kept.')
+  for (const f of files) if (!(await exists(join(root, f)))) throw new StorageError(`${f} was deleted. Deleting files from the history isn't supported yet.`)
+  return commitMetadata(root, files, message)
+}
+
+export async function commitChanges(root: string, commit: string): Promise<string> {
+  await checkGitDirectory(root)
+  if (!COMMIT.test(commit)) throw new StorageError('That checkpoint id is not valid.')
+  const out = await git(root, ['show', '--no-ext-diff', '--no-textconv', '--no-renames', '--no-color', '--stat', '--patch', '--format=%s%n', commit, '--'])
+  safeText(Buffer.from(out))
+  return out.length > 40_000 ? `${out.slice(0, 40_000)}\n...` : out
+}
+
+// puts the files as they were at a checkpoint back in the folder. files added since stay,
+// nothing is committed, so a restore can be looked at and saved as a new checkpoint
+export async function restoreCommit(root: string, commit: string): Promise<{ restored: string[] }> {
+  await checkGitDirectory(root)
+  if (!COMMIT.test(commit)) throw new StorageError('That checkpoint id is not valid.')
+  const raw = await git(root, ['ls-tree', '-r', '-z', commit])
+  const restored: string[] = []
+  for (const record of raw.split('\0').filter(Boolean)) {
+    const m = /^(100644|100755) blob ([a-f0-9]{40,64})\t(.+)$/.exec(record)
+    if (!m) throw new StorageError('That checkpoint has entries that cannot be restored.')
+    const name = metadataPath(m[3])
+    if (name === '.gitignore') continue
+    const text = safeText(Buffer.from(await git(root, ['cat-file', 'blob', m[2]])))
+    const full = join(root, name)
+    await fs.mkdir(dirname(full), { recursive: true })
+    await noSymlinks(dirname(full))
+    if (await exists(full)) await metadataFile(root, name)
+    await fs.writeFile(full, text, 'utf8')
+    restored.push(name)
+  }
+  return { restored }
+}

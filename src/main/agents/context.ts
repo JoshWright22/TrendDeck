@@ -4,6 +4,7 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { SOURCE_NAMES, type Brand, type TrendFeed } from '@shared/types'
 import { EMBED_LANG, type Attachment, type Thread, type ThreadMessage } from '@shared/chat'
+import { styleContext } from '../context'
 
 // what an agent gets with every message: the brand's name, keywords, top trends and
 // saved ideas. never cookies, logins or anything from inside a site tab
@@ -94,6 +95,8 @@ export async function brandContext(brand: Brand): Promise<string> {
     'Help plan, record, edit and publish content using the provided tools. Be direct and practical, and explain your current work and next step in plain language.',
     'Manage the workflow for the user: inspect pipeline_get and run_list, propose appropriate changes with pipeline_propose_change, and use run_start and stage-status tools to keep progress accurate. Ask for missing creative decisions instead of asking the user to configure a pipeline manually.',
     'Use craft_list and craft_open to select and open the editors you need inside chat. Downloads follow the app permission policy. Do not claim an edit or installation succeeded before its tool result confirms it.',
+    "Show, don't describe. When you have an idea for the video (an edit, a shot, a title, a thumbnail, a caption), call suggest so it pops up as a card the user can accept, put off or answer; don't bury ideas in long replies. To show progress, call show_video with the render, export or take from the project folder: the user can play it, highlight a range and send timestamped comments. For an edit, suggest with kind edit, render a preview when asked and report the result with card_update. Their answers come back as messages.",
+    'Before you write or cut, check brand_docs_search, past_videos_search and the style rules below. When the user states a lasting preference (pacing, words to avoid, a look), propose it with remember_style; it is only kept once they confirm.',
     'Use login for website authentication. TrendDeck can request private credentials directly in chat; never ask the user to put passwords or two-factor codes into ordinary messages.',
     '',
     `## Brand: ${oneLine(brand.name, 60)}`,
@@ -114,6 +117,9 @@ export async function brandContext(brand: Brand): Promise<string> {
   lines.push('', '## Saved ideas')
   if (ideas.length === 0) lines.push('None yet.')
   for (const i of ideas) lines.push(`- ${oneLine(i.title)}`)
+
+  const style = await styleContext(brand.id)
+  if (style) lines.push('', style)
 
   lines.push('', '## Cards', EMBED_GUIDE)
   return lines.join('\n')

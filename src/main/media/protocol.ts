@@ -3,6 +3,7 @@ import { createReadStream, promises as fs } from 'node:fs'
 import { Readable } from 'node:stream'
 import { MEDIA_SCHEME } from '@shared/media'
 import { getLib, thumbPath, validId } from './library'
+import { servedPath } from '../cards/files'
 
 // has to run before the app is ready
 export function registerMediaScheme(): void {
@@ -78,6 +79,14 @@ export function handleMediaScheme(): void {
   protocol.handle(MEDIA_SCHEME, async (req) => {
     try {
       const url = new URL(req.url)
+      // a file in a project folder for a chat card, td-media://project/<brand>/<project>/<file>
+      if (url.hostname === 'project') {
+        const [b, p, ...rest] = url.pathname.split('/').filter(Boolean)
+        const path = rest.length ? await servedPath(b, p, decodeURIComponent(rest.join('/'))) : null
+        if (!path) return notFound()
+        const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+        return await serveFile(path, TYPES[ext] ?? 'application/octet-stream', req.headers.get('range'))
+      }
       const [brandId, id] = url.pathname.split('/').filter(Boolean)
       if (!validId(brandId) || !validId(id)) return notFound()
       const lib = await getLib(brandId)
