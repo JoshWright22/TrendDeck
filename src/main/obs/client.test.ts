@@ -54,6 +54,31 @@ describe('OBS client lifecycle', () => {
     await expect(client.request('StopRecord')).rejects.toThrow('disconnected')
   })
 
+  it('subscribes to events, delivers them, and reports one close for a monitor connection', async () => {
+    vi.stubGlobal('WebSocket', Socket)
+    const events: string[] = []
+    const closes: string[] = []
+    const client = new ObsClient(100)
+    const connection = client.connect('ws://localhost:4455', undefined, {
+      subscriptions: 64,
+      onEvent: (type, data) => events.push(`${type}:${String(data.outputState)}`),
+      onClose: (error) => closes.push(error.message)
+    })
+    const socket = Socket.last
+    socket.message(0, { rpcVersion: 1 })
+    expect(socket.sent[0]).toEqual({ op: 1, d: { rpcVersion: 1, eventSubscriptions: 64 } })
+    socket.message(2, { negotiatedRpcVersion: 1 })
+    await connection
+    socket.message(5, { eventType: 'RecordStateChanged', eventIntent: 64, eventData: { outputState: 'OBS_WEBSOCKET_OUTPUT_STOPPED' } })
+    expect(events).toEqual(['RecordStateChanged:OBS_WEBSOCKET_OUTPUT_STOPPED'])
+    const event = new Event('close')
+    Object.defineProperty(event, 'code', { value: 1006 })
+    socket.dispatchEvent(event)
+    client.disconnect()
+    expect(closes).toHaveLength(1)
+    expect(client.connected).toBe(false)
+  })
+
   it('times out identification and reports authentication disconnect codes', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('WebSocket', Socket)

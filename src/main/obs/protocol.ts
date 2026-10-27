@@ -16,9 +16,23 @@ export function authentication(password: string, salt: string, challenge: string
   return createHash('sha256').update(secret + challenge).digest('base64')
 }
 
-export function identify(hello: Record<string, unknown>, password?: string): Record<string, unknown> {
+// OBS v5 event subscription bits, see EventSubscription in the protocol docs
+export const EVENTS = { config: 1 << 1, scenes: 1 << 2, inputs: 1 << 3, outputs: 1 << 6 } as const
+
+// a request OBS answered with a failure: the outcome is known, nothing happened. a timeout or a
+// dropped connection is a plain Error instead, because then the outcome is unknown
+export class ObsRequestError extends Error {
+  readonly definite = true
+  constructor(message: string, readonly code: number) { super(message) }
+}
+
+// by shape too, so it holds across module copies (tests reset modules)
+export const isRequestError = (err: unknown): err is ObsRequestError =>
+  err instanceof ObsRequestError || (err instanceof Error && (err as { definite?: unknown }).definite === true)
+
+export function identify(hello: Record<string, unknown>, password?: string, eventSubscriptions = 0): Record<string, unknown> {
   if (typeof hello.rpcVersion !== 'number' || hello.rpcVersion < 1) throw new Error('OBS WebSocket v5 RPC 1 is required')
-  const data: Record<string, unknown> = { rpcVersion: 1, eventSubscriptions: 0 }
+  const data: Record<string, unknown> = { rpcVersion: 1, eventSubscriptions }
   if (hello.authentication !== undefined) {
     const auth = hello.authentication as Record<string, unknown> | null
     if (!auth || typeof auth.salt !== 'string' || typeof auth.challenge !== 'string') throw new Error('Invalid OBS authentication challenge')
@@ -41,6 +55,9 @@ export function parseFrame(text: string): ObsFrame {
 export function responseData(data: Record<string, unknown>, requestType: string): Record<string, unknown> {
   const status = data.requestStatus as { result?: boolean; code?: number } | undefined
   if (data.requestType !== requestType || !status || typeof status.result !== 'boolean') throw new Error('Invalid OBS request response')
-  if (!status.result) throw new Error(`OBS ${requestType} failed (code ${Number(status.code) || 'unknown'}). Check OBS settings and output state`)
+  if (!status.result) {
+    const code = Number(status.code) || 0
+    throw new ObsRequestError(`OBS ${requestType} failed (code ${code || 'unknown'}). Check OBS settings and output state`, code)
+  }
   return (data.responseData ?? {}) as Record<string, unknown>
 }

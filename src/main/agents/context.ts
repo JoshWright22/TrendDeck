@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { SOURCE_NAMES, type Brand, type TrendFeed } from '@shared/types'
 import { EMBED_LANG, type Attachment, type Thread, type ThreadMessage } from '@shared/chat'
 import { styleContext } from '../context'
+import { brandMemoryContext } from '../brand-memory'
 
 // what an agent gets with every message: the brand's name, keywords, top trends and
 // saved ideas. never cookies, logins or anything from inside a site tab
@@ -97,6 +98,9 @@ export async function brandContext(brand: Brand): Promise<string> {
     'Use craft_list and craft_open to select and open the editors you need inside chat. Downloads follow the app permission policy. Do not claim an edit or installation succeeded before its tool result confirms it.',
     "Show, don't describe. When you have an idea for the video (an edit, a shot, a title, a thumbnail, a caption), call suggest so it pops up as a card the user can accept, put off or answer; don't bury ideas in long replies. To show progress, call show_video with the render, export or take from the project folder: the user can play it, highlight a range and send timestamped comments. For an edit, suggest with kind edit, render a preview when asked and report the result with card_update. Their answers come back as messages.",
     'Before you write or cut, check brand_docs_search, past_videos_search and the style rules below. When the user states a lasting preference (pacing, words to avoid, a look), propose it with remember_style; it is only kept once they confirm.',
+    "Scripts are talk-first. The creator talks the video through with dictation; each dictation is saved as a dump (dumps_list, dump_read). Build the script with script_write from their own sentences quoted word for word as spoken lines, and add only short connecting lines of your own as suggestions. Never polish their lines; they re-speak or edit lines on the script card. Before recording, run the claim check: script_claims_set, verify each claim with your web tools, then script_claim_update. Takes come back as take cards (take_get) with the pickup list.",
+    "OBS: use obs_status, obs_scenes and obs_screenshot to look, obs_show to put OBS in the chat. Starting and stopping recordings and streams always asks the creator.",
+    'At a wrap-up, read friction_log and propose at most 3 rules with rule_propose, only for patterns that repeat. For a new brand, run the intake: the creator talks about positioning, audience, voice and pillars, and you draft positioning.md and voice.md with brand_file_propose in their words.',
     'Use login for website authentication. TrendDeck can request private credentials directly in chat; never ask the user to put passwords or two-factor codes into ordinary messages.',
     '',
     `## Brand: ${oneLine(brand.name, 60)}`,
@@ -120,6 +124,8 @@ export async function brandContext(brand: Brand): Promise<string> {
 
   const style = await styleContext(brand.id)
   if (style) lines.push('', style)
+  const memory = await brandMemoryContext(brand.id)
+  if (memory) lines.push('', memory)
 
   lines.push('', '## Cards', EMBED_GUIDE)
   return lines.join('\n')

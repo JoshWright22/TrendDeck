@@ -17,6 +17,7 @@ import SiteStrip from './workspace/SiteStrip'
 import { useInbox } from './pages/inbox/useInbox'
 import { setNames, syncThread } from './chat/pending'
 import { draftChat } from './pages/voice/chatDraft'
+import { onOpenSettings } from './settings-link'
 
 const ChatView = lazy(() => import('./chat/ChatView'))
 const Settings = lazy(() => import('./components/Settings'))
@@ -25,7 +26,7 @@ const BrandModal = lazy(() => import('./components/BrandModal'))
 const SiteModal = lazy(() => import('./components/SiteModal'))
 const Onboarding = lazy(() => import('./components/Onboarding'))
 
-type ModalState = { kind: 'brand'; id: string | null } | { kind: 'site' } | { kind: 'settings' } | null
+type ModalState = { kind: 'brand'; id: string | null } | { kind: 'site' } | { kind: 'settings'; section?: string } | null
 
 // where each brand is: which project, which chat, what the workspace shows. not saved,
 // the app always opens on General with a new chat
@@ -57,6 +58,8 @@ const newId = (): string => crypto.randomUUID()
 export default function App(): ReactNode {
   const { data, update } = useAppData()
   const [modal, setModal] = useState<ModalState>(null)
+  // e.g. the composer's mic menu opens Settings at Dictation
+  useEffect(() => onOpenSettings((section) => setModal({ kind: 'settings', section })), [])
   const [places, setPlaces] = useState<Record<string, Place>>({})
   const [pane, setPane] = useState(loadPane)
   // last page each site was on, so going back to a site picks up where you left it
@@ -506,6 +509,7 @@ export default function App(): ReactNode {
                 openUrl(url)
               }}
               onClose={() => setModal(null)}
+              section={modal.section}
             />
           </SettingsModal>
         )}

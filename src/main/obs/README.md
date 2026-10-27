@@ -1,75 +1,100 @@
-# OBS integration handoff
+# OBS
 
-Only new files are supplied. No OBS process is installed, started, stopped, or
-configured on import. No existing gateway, IPC, preload or renderer is changed.
+TrendDeck works with the OBS already installed and running on this computer, through its
+WebSocket v5 server. Nothing is installed, launched or closed. The agent reaches OBS through
+gateway tools, the window through `window.trenddeckObs` (`ObsApi` in `src/shared/obs.ts`).
 
-## Parent wiring
+## Files
 
-- Import `OBS_TOOLS` and `setupObs` from `src/main/obs/index.ts`.
-- Register `OBS_TOOLS` using the existing gateway `registerTools`.
-- Call `setupObs()` once after Electron is ready and brand data is loaded.
-- Expose the `ObsApi` shape from `src/shared/obs.ts` through the existing trusted
-  preload: `preferences(brandId)`, `configure(brandId, input)`, `status(brandId)`
-  invoke the matching `OBS_CHANNELS` values. Do not expose `service.ts`, raw
-  request access, or credentials through preload/MCP.
-- Configure input is `{ endpoint, importLocalPassword?: boolean,
-  clearPassword?: boolean }`. There is deliberately no password field.
-  The user explicitly imports the installed local OBS server password in main;
-  only encrypted Electron safeStorage bytes are persisted per brand.
-- Setup UI can instruct the user to open existing OBS, enable its WebSocket v5
-  server, set authentication, and import local credentials. It never needs to
-  display or receive the password. No renderer card is included.
+- `protocol.ts` endpoint rules, v5 auth, frames, `ObsRequestError` (OBS answered "failed": the
+  outcome is known) versus plain errors (timeout or dropped connection: the outcome is unknown).
+- `client.ts` one connection: identify, correlated requests, 8 s timeouts, optional event
+  subscriptions and one `onClose` for long-lived connections.
+- `monitor.ts` the long-lived connection per brand (see Live connection).
+- `rules.ts` pure rules for the per-brand recording settings.
+- `preferences.ts` per-brand file in `userData/obs/<brand>.json`: endpoint, the password as
+  safeStorage bytes, recording settings.
+- `service.ts` every operation, ownership, restore and auto-import.
+- `tools.ts` the gateway tools, registered in `src/main/gateway/index.ts`.
+- `index.ts` IPC for the window.
 
-## Safety and behavior
+## Settings, OBS (per brand)
 
-`obs_status` inspects version/capabilities, profiles, scenes, recording/streaming
-and directory without mutation. `obs_setup_recording`, `obs_start_recording`,
-and `obs_stop_recording` are gateway `edit` tools (the existing gateway has no
-`write` risk), with both `alwaysAsk` and unconditional `mustAsk`.
-Only the gateway registration should make these operations available to agents.
+- Address (loopback `ws://` only) and "Import password from local OBS", which reads OBS's own
+  `plugin_config/obs-websocket/config.json` in main and keeps it with safeStorage.
+- Profile: default keeps OBS's current profile. TrendDeck only switches to a profile that already
+  exists and never creates one, because a blank profile loses the user's encoder and output setup.
+- Scene collection: default keeps the current one. Only existing ones.
+- Folder: a folder inside the project folder, default `footage` (`<project folder>\footage`).
+  `{project}` and `{brand}` work. Absolute paths and `..` are refused.
+- File name: default leaves OBS's own `Output.FilenameFormatting`. A pattern can use `{project}`,
+  `{brand}` and OBS's `%` specifiers. No path separators.
+- Auto-import: default on. A stopped TrendDeck recording becomes a take card.
 
-Approved setup creates/selects `TrendDeck-<brandId>-<projectId>` and sets
-`Recordings` under the existing `projectFolder` helper. It adds an existing
-media-library watch with agent access **disabled**. It does not alter scenes,
-encoders, source capture, streaming credentials, or OBS installation. Profiles
-are real OBS profiles; new profiles use OBS defaults, so users must configure
-capture sources/output quality in OBS. No fake success/connection fallback.
+The profile and scene collection stay switched after a recording (they're the user's own). The
+record folder, and the file name format when a brand sets one, are remembered when a recording
+starts and put back on the same profile after it stops, so OBS outside TrendDeck isn't left
+pointing at a project. If OBS is busy at that moment, the restore waits for the next time OBS is
+idle (seen through the monitor), once. If OBS switched profiles or someone changed the folder in
+the meantime, their choice is left alone and the card says so. If the app quits mid-recording the
+folder stays on the project; set it back in OBS, Settings, Output.
 
-All operations serialize globally across brands, not just per endpoint. An
-in-memory owner binds brand, project, profile and directory. Other brands cannot
-stop/start its recording. Setup checks both the target and previous owner's
-server are idle before transferring ownership. Every OBS configuration write
-is preceded by fresh recording/streaming checks. An active external recording
-cannot be adopted or stopped. Ownership is intentionally not restored after
-an app restart: an already-active recording must then be stopped manually in OBS.
+## Safety rules
 
-Timeout/disconnect never retries writes automatically. An attempted start/stop
-whose outcome is unknown retains an uncertain ownership lock. The owning brand
-can inspect and explicitly approve stop to resolve it. Changes outside TrendDeck
-to profile/directory block further recording controls and may require manual
-recovery in OBS. External OBS UI/other clients can race the idle checks; OBS v5
-has no global transaction/ownership lease. Partial setup is not rolled back
-automatically; inspect OBS and approve setup again while idle.
+- Only literal loopback `ws://` endpoints; `localhost` is pinned to 127.0.0.1.
+- The password is never an IPC input, a tool argument or a result. Server error comments and close
+  reasons are never echoed. Stream keys and stream service settings are never read or changed.
+- All writes serialize through one global queue across brands.
+- Every config write comes right after a fresh check that OBS isn't recording or streaming.
+- A recording TrendDeck starts is owned by its brand and project. Another brand or project can't
+  stop it or start another. A recording TrendDeck didn't start is never adopted or stopped, and
+  while one runs TrendDeck changes nothing. If OBS's events were missed during our recording and
+  the recording now in OBS is much shorter than ours, stop refuses (it isn't ours).
+- No write is retried automatically. A start or stop whose outcome is unknown keeps an uncertain
+  lock; the owning brand resolves it with an approved stop. A definite failure (OBS said no) puts
+  the record folder back once.
+- Ownership is not restored after an app restart; a running recording must then be stopped in OBS.
+- External OBS UI or other clients can race the idle checks; OBS v5 has no global lease.
 
-Only literal loopback `ws://` endpoints are allowed; `localhost` is pinned to
-127.0.0.1 to avoid hostname resolution changes. Connections are short-lived,
-JSON RPC 1, with challenge authentication, correlated requests and 8-second
-connection/request timeouts. Server error comments/close reasons are never
-echoed. Passwords are neither IPC inputs nor tool arguments/results. Normal
-installed OBS config paths are supported on Windows, macOS and Linux; portable
-or nonstandard OBS config paths are not auto-discovered. Secure keychain storage
-is mandatory for password import, including rejecting Linux basic_text fallback.
+## Live connection
+
+`ObsMonitor` keeps one connection per brand while a card or the pane shows OBS (watch/unwatch
+from the window, by window, with a 10 s linger), while TrendDeck owns a recording, or while a
+restore is pending. It subscribes to Outputs, Scenes and Config events, so a recording stopped
+from OBS's own window is still seen: the owner is finalized, the folder is put back and the take
+is imported. Reconnects back off 2, 5, 10, then 30 s. After a reconnect, a recording that stopped
+meanwhile is finalized with the newest recording file in the folder. The preview's frames
+(`GetSourceScreenshot`, jpg, 480 wide, at most one in flight) go through this connection only.
+
+## Auto-import
+
+When a TrendDeck recording stops (Stop on the card, `obs_stop_recording`, or OBS's own Stop) and
+auto-import is on, `ingestRecording({ brandId, projectId, path, source: 'obs', threadId })` from
+`src/main/takes/ingest.ts` is called with OBS's `outputPath`, after checking (realpath) that it's
+inside the project folder. `threadId` is the chat the recording was started from. Main logs
+`obs: importing take <relative path> for project <id>`.
+
+## Agent tools
+
+| Tool | Risk | Asks |
+|---|---|---|
+| `obs_status` | read | |
+| `obs_scenes` scenes, program scene, inputs with mute | read | |
+| `obs_screenshot` png, 960 wide by default, program or a named source | read | |
+| `obs_show` puts the OBS card in the chat | read | |
+| `obs_takes` recent recordings in the project's folder | read | |
+| `obs_scene_switch` | edit | while streaming |
+| `obs_input_mute` | edit | while streaming |
+| `obs_setup_recording` profile and scene collection, makes the folder | edit | always |
+| `obs_start_recording` | edit | always |
+| `obs_stop_recording` | edit | always |
+| `obs_stream_start`, `obs_stream_stop` | publish | always |
+
+Record and Stop on the card or pane are the user's own action: no approval prompt, the same
+ownership and idle checks.
 
 ## Verification
 
-Primary upstream sources checked during implementation:
-
-- https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md
-  (Hello/Identify, authentication, request response, profiles, directory, outputs)
-- https://github.com/obsproject/obs-websocket/blob/master/src/Config.cpp
-  (local config keys used for explicit credential import)
-
-Run `npx.cmd vitest run src/main/obs` and `npx.cmd tsc --noEmit -p tsconfig.node.json`.
-Unit tests use pure protocol helpers and fake transports/OBS state; they do not
-start recording. A live installed OBS end-to-end check requires parent wiring,
-user-approved setup and a real running local OBS server.
+`TRENDDECK_SKIP_FFMPEG=1 npx vitest run src/main/obs` (fake transports and OBS state, nothing
+real is started). Protocol sources: obs-websocket `docs/generated/protocol.md` and
+`src/Config.cpp`.

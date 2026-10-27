@@ -69,6 +69,8 @@ function craftDef(key: string): WorkspaceDef | undefined {
 }
 
 registerWorkspace('phone', { label: 'Phone', component: PhoneWorkspace, tool: true })
+const ObsWorkspace = lazy(() => import('./obs/ObsWorkspace'))
+registerWorkspace('obs', { label: 'OBS', component: ObsWorkspace, tool: true })
 // the pane docks the Craft apps and OBS (registered by the OBS pane as 'obs'). the old pages
 // (ideas, writer, media, trends and the rest) are gone from it, the agent does that work in chat
 for (const k of OWN_KEYS) registerWorkspace(k, craftDef(k)!)

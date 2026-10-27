@@ -28,7 +28,12 @@ import { EmbedCard, type EmbedActions } from './Embeds'
 import MediaReview from './MediaReview'
 import CardList from './cards/CardList'
 import { useCards, type CardActions } from './cards/useCards'
-import { Dictation } from './Dictation'
+import ComposerMic from './ComposerMic'
+import TakeRecorder from './TakeRecorder'
+import { useTakeTranscriber } from './useTakeTranscriber'
+import { joinTranscripts, useDictation } from '../dictation/useDictation'
+import type { Transcription } from '@shared/speech'
+import type { BrandMemoryState } from '@shared/brand-memory'
 import AgentSettings from './AgentSettings'
 import SetupSteps from './SetupSteps'
 import WorkLog from './WorkLog'
@@ -62,6 +67,22 @@ interface Props {
   project?: Project
   onInlineCraft?: () => void
 }
+
+// talking modes for the composer: what you say goes to the agent with this ask in front
+const TALK_MODES = {
+  script: {
+    label: 'Talk-first script',
+    hint: "Talk the video through, no need for order. Send when you're done.",
+    prefix:
+      "Talk-first script. Below is the video in my own words (saved as a dump with word times). Build the script with script_write: beats from my sentences quoted word for word as spoken lines, only short connecting lines of your own as suggestions. Then show it and tell me in one line what's missing."
+  },
+  intake: {
+    label: 'Brand intake',
+    hint: 'Talk about who it is for, the promise, how you talk, what you are not, and your content pillars.',
+    prefix: ''
+  }
+} as const
+type TalkMode = keyof typeof TALK_MODES
 
 const STARTERS = [
   {
@@ -106,6 +127,24 @@ function StopIcon(): ReactNode {
   return (
     <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
       <rect x="1" y="1" width="10" height="10" rx="2" fill="currentColor" />
+    </svg>
+  )
+}
+
+function RecordIcon(): ReactNode {
+  return (
+    <svg width="15" height="14" viewBox="0 0 15 14" aria-hidden="true">
+      <rect x="1" y="3" width="9" height="8" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M10 6l3.6-2v6L10 8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ObsIcon(): ReactNode {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+      <rect x="1" y="2" width="12" height="8.5" rx="1.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M4.5 13h5M7 10.5V13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   )
 }
@@ -210,6 +249,13 @@ export default function ChatView({
   const brandId = brand.id
   // cards the agent's tools put in this chat: videos to review, suggestions, copies, history
   const cards = useCards(brandId, openId)
+  useTakeTranscriber(brandId, cards)
+  // dictation: finished words go into the draft, the part still being transcribed shows lighter
+  const [partial, setPartial] = useState('')
+  const dictated = useRef<{ t: Transcription; offset: number }[]>([])
+  const [talkMode, setTalkMode] = useState<TalkMode | null>(null)
+  const [recording, setRecording] = useState(false)
+  const [memory, setMemory] = useState<BrandMemoryState | null>(null)
 
   const loadAgents = useCallback(async (rescan = false) => {
     setScanning(true)
@@ -244,6 +290,18 @@ export default function ChatView({
   useEffect(() => {
     void loadThreads()
   }, [loadThreads])
+
+  useEffect(() => {
+    let alive = true
+    const api = window.trenddeckBrandMemory
+    const load = (): void => void api.state(brandId).then((m) => alive && setMemory(m)).catch(() => {})
+    load()
+    const off = api.onChanged((b) => b === brandId && load())
+    return () => {
+      alive = false
+      off()
+    }
+  }, [brandId])
 
   useEffect(() => {
     // each chat remembers its own agent, a pick only sticks to the chat it was made in
@@ -481,9 +539,34 @@ export default function ChatView({
     }
   }
 
+  // what was dictated since the last send, saved with its word times. returns a note for the agent
+  const keepDictation = async (): Promise<string> => {
+    const joined = joinTranscripts(dictated.current)
+    dictated.current = []
+    if (!joined || !joined.text) return ''
+    try {
+      if (project) {
+        const dump = await window.trenddeckScripts.saveDump(brandId, project.id, joined)
+        return `\n\n(Dictated. Saved as dump ${dump.id} with word times.)`
+      }
+      await window.trenddeckScripts.addSpeech(brandId, joined)
+    } catch {
+      // the message still goes, only the word times are lost
+    }
+    return ''
+  }
+
   const send = async (text = draft, how: 'steer' | 'queue' = 'steer'): Promise<void> => {
-    const body = text.trim()
+    let body = text.trim()
     if (!body || !agentId) return
+    if (text === draft) {
+      if (!body) dictated.current = []
+      const note = await keepDictation()
+      const mode = talkMode ? TALK_MODES[talkMode] : null
+      const prefix = talkMode === 'intake' ? await window.trenddeckBrandMemory.intakePrompt().catch(() => '') : mode?.prefix ?? ''
+      body = `${prefix ? `${prefix}\n\n` : ''}${body}${note}`
+      setTalkMode(null)
+    }
     setError('')
     setNotice('')
     if (busy && thread) {
@@ -534,6 +617,42 @@ export default function ChatView({
     } else void loadThread(res.threadId)
   }
   const cardActions: CardActions = { brand, project, sendToAgent, hasAgent: !!agentId }
+
+  const dictation = useDictation({
+    onPartial: setPartial,
+    onText: (text, t) => {
+      // hands-free while a reply runs: what you say goes straight in as a steer
+      if (dictation.config?.handsFree && busy && thread) {
+        dictated.current.push({ t, offset: 0 })
+        void keepDictation().then((note) => sendToAgent(`${text}${note}`).catch((err) => setError(cleanError(err))))
+        return
+      }
+      const offset = dictated.current.reduce((n, p) => n + p.t.duration, 0)
+      dictated.current.push({ t, offset })
+      setDraft((current) => (current.trim() ? `${current.replace(/\s+$/, '')} ${text}` : text))
+    },
+    onPause: () => void send()
+  })
+  const startTalking = (mode: TalkMode): void => {
+    setTalkMode(mode)
+    input.current?.focus()
+    dictation.start('click')
+  }
+  // a different chat starts with the mic off
+  useEffect(() => {
+    dictation.stop()
+    dictated.current = []
+    setTalkMode(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId, brandId])
+
+  const wrapUp = async (): Promise<void> => {
+    try {
+      await sendToAgent(await window.trenddeckBrandMemory.wrapUp(brandId))
+    } catch (err) {
+      setError(cleanError(err))
+    }
+  }
 
   const stop = (): void => {
     if (thread && busy) void chat().stop(brandId, thread.id)
@@ -892,6 +1011,18 @@ export default function ChatView({
                   tabs.
                 </p>
                 <div className="cx-starters">
+                  {memory && !memory.intakeDone && (
+                    <button className="cx-starter" disabled={!agentId} title={TALK_MODES.intake.hint} onClick={() => startTalking('intake')}>
+                      <RisingMark className="cx-starter-mark" />
+                      <span className="cx-starter-title">Set up this brand by talking</span>
+                      <span className="cx-starter-hint">Your agent drafts the voice guide from what you say</span>
+                    </button>
+                  )}
+                  <button className="cx-starter" disabled={!agentId} title={TALK_MODES.script.hint} onClick={() => startTalking('script')}>
+                    <RisingMark className="cx-starter-mark" />
+                    <span className="cx-starter-title">Talk through a video</span>
+                    <span className="cx-starter-hint">Your words become the script</span>
+                  </button>
                   {STARTERS.map((s) => (
                     <button
                       key={s.title}
@@ -985,8 +1116,22 @@ export default function ChatView({
               ))}
             </ul>
           )}
-          <Dictation key={`dictation:${brandId}:${openId ?? 'new'}`} api={window.trenddeckDictation}
-            onTranscript={(text) => { setDraft((current) => current ? `${current}\n${text}` : text); input.current?.focus() }} />
+          {dictation.error && (
+            <p className="cx-error">
+              {dictation.error}{' '}
+              <button type="button" className="cx-tool" onClick={dictation.clearError}>
+                Dismiss
+              </button>
+            </p>
+          )}
+          {memory && memory.pending >= 3 && !busy && agentId && (
+            <p className="cx-notice cx-wrap">
+              You changed or turned down {memory.pending} things this session.{' '}
+              <button type="button" className="cx-tool" onClick={() => void wrapUp()}>
+                Wrap up
+              </button>
+            </p>
+          )}
           <div className={`cx-box${approval ? ' approving' : ''}`}>
             {approval && (
               <ApprovalPanel
@@ -1014,6 +1159,35 @@ export default function ChatView({
                 ))}
               </div>
             )}
+            {talkMode && (
+              <div className="cx-talk-mode">
+                <strong>{TALK_MODES[talkMode].label}</strong>
+                <span>{TALK_MODES[talkMode].hint}</span>
+                <button type="button" className="cx-tool" onClick={() => setTalkMode(null)}>
+                  Cancel
+                </button>
+              </div>
+            )}
+            {recording && (
+              <div className="cx-take-pop" role="dialog" aria-label="Record a take">
+                <TakeRecorder
+                  brandId={brandId}
+                  projectId={project?.id}
+                  threadId={openId}
+                  onAttach={(list) => {
+                    attach(list)
+                    setRecording(false)
+                  }}
+                  onSaved={() => setRecording(false)}
+                />
+              </div>
+            )}
+            <div className="cx-input">
+            <div className="cx-input-mirror" aria-hidden="true">
+              <span className="cx-input-ghost">{draft}</span>
+              {partial && <span className="cx-input-partial">{draft.trim() ? ' ' : ''}{partial}</span>}
+              {'\n'}
+            </div>
             <textarea
               ref={input}
               value={draft}
@@ -1047,7 +1221,12 @@ export default function ChatView({
                   void addFiles(e.clipboardData.files)
                 }
               }}
+              onScroll={(e) => {
+                const mirror = e.currentTarget.previousElementSibling as HTMLElement | null
+                if (mirror) mirror.scrollTop = e.currentTarget.scrollTop
+              }}
             />
+            </div>
             <div className="cx-box-row">
               <Dropdown
                 className="cx-agent"
@@ -1107,6 +1286,29 @@ export default function ChatView({
               >
                 <ClipIcon />
               </button>
+              <ComposerMic d={dictation} disabled={!agentId || !!approval} />
+              <button
+                type="button"
+                className={`ui-menu-btn${recording ? ' on' : ''}`}
+                title={project ? 'Record a take for this project' : 'Record a take'}
+                aria-label="Record a take"
+                aria-expanded={recording}
+                onClick={() => setRecording(!recording)}
+              >
+                <RecordIcon />
+              </button>
+              {project && (
+                <button
+                  type="button"
+                  className="ui-menu-btn"
+                  title="Show OBS in the chat"
+                  aria-label="Show OBS in the chat"
+                  disabled={!openId}
+                  onClick={() => openId && void window.trenddeckObs.showCard(brandId, openId, project.id).catch((err: unknown) => setError(cleanError(err)))}
+                >
+                  <ObsIcon />
+                </button>
+              )}
               <span className="spacer" />
               <UsagePopover agents={agents ?? []} thread={thread} />
               {busy && thread && !approval && draft.trim() && (

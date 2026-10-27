@@ -30,6 +30,7 @@ import { dropCards, setupCards } from './cards'
 import { dropStorageBrand, setupStorageSettings } from './production-storage'
 import { dropContextBrand, setupContext } from './context'
 import { dropMcpServersBrand, setupMcpServers } from './mcp-servers'
+import { dropBrandMemory, setupVoiceScript } from './voice-script'
 
 const PARTITION_PREFIX = 'persist:brand-'
 if (process.platform === 'win32') app.setAppUserModelId('com.joshwright.trenddeck')
@@ -92,10 +93,20 @@ function createWindow(): void {
   // craft apps dock over this window's workspace pane
   craftHost(win)
 
+  // test runs: the window lives off screen and never takes focus, screenshots go through
+  // capturePage or the devtools protocol
+  const offscreen = process.env.TRENDDECK_TEST_OFFSCREEN === '1'
+  if (offscreen) {
+    win.setPosition(-10000, -10000)
+    win.setSkipTaskbar(true)
+    win.setFocusable(false)
+  }
+
   win.once('ready-to-show', () => {
     // a downloaded update that got this far works, boot.ts keeps using it
     bootInfo()?.markGood()
-    win.show()
+    if (offscreen) win.showInactive()
+    else win.show()
     // the ad blocker engine is big, give the first paint a head start
     setTimeout(startAdblock, 1000)
   })
@@ -205,6 +216,7 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   await dropStorageBrand(brandId)
   await dropContextBrand(brandId)
   await dropMcpServersBrand(brandId)
+  await dropBrandMemory(brandId)
 })
 
 setupTrends()
@@ -224,6 +236,7 @@ setupCards()
 setupStorageSettings()
 setupContext()
 setupMcpServers()
+setupVoiceScript()
 
 void app.whenReady().then(() => {
   app.userAgentFallback = plainUserAgent()

@@ -14,6 +14,7 @@ import { PUBLISH_TOOLS } from './tools/publish'
 import { qcTools } from '../qc/tools'
 import { STORAGE_TOOLS } from '../production-storage'
 import { CONTEXT_TOOLS } from '../context'
+import { OBS_TOOLS } from '../obs'
 
 export { callGatewayTool, mcpToolList, toolInfo } from './call'
 
@@ -23,6 +24,8 @@ registerTools(qcTools())
 // project history and cloud copies, then the brand's docs, past videos and style memory
 registerTools(STORAGE_TOOLS)
 registerTools(CONTEXT_TOOLS)
+// OBS: status, scenes, pictures, recording and streaming with the user's approval
+registerTools(OBS_TOOLS)
 
 const isId = (v: unknown): v is string => typeof v === 'string' && ID_PATTERN.test(v)
 // approvals and policy only from the app window, a site tab never gets to say yes

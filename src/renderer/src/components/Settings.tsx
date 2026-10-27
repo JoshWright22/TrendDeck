@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import {
   cleanDomain,
   DEFAULT_SITES,
@@ -18,9 +18,11 @@ import CraftSettings from '../workspace/craft/CraftSettings'
 import ContextSection from './context/ContextSection'
 import McpServersSection from './mcp-servers/McpServersSection'
 import StorageSection from './storage/StorageSection'
+import DictationSettings from './dictation/DictationSettings'
+import ObsSettings from './obs/ObsSettings'
 
 const REPO_URL = 'https://github.com/JoshWright22/TrendDeck'
-const SECTIONS = ['Brand', 'Sites', 'Ad blocker', 'Tabs', 'Trends', 'Posting pace', 'Agents', 'Agent access', 'MCP servers', 'Context', 'Craft apps', 'Storage', 'Saved logins', 'About'] as const
+const SECTIONS = ['Brand', 'Sites', 'Ad blocker', 'Tabs', 'Trends', 'Posting pace', 'Agents', 'Agent access', 'MCP servers', 'Context', 'Dictation', 'OBS', 'Craft apps', 'Storage', 'Saved logins', 'About'] as const
 
 interface Props {
   data: AppData
@@ -31,6 +33,8 @@ interface Props {
   onAddSite: () => void
   onOpenUrl: (url: string) => void
   onClose: () => void
+  // the section to open at
+  section?: string
 }
 
 const sectionId = (s: string): string => `settings-${s.toLowerCase().replace(/\s+/g, '-')}`
@@ -251,6 +255,9 @@ export default function Settings(props: Props): ReactNode {
   const [cap, setCap] = useState(String(data.settings.tabCap))
   const [key, setKey] = useState(data.settings.youtubeApiKey)
   const [at, setAt] = useState<string>(SECTIONS[0])
+  useEffect(() => {
+    if (props.section) document.getElementById(sectionId(props.section))?.scrollIntoView({ block: 'start' })
+  }, [props.section])
   // the open brand first
   const ordered = [...data.brands].sort((a, b) => Number(b.id === brand.id) - Number(a.id === brand.id))
   const setSettings = (patch: Partial<AppData['settings']>): void =>
@@ -325,6 +332,8 @@ export default function Settings(props: Props): ReactNode {
     'Agent access': <AgentAccess brandId={brand.id} />,
     'MCP servers': <McpServersSection key={brand.id} brand={brand} />,
     Context: <ContextSection key={brand.id} brand={brand} />,
+    Dictation: <DictationSettings />,
+    OBS: <ObsSettings key={brand.id} brand={brand} />,
     'Craft apps': <CraftSettings />,
     Storage: <StorageSection key={brand.id} brand={brand} />,
     'Saved logins': <SavedLogins brandId={brand.id} />,

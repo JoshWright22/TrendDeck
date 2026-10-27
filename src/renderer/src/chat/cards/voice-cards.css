@@ -1,0 +1,218 @@
+/* script, take, rule and brand file cards. grays only: who wrote a line is carried by brightness
+   and the label, never by color. red only for errors */
+
+.cx-card2 h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--chalk);
+}
+
+.cx-card2-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--felt);
+  color: var(--chalk);
+  font: inherit;
+  resize: vertical;
+}
+
+/* script */
+.cx-script-beat ol {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cx-script-line {
+  display: grid;
+  grid-template-columns: 76px 1fr;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.cx-script-origin {
+  padding-top: 1px;
+  color: var(--chalk);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cx-script-line.agent .cx-script-origin,
+.cx-script-line.agent .cx-script-text {
+  color: var(--smoke);
+}
+
+.cx-script-line.agent .cx-script-text {
+  font-style: italic;
+}
+
+.cx-script-text {
+  margin: 0;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.cx-script-body {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cx-script-body textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--felt);
+  color: var(--chalk);
+  font: inherit;
+  resize: vertical;
+}
+
+.cx-script-flag,
+.cx-script-claim {
+  margin: 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--chalk);
+  font-size: 12.5px;
+}
+
+.cx-script-claim.wrong {
+  border-left-color: var(--pink);
+}
+
+.cx-script-claim strong {
+  font-weight: 600;
+}
+
+.cx-script-claim a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.cx-script-claim-note {
+  color: var(--smoke);
+}
+
+.cx-script-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+.cx-card2 .cx-script-actions button {
+  min-height: 26px;
+  padding: 2px 8px;
+  border-color: transparent;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.cx-card2 .cx-script-actions button:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  color: var(--chalk);
+}
+
+/* take */
+.cx-take-section p {
+  margin: 0;
+}
+
+.cx-take-notes,
+.cx-take-pickups,
+.cx-take-lines {
+  display: grid;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.cx-take-notes {
+  padding-left: 0;
+  list-style: none;
+}
+
+.cx-card2 .cx-take-at {
+  min-height: 0;
+  padding: 0 4px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.cx-take-line {
+  color: var(--accent);
+}
+
+.cx-take-lines li strong {
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.cx-take-lines li.said {
+  color: var(--smoke);
+}
+
+.cx-take-said {
+  display: block;
+  color: var(--chalk);
+}
+
+.cx-card2 details summary {
+  margin-top: 6px;
+  color: var(--chalk);
+  cursor: pointer;
+}
+
+.cx-card2 .cx-take-toggle {
+  min-height: 26px;
+  padding: 2px 8px;
+}
+
+.cx-take-transcript {
+  margin-top: 6px;
+  line-height: 1.8;
+}
+
+.cx-card2 .cx-take-word {
+  min-height: 0;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  color: var(--chalk);
+  font: inherit;
+}
+
+.cx-card2 .cx-take-word:hover {
+  background: var(--raised);
+}
+
+/* rules and brand files */
+.cx-rule-examples {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--chalk);
+}
+
+.cx-brand-file-body {
+  max-height: 320px;
+  overflow: auto;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--felt);
+}
+
+.cx-brand-file-edit {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12.5px;
+}

@@ -2425,3 +2425,117 @@
 .cx-media-review { min-width: 0; margin: 12px 0; }
 .cx-media-review audio { width: 100%; }
 .cx-media-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+
+/* dictation in the composer: the box shows what is being said, lighter until it is final */
+.cx-input {
+  position: relative;
+  display: grid;
+}
+
+.cx-input > textarea,
+.cx-input-mirror {
+  grid-area: 1 / 1;
+  margin: 0;
+  padding: 2px 0;
+  font: inherit;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cx-input-mirror {
+  max-height: 220px;
+  overflow: hidden;
+  pointer-events: none;
+  color: transparent;
+}
+
+.cx-input > textarea {
+  position: relative;
+}
+
+.cx-input-partial {
+  color: var(--smoke);
+}
+
+.cx-mic {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cx-mic .cx-mic-btn[aria-pressed='true'],
+.cx-box-row .ui-menu-btn.on {
+  background: var(--raised);
+  color: var(--accent);
+}
+
+.cx-mic-menu .ui-menu-btn {
+  width: 18px;
+}
+
+.cx-mic-meter {
+  position: relative;
+  width: 44px;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+.cx-mic-meter > span {
+  position: absolute;
+  inset: 0;
+  background: var(--chalk);
+  transform-origin: left center;
+  transition: transform 0.1s linear;
+}
+
+.cx-mic-time {
+  color: var(--chalk);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cx-mic-label {
+  color: var(--chalk);
+  font-size: 12px;
+}
+
+.cx-mic-stop {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--chalk);
+  font-size: 12px;
+}
+
+.cx-mic-stop:hover {
+  background: var(--hover);
+}
+
+.cx-talk-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  color: var(--chalk);
+  font-size: 12.5px;
+}
+
+.cx-talk-mode strong {
+  font-weight: 600;
+}
+
+.cx-take-pop {
+  padding: 10px 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cx-mic-meter > span {
+    transition: none;
+  }
+}
