@@ -136,6 +136,18 @@
 .ui-item.danger {
   color: var(--pink);
 }
+.ui-item.divided {
+  position: relative;
+  margin-top: 9px;
+}
+.ui-item.divided::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 4px;
+  right: 4px;
+  border-top: 1px solid var(--line);
+}
 .ui-item[aria-disabled] {
   opacity: 0.45;
   cursor: default;

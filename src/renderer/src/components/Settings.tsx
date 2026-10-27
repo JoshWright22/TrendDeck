@@ -14,9 +14,10 @@ import AgentAccess from './mcp/AgentAccess'
 import AgentsSection from '../chat/AgentsSection'
 import PacePanel from '../pages/reuse/PacePanel'
 import SavedLogins from './vault/SavedLogins'
+import CraftSettings from '../workspace/craft/CraftSettings'
 
 const REPO_URL = 'https://github.com/JoshWright22/TrendDeck'
-const SECTIONS = ['Brand', 'Sites', 'Ad blocker', 'Tabs', 'Trends', 'Posting pace', 'Agents', 'Agent access', 'Saved logins', 'About'] as const
+const SECTIONS = ['Brand', 'Sites', 'Ad blocker', 'Tabs', 'Trends', 'Posting pace', 'Agents', 'Agent access', 'Craft apps', 'Saved logins', 'About'] as const
 
 interface Props {
   data: AppData
@@ -319,6 +320,7 @@ export default function Settings(props: Props): ReactNode {
     'Posting pace': <PacePanel />,
     Agents: <AgentsSection />,
     'Agent access': <AgentAccess brandId={brand.id} />,
+    'Craft apps': <CraftSettings />,
     'Saved logins': <SavedLogins brandId={brand.id} />,
     About: (
       <>

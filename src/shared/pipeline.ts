@@ -26,7 +26,20 @@ export const WORKSPACES = [
   'writer',
   'voice',
   'media',
-  'editor',
+  // the Craft apps, docked over the pane. the four with their own keys, the rest as craft:<id>
+  'filmcraft',
+  'photocraft',
+  'soundcraft',
+  'effectcraft',
+  'craft:designcraft',
+  'craft:vectorcraft',
+  'craft:lightcraft',
+  'craft:pdfcraft',
+  'craft:wordcraft',
+  'craft:deckcraft',
+  'craft:gridcraft',
+  'craft:cadcraft',
+  'craft:figcraft',
   'schedule',
   'posting',
   'shorts',
@@ -38,7 +51,10 @@ export const WORKSPACES = [
 ] as const
 export type Workspace = string
 export const MAX_STAGES = 30
-export const WORKSPACE_KEY = /^[a-z0-9-]{1,40}$/
+// a plain key, or craft:<app id> for any app of the Craft suite
+export const WORKSPACE_KEY = /^(craft:)?[a-z0-9-]{1,40}$/
+// stages saved before the Craft apps pointed at the built-in editor
+export const OLD_WORKSPACES: Record<string, string> = { editor: 'filmcraft' }
 
 export type StageConfig = Record<string, string | number | boolean>
 
@@ -181,9 +197,9 @@ export const DEFAULT_STAGES: readonly PipelineStage[] = [
   { id: 'idea', label: 'Idea', kind: 'idea', workspace: 'ideas', config: {}, auto: false },
   { id: 'script', label: 'Script', kind: 'script', workspace: 'writer', config: {}, auto: true },
   { id: 'record', label: 'Record', kind: 'record', workspace: 'media', config: {}, auto: false },
-  { id: 'edit', label: 'Edit', kind: 'edit', workspace: 'editor', config: {}, auto: false },
-  { id: 'thumbnail', label: 'Thumbnail', kind: 'thumbnail', workspace: 'editor', config: {}, auto: false },
-  { id: 'captions', label: 'Captions', kind: 'captions', workspace: 'writer', config: {}, auto: true },
+  { id: 'edit', label: 'Edit', kind: 'edit', workspace: 'filmcraft', config: {}, auto: false },
+  { id: 'thumbnail', label: 'Thumbnail', kind: 'thumbnail', workspace: 'photocraft', config: {}, auto: false },
+  { id: 'captions', label: 'Captions', kind: 'captions', workspace: 'filmcraft', config: {}, auto: true },
   { id: 'schedule', label: 'Schedule', kind: 'schedule', workspace: 'schedule', config: {}, auto: true },
   { id: 'post', label: 'Post', kind: 'post', workspace: 'posting', config: {}, auto: false },
   { id: 'engage', label: 'Replies', kind: 'engage', workspace: 'inbox', config: {}, auto: false },

@@ -9,6 +9,8 @@ export interface MenuItem {
   danger?: boolean
   disabled?: boolean
   shortcut?: string
+  // a hairline above it, to start a group
+  divider?: boolean
 }
 
 interface Props {
@@ -121,7 +123,7 @@ export function Menu({ items, label, trigger, up, align = 'right', className }: 
               id={`${id}-${i}`}
               role="menuitem"
               aria-disabled={item.disabled || undefined}
-              className={`ui-item${i === active ? ' active' : ''}${item.danger ? ' danger' : ''}`}
+              className={`ui-item${i === active ? ' active' : ''}${item.danger ? ' danger' : ''}${item.divider ? ' divided' : ''}`}
               onMouseEnter={() => setActive(i)}
               onClick={() => pick(i)}
             >

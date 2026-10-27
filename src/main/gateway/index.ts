@@ -11,11 +11,13 @@ import { dropReplies, listReplyDrafts, removeReplyDraft } from './replies'
 import { forgetSecrets } from './secrets'
 import { CONTENT_TOOLS } from './tools/content'
 import { PUBLISH_TOOLS } from './tools/publish'
+import { qcTools } from '../qc/tools'
 
 export { callGatewayTool, mcpToolList, toolInfo } from './call'
 
 // every tool an agent can call, in the order tools/list shows them
 registerTools([...SITE_TOOLS, ...CONTENT_TOOLS, ...PUBLISH_TOOLS, ...PIPELINE_TOOLS])
+registerTools(qcTools())
 
 const isId = (v: unknown): v is string => typeof v === 'string' && ID_PATTERN.test(v)
 // approvals and policy only from the app window, a site tab never gets to say yes

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { cleanPolicy, decide, defaultPolicy } from '../src/main/gateway/decide'
 import { redact, redactText, REDACTED } from '../src/main/gateway/redact'
 import { int, list, obj, oneOf, str, validateArgs } from '../src/main/gateway/validate'
-import { advanceRun, applyChanges, defaultStages, diffStages, newRun, PipelineError, setStage, syncRun } from '../src/main/pipeline/model'
+import { advanceRun, applyChanges, cleanStage, defaultStages, diffStages, newRun, PipelineError, setStage, syncRun } from '../src/main/pipeline/model'
 
 let passed = 0
 function test(name: string, fn: () => void): void {
@@ -199,6 +199,17 @@ test('runs follow the pipeline when stages change', () => {
   const synced = syncRun(r, fewer)
   assert.equal(synced.currentStageId, 'idea')
   assert.ok(synced.stageStates.research, 'old state kept')
+})
+
+test('stages saved with the old editor open filmcraft, craft keys are kept', () => {
+  const old = cleanStage({ id: 'edit', label: 'Edit', kind: 'edit', workspace: 'editor', config: {}, auto: false })
+  assert.equal(old?.workspace, 'filmcraft')
+  assert.equal(cleanStage({ id: 'deck', label: 'Deck', kind: 'custom', workspace: 'craft:deckcraft' })?.workspace, 'craft:deckcraft')
+  assert.equal(cleanStage({ id: 'x', label: 'X', kind: 'custom', workspace: 'craft:../x' })?.workspace, 'none')
+  const d = defaultStages()
+  assert.equal(d.find((s) => s.id === 'edit')?.workspace, 'filmcraft')
+  assert.equal(d.find((s) => s.id === 'thumbnail')?.workspace, 'photocraft')
+  assert.equal(d.find((s) => s.id === 'captions')?.workspace, 'filmcraft')
 })
 
 console.log(`gateway tests: ${passed} passed`)

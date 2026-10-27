@@ -6,6 +6,7 @@ import {
   STAGE_STATUSES,
   MAX_STAGES,
   WORKSPACE_KEY,
+  OLD_WORKSPACES,
   type PipelineChange,
   type PipelineStage,
   type Run,
@@ -51,7 +52,8 @@ export function cleanStage(raw: unknown): PipelineStage | null {
     id: s.id,
     label: s.label.trim().slice(0, 60),
     kind: (STAGE_KINDS as readonly string[]).includes(s.kind as string) ? (s.kind as StageKind) : 'custom',
-    workspace: typeof s.workspace === 'string' && WORKSPACE_KEY.test(s.workspace) ? s.workspace : 'none',
+    workspace:
+      typeof s.workspace === 'string' && WORKSPACE_KEY.test(s.workspace) ? (OLD_WORKSPACES[s.workspace] ?? s.workspace) : 'none',
     config: cleanConfig(s.config),
     auto: s.auto === true
   }

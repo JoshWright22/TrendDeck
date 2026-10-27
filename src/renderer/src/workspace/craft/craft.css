@@ -1,0 +1,292 @@
+/* the Craft apps in the workspace pane and in settings. grays and hairlines, red only for errors */
+
+.craft {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.craft-center {
+  display: grid;
+  place-items: center;
+}
+
+.craft-card {
+  width: min(360px, 100% - 48px);
+  padding: 24px;
+  text-align: center;
+}
+
+.craft h2 {
+  margin: 0 0 4px;
+  font: 600 14px/1.2 var(--body);
+  color: var(--accent);
+}
+
+.craft-blurb {
+  margin: 0 0 16px;
+  color: var(--smoke);
+}
+
+.craft-head .craft-blurb {
+  margin: 0;
+}
+
+.craft-hint {
+  margin: 10px 0 0;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.craft-error {
+  color: var(--pink);
+  font-size: 12px;
+}
+
+.craft-card .craft-error {
+  margin: 10px 0 0;
+}
+
+.craft-pad {
+  padding: 0 14px 12px;
+}
+
+.craft-progress {
+  height: 3px;
+  margin: 4px 0 0;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.craft-progress span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.2s var(--ease);
+}
+
+.craft-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 16px 14px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.craft-version {
+  color: var(--faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.craft-files {
+  margin: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.craft-files-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 38px;
+  padding: 6px 8px 6px 14px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.craft-files-head + .craft-list {
+  border-top: 1px solid var(--hair);
+}
+
+.craft-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.craft-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 4px 8px 4px 14px;
+}
+
+.craft-list li + li {
+  border-top: 1px solid var(--hair);
+}
+
+.craft-list li:hover {
+  background: var(--hover);
+}
+
+.craft-file {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.craft-when {
+  color: var(--faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* open: a thin bar, then the box the app's window docks over */
+
+.craft-docked {
+  gap: 0;
+}
+
+.craft-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--hair);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.craft-bar-name {
+  color: var(--chalk);
+  font-weight: 500;
+}
+
+.craft-bar-sep {
+  color: var(--faint);
+}
+
+.craft-bar-file {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--smoke);
+}
+
+.craft-agent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--smoke);
+}
+
+.craft-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px var(--faint);
+}
+
+.craft-dot.headless {
+  background: var(--faint);
+  box-shadow: none;
+}
+
+.craft-dot.bridge {
+  background: var(--accent);
+  box-shadow: none;
+}
+
+.craft-dot.error {
+  background: var(--pink);
+  box-shadow: none;
+}
+
+.craft-dock {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  background: var(--panel);
+}
+
+.craft-dock p {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+/* settings table */
+
+.craft-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+}
+
+.craft-col-ver {
+  width: 64px;
+}
+
+.craft-col-status {
+  width: 30%;
+}
+
+.craft-col-actions {
+  width: 172px;
+}
+
+.craft-table th {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  color: var(--faint);
+  font-weight: 500;
+  text-align: left;
+}
+
+.craft-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--hair);
+  vertical-align: middle;
+}
+
+.craft-table .num {
+  font-variant-numeric: tabular-nums;
+  color: var(--smoke);
+  white-space: nowrap;
+}
+
+.craft-row-name {
+  display: block;
+  color: var(--chalk);
+  font-weight: 500;
+}
+
+.craft-row-blurb {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--faint);
+}
+
+.craft-row-error {
+  display: block;
+}
+
+.craft-row-progress {
+  display: grid;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.craft-row-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.craft-row-actions .ws-head-btn + .ws-head-btn {
+  margin-left: 4px;
+}
+
+.ws-head-btn.danger {
+  color: var(--pink);
+}

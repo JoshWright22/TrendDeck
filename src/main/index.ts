@@ -21,8 +21,8 @@ import { dropInboxBrand, setupInbox } from './inbox'
 import { setupReuse } from './reuse'
 import { dropBrandPhone, setupEmulator } from './emulator'
 import { setupWorkspace } from './workspace'
-import { setupEditor } from './editor'
 import { craftHost, setupCraft } from './craft'
+import { setupQc } from './qc'
 
 const PARTITION_PREFIX = 'persist:brand-'
 
@@ -209,7 +209,7 @@ void app.whenReady().then(() => {
   setupPosting()
   setupMedia()
   setupReuse()
-  setupEditor()
+  setupQc()
   createWindow()
   void setupUpdater()
   app.on('activate', () => {

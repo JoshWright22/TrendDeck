@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { PipelineStage } from '@shared/workspace'
 import type { Run } from '@shared/pipeline'
 import { Menu } from '../chat/ui'
@@ -7,6 +7,9 @@ import StageStrip from './StageStrip'
 import PipelineEditor from './PipelineEditor'
 import Placeholder from './Placeholder'
 import { toolWorkspaces, workspaceFor, type WorkspaceProps } from './registry'
+import { PaneContext } from './pane'
+import { craftKey } from './craft/apps'
+import { useCraftApps } from './craft/store'
 
 // what the right pane shows: a pipeline stage, a tool from the menu, or a site tab
 export type WsView = { kind: 'stage'; stageId: string } | { kind: 'tool'; key: string } | { kind: 'site'; id: string }
@@ -96,8 +99,10 @@ export default function WorkspacePane(props: Props): ReactNode {
   const crumb =
     view.kind === 'stage' ? (stage?.label ?? 'Stage') : view.kind === 'tool' ? (def?.label ?? 'Tool') : (site?.name ?? 'Site')
   const tools = toolWorkspaces()
+  const craft = useCraftApps() ?? []
   const run = useRun(brand.id, project.id)
   const [editing, setEditing] = useState(false)
+  const paneValue = useMemo(() => ({ collapsed }), [collapsed])
   const [runError, setRunError] = useState('')
   const here = run?.currentStageId ?? project.stageId
 
@@ -137,7 +142,14 @@ export default function WorkspacePane(props: Props): ReactNode {
           trigger={<span className="ws-head-btn">Tools</span>}
           items={[
             ...tools.map(([k, d]) => ({ label: d.label, onSelect: () => onView({ kind: 'tool', key: k }) })),
-            ...(brand.sites[0] ? [{ label: 'Sites', onSelect: () => onView({ kind: 'site', id: brand.sites[0].id }) }] : [])
+            ...(brand.sites[0] ? [{ label: 'Sites', onSelect: () => onView({ kind: 'site', id: brand.sites[0].id }) }] : []),
+            // the Craft apps, opened on this project's files
+            ...craft.map((c, i) => ({
+              label: c.app.name,
+              divider: i === 0,
+              shortcut: c.running ? 'Open' : c.install.kind === 'installed' ? undefined : 'Install',
+              onSelect: () => onView({ kind: 'tool', key: craftKey(c.app.id) })
+            }))
           ]}
         />
         <button className="icon-btn small" title="Hide workspace (Ctrl+B)" aria-label="Hide workspace" onClick={props.onCollapse}>
@@ -159,6 +171,7 @@ export default function WorkspacePane(props: Props): ReactNode {
         {view.kind !== 'site' &&
           (View ? (
             <Suspense fallback={<div className="page" />}>
+              <PaneContext.Provider value={paneValue}>
               <View
                 brand={brand}
                 project={project}
@@ -170,6 +183,7 @@ export default function WorkspacePane(props: Props): ReactNode {
                 trendQuery={props.trendQuery}
                 onTrendQuery={props.onTrendQuery}
               />
+              </PaneContext.Provider>
             </Suspense>
           ) : (
             <Placeholder title={crumb} text="Nothing to edit by hand here yet. The agent handles this step." />

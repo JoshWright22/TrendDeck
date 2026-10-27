@@ -502,6 +502,11 @@ button.ws-head-btn:hover,
   background: var(--hover);
 }
 
+/* tools and the Craft apps, taller than other menus */
+.ws-tools .ui-pop {
+  max-height: min(560px, 100vh - 120px);
+}
+
 .ws-tools .ui-menu-btn {
   width: auto;
   height: auto;

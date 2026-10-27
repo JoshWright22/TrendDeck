@@ -31,7 +31,7 @@
 
 ## Hooking in
 
-- A stage's `workspace` is a key into `renderer/src/workspace/registry.tsx`. To add one, call `registerWorkspace('editor', { label: 'Editor', component })` with a component that takes `WorkspaceProps`. Use `tool: true` if it should also be in the Tools menu. Registering an existing key replaces it, so the real editor can take over `editor` from the placeholder. A key that isn't registered shows a placeholder, not an error.
+- A stage's `workspace` is a key into `renderer/src/workspace/registry.tsx`. To add one, call `registerWorkspace('trends', { label: 'Trends', component })` with a component that takes `WorkspaceProps`. Use `tool: true` if it should also be in the Tools menu. Registering an existing key replaces it. The Craft apps use `filmcraft`, `photocraft`, `soundcraft`, `effectcraft` and `craft:<id>`, see `DECISIONS-craft-ui.md`. A key that isn't registered shows a placeholder, not an error.
 - The component mounts under the stage strip in a `position: relative` box. Fill it with `position: absolute; inset: 0`, which the `.page` class already does.
 - Main-side code reads and writes pipelines and projects through `src/main/workspace/index.ts`: `getPipeline`, `setPipeline`, `listProjects`, `saveProject`, `linkThread`. Each write saves `trenddeck.json` and sends `data:changed` to the renderer, which swaps in that copy. Otherwise the renderer's next save would put the old one back.
 - The same calls are exposed over IPC as `window.trenddeckWorkspace`.
