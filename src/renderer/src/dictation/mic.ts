@@ -17,15 +17,12 @@ export async function openMic(onFrame: (frame: Float32Array) => void): Promise<M
   let ctx: AudioContext | null = null
   try {
     ctx = new AudioContext({ sampleRate: VAD_SAMPLE_RATE })
-    await ctx.audioWorklet.addModule(workletUrl)
     const source = ctx.createMediaStreamSource(stream)
-    const node = new AudioWorkletNode(ctx, 'td-capture', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1 })
-    node.port.onmessage = (e: MessageEvent<Float32Array>) => onFrame(e.data)
-    source.connect(node)
+    const stop = await capture(ctx, source, onFrame)
     const context = ctx
     return {
       close: () => {
-        node.port.onmessage = null
+        stop()
         try {
           source.disconnect()
         } catch {
@@ -39,5 +36,36 @@ export async function openMic(onFrame: (frame: Float32Array) => void): Promise<M
     stream.getTracks().forEach((t) => t.stop())
     void ctx?.close().catch(() => {})
     throw err
+  }
+}
+
+const FRAME = 2048
+
+// the frames come from the audio worklet where chromium lets the page load one (the dev build over
+// http). the packaged app's file:// page can't load a worklet module from any url, so there a
+// script processor does the same job on the main thread: 2048 samples is 128 ms at 16 kHz
+async function capture(ctx: AudioContext, source: MediaStreamAudioSourceNode, onFrame: (frame: Float32Array) => void): Promise<() => void> {
+  try {
+    await ctx.audioWorklet.addModule(workletUrl)
+    const node = new AudioWorkletNode(ctx, 'td-capture', { numberOfInputs: 1, numberOfOutputs: 0, channelCount: 1 })
+    node.port.onmessage = (e: MessageEvent<Float32Array>) => onFrame(e.data)
+    source.connect(node)
+    return () => {
+      node.port.onmessage = null
+    }
+  } catch {
+    const node = ctx.createScriptProcessor(FRAME, 1, 1)
+    // it only runs while connected to the output, a silent gain keeps the mic out of the speakers
+    const mute = ctx.createGain()
+    mute.gain.value = 0
+    node.onaudioprocess = (e) => onFrame(new Float32Array(e.inputBuffer.getChannelData(0)))
+    source.connect(node)
+    node.connect(mute)
+    mute.connect(ctx.destination)
+    return () => {
+      node.onaudioprocess = null
+      node.disconnect()
+      mute.disconnect()
+    }
   }
 }
