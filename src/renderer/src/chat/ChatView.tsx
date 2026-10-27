@@ -55,25 +55,27 @@ interface Props {
 
 const STARTERS = [
   {
-    title: "Video ideas from today's trends",
-    hint: 'Five ideas with a hook each',
-    prompt: "Give me 5 video ideas from today's top trends, with a hook and why it should work for each."
-  },
-  {
-    title: 'Outline an idea',
-    hint: 'Hook, beats and a call to action',
+    title: 'Start a new video',
+    hint: 'Plan it and set up its checklist',
     prompt:
-      "Outline one of my saved ideas into a short video: hook, beats and a call to action. Ask me which idea if it's not obvious."
+      "Let's start a new video. Ask me what it's about and who it's for, then set up its checklist from idea to post and tell me the first thing I should do."
   },
   {
-    title: 'Titles and thumbnail text',
-    hint: 'Ten pairs for your best trend',
-    prompt: 'Write 10 titles with matching thumbnail text for my best trend right now. Keep the thumbnail text under 5 words.'
+    title: 'Get ready to record',
+    hint: 'Shot list and beats for the camera',
+    prompt:
+      "Make a shot list and beat sheet for the video I'm recording next, with the lines I need to say and any B-roll to grab. Ask me what's missing."
   },
   {
-    title: 'Posts for every platform',
-    hint: 'One trend, a draft per site',
-    prompt: 'Turn my best trend into a post for each platform I use, as draft cards, each written the way that platform likes it.'
+    title: 'How are my videos doing',
+    hint: 'What worked and what to change',
+    prompt:
+      'Check how my latest videos are doing: views, retention and where people drop off. Tell me what worked and one thing to change in the next video.'
+  },
+  {
+    title: 'Titles and thumbnail',
+    hint: 'Ten pairs for this video',
+    prompt: 'Write 10 titles with matching thumbnail text for the video in this project. Keep the thumbnail text under 5 words.'
   }
 ]
 
@@ -838,9 +840,9 @@ export default function ChatView({
               <div className="cx-empty">
                 <RisingMark className="cx-home-mark" />
                 <p className="cx-home-brand">{brand.name}</p>
-                <p className="cx-hello">Deal yourself in. What are we making today?</p>
+                <p className="cx-hello">What are we making today?</p>
                 <p className="muted">
-                  Your agent gets this brand's voice, keywords, top trends and saved ideas. Never your logins or what's in your
+                  Your agent gets this brand's voice, its videos and how they're doing. Never your logins or what's in your
                   tabs.
                 </p>
                 <div className="cx-starters">

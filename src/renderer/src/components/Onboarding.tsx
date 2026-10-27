@@ -61,7 +61,7 @@ export default function Onboarding({ brand, onDone }: Props): ReactNode {
         <div className="onboard-step" key={step}>
           {step === 0 && (
             <>
-              <h1>Deal yourself in</h1>
+              <h1>Set up your first brand</h1>
               <p className="onboard-lead">Start with one brand. You can add more from the title bar later.</p>
               <label>
                 Brand name
