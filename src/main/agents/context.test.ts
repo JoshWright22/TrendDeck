@@ -18,7 +18,8 @@ describe('recording workflow context', () => {
       'take_list', 'take_get', 'take_show creates a new take card for analysis, not a new recording',
       'never bypass it', 'Never start capture or send audio to a remote service without permission',
       'only use it when the creator permits sharing that view', 'never ask for OBS passwords or stream keys in chat',
-      'Do not claim transcription, analysis, OBS connection or recording succeeded until the tools confirm it'
+      'Do not claim transcription, analysis, OBS connection or recording succeeded until the tools confirm it',
+      'consult the content map first', 'Say which past videos you are building on', 'similar_videos', 'what_worked', 'retention_dips'
     ]) expect(context).toContain(instruction)
     expect(context.length).toBeLessThan(PROMPT_MAX)
   })

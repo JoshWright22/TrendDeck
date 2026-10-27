@@ -28,6 +28,8 @@ All of it is in the app's user data folder:
 | Inbox | `inbox/<brand id>.json` | comments read from your accounts, read marks and spam filters |
 | Media library | `media/<brand id>.json`, `media/<brand id>/` | file list, thumbnails and copies you asked for |
 | Posting | `posting.json`, `posting-keys.json` | queue, log and settings, API keys locked with your system keychain when it's there |
+| Content map | `content-map/<brand id>.json` | your past videos, their numbers, pillars and the snapshots after each upload |
+| YouTube sign-in for the content map | `content-map/<brand id>.auth`, `content-map/client.json` | Google tokens and your OAuth client secret locked with your system keychain; without the keychain they aren't kept at all |
 | Posting pace | `reuse-pace.json` | daily limits and gaps per site |
 | Agent rules | `gateway/policy.json` | per brand: which kinds of agent actions run on their own and which wait for you |
 | Agent audit log | `gateway/audit/<brand id>.jsonl` | every agent tool call: time, chat, tool, arguments with secrets scrubbed, your answer and a short result |
@@ -61,6 +63,7 @@ Nothing goes out unless it's one of these.
 - **Brand voice import, inbox and analytics refresh.** Only when you press Import or Refresh. The app opens your own pages on those sites in a hidden window on the brand's session and reads them.
 - **Shorts import.** Only when you press it. The app loads your channel's Shorts page on the brand's session.
 - **Phone setup.** Only when you press Download and set up. The Android tools and system image come straight from Google. The phone itself is a normal Android phone and its apps go online like they would on any phone.
+- **Content map.** Only for a brand you connected in Settings, Channels. Once a day, and on Sync now, the app asks YouTube for the channel's uploads and numbers: with your Google sign-in (read only) or API key that goes to Google with the request; without them it reads the channel's public feed. Every 5 minutes it reads the newest uploads' counts at 1 hour, 6 hours, 1, 2, 7 and 28 days, inside a daily budget of 6,000 YouTube quota units. Connecting opens Google's sign-in in your own browser and the answer comes back to a one-off server on `127.0.0.1`.
 - **Chat.** When you send a chat message, the agent you picked gets your message and works through its own provider, the same way it does in a terminal. What it can see through TrendDeck is below.
 
 The app never loads remote images or fonts for its own screens, has no crash reporter.

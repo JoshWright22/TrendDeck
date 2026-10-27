@@ -2,6 +2,7 @@ import type { EmbedAlternatives, EmbedFocus, EmbedTurn } from './craft-embed'
 import type { Transcription } from './speech'
 import type { TakeDiff, TakeFeedback } from './take'
 import type { BrandFileName, ProposedRule } from './brand-memory'
+import type { MappedDip, SnapshotLabel } from './content-map'
 
 // cards in the chat timeline that the agent's tools put there: a video to review, a suggestion,
 // a cloud copy, a project's history. main keeps them per brand, the chat shows the ones of the
@@ -165,6 +166,36 @@ export interface ObsCard extends CardBase {
   projectId: string | null
 }
 
+// the brand's content map in the chat: pillars, baselines and every past video against them.
+// the card loads the map live, focus opens one video's retention curve
+export interface ContentMapCard extends CardBase {
+  type: 'content-map'
+  note: string
+  focus: string | null
+}
+
+export interface Learning {
+  id: string
+  text: string
+  state: 'proposed' | 'kept' | 'dropped'
+}
+
+// after +48h and +7d: how a new video did against the baseline at the same age, where people
+// left and what was said there. kept learnings go into brand/learnings.md
+export interface PostMortemCard extends CardBase {
+  type: 'post-mortem'
+  videoId: string
+  title: string
+  stage: Extract<SnapshotLabel, '48h' | '7d'>
+  // views at this age over the median of earlier videos at the same age
+  ratio: number | null
+  views: number | null
+  at30: number | null
+  dips: MappedDip[]
+  summary: string
+  learnings: Learning[]
+}
+
 export type ChatCard =
   | VideoCard
   | SuggestionCard
@@ -176,6 +207,8 @@ export type ChatCard =
   | RuleCard
   | BrandFileCard
   | ObsCard
+  | ContentMapCard
+  | PostMortemCard
 
 export interface CardsChanged {
   brandId: string

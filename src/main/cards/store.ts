@@ -88,6 +88,11 @@ export async function listCards(brandId: string, threadId: string): Promise<Chat
   return (await load(brandId)).filter((c) => c.threadId === threadId)
 }
 
+// every card of the brand, e.g. its takes for the content map
+export async function allCards(brandId: string): Promise<ChatCard[]> {
+  return [...(await load(brandId))]
+}
+
 export async function dropCards(brandId: string): Promise<void> {
   check(brandId)
   await serial(brandId, async () => {

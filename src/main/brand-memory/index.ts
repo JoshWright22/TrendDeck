@@ -181,6 +181,16 @@ export async function memoryState(brandId: string): Promise<BrandMemoryState> {
   }
 }
 
+// a learning the creator confirmed elsewhere, e.g. from a post-mortem card: one dated line in
+// brand/learnings.md, committed to the brand folder's history
+export async function addLearning(brandId: string, text: string): Promise<void> {
+  const clean = text.replace(/\s+/g, ' ').trim()
+  if (!clean) throw new Error('The learning is empty.')
+  await serial(brandId, () => appendLearningLine(brandFolder(brandId), brandName(brandId), Date.now(), clean.slice(0, 600)))
+  await commitBrand(brandId, `learning: ${clean}`)
+  broadcast('brand-memory:changed', brandId)
+}
+
 // ---------- weekly digest hook ----------
 
 // a weekly brand digest card (open videos, stalled stages, the guide's changes) isn't built yet.

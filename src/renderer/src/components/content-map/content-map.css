@@ -1,0 +1,369 @@
+/* the content map: plain tables and one gray line chart on the app's tokens */
+
+.cm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+  min-width: 0;
+}
+
+.cm-hint {
+  margin: 0;
+  color: var(--smoke);
+}
+
+.cm-error {
+  margin: 0;
+  color: var(--pink);
+}
+
+.cm-label {
+  color: var(--smoke);
+}
+
+.cm-baselines {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-2);
+}
+
+.cm-baselines strong {
+  font-weight: 600;
+  color: var(--chalk);
+}
+
+.cm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+.cm-table caption {
+  padding-bottom: 6px;
+  color: var(--chalk);
+  font-weight: 600;
+  text-align: left;
+}
+
+.cm-table th,
+.cm-table td {
+  padding: 7px 10px 7px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  color: var(--text-2);
+}
+
+.cm-table th {
+  color: var(--smoke);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cm-table .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.cm-table tr.on td {
+  background: var(--raised);
+}
+
+.cm-table-small th,
+.cm-table-small td {
+  padding: 5px 10px 5px 0;
+}
+
+.cm-sub {
+  display: block;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.cm-sort,
+.cm-title,
+.cm-quiet {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cm-table .cm-sort,
+.cm-table .cm-title {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.cm-sort:hover,
+.cm-title:hover {
+  color: var(--accent);
+}
+
+.cm-title {
+  color: var(--chalk);
+  overflow-wrap: anywhere;
+}
+
+.cm-sort:focus-visible,
+.cm-title:focus-visible,
+.cm-quiet:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.cm .cm-quiet,
+.cm-detail .cm-quiet {
+  justify-self: start;
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--text-2);
+}
+
+.cm .cm-quiet:hover,
+.cm-detail .cm-quiet:hover {
+  background: var(--hover);
+  color: var(--chalk);
+}
+
+.cm-detail {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--felt);
+}
+
+.cm-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.cm-detail-head h4 {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--chalk);
+  overflow-wrap: anywhere;
+}
+
+.cm-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.cm-metric dt {
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.cm-metric dd {
+  margin: 2px 0 0;
+  color: var(--chalk);
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-chart {
+  position: relative;
+  margin: 0;
+}
+
+.cm-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.cm-grid {
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1;
+}
+
+.cm-baseline {
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 1;
+}
+
+.cm-axis {
+  fill: var(--smoke);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-line {
+  fill: none;
+  stroke: var(--chalk);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.cm-dip {
+  fill: rgba(255, 255, 255, 0.09);
+}
+
+.cm-dip-label {
+  fill: var(--text-2);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-cross {
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 1;
+}
+
+.cm-dot {
+  fill: var(--chalk);
+  stroke: var(--felt);
+  stroke-width: 2;
+}
+
+.cm-plot {
+  position: relative;
+}
+
+.cm-tip {
+  position: absolute;
+  transform: translate(-50%, 12px);
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.cm-tip strong {
+  color: var(--chalk);
+  font-weight: 600;
+}
+
+.cm-caption {
+  margin-top: 4px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.cm-table-toggle summary {
+  color: var(--smoke);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.cm-dips {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-2);
+}
+
+.cm-dips strong {
+  color: var(--chalk);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cm-dip-line {
+  display: block;
+  color: var(--smoke);
+}
+
+.cm-hook p {
+  margin: 2px 0 0;
+  color: var(--text-2);
+}
+
+.cm-project {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* the post-mortem card's learnings */
+
+.cm-learnings {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cm-learnings li {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.cm-learnings p {
+  margin: 0;
+  color: var(--text-2);
+}
+
+/* settings, channels */
+
+.cm-settings {
+  display: grid;
+  gap: 10px;
+}
+
+.cm-settings h4 {
+  margin: 10px 0 0;
+}
+
+.cm-settings .row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cm-settings ol {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-2);
+}
+
+.cm-settings ol li + li {
+  margin-top: 3px;
+}
+
+.cm-pillars {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cm-pillars li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
