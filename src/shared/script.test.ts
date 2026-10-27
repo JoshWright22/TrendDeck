@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allLines, changeLine, cleanClaims, findQuote, parseMarkdown, readiness, toMarkdown, writeScript, type Dump } from './script'
+import { allLines, changeLine, cleanClaims, findQuote, parseMarkdown, readiness, toMarkdown, wavBytes, writeScript, type Dump } from './script'
 import type { SpokenWord } from './speech'
 
 const words = (text: string, start = 0): SpokenWord[] => text.split(' ').map((w, i) => ({ text: w, start: start + i * 0.4, end: start + i * 0.4 + 0.3 }))
@@ -141,5 +141,18 @@ describe('script origins', () => {
     const r = readiness(script, claims)
     expect(r.ready).toBe(true)
     expect(r.warnings.map((c) => c.id)).toEqual(['c2'])
+  })
+})
+
+describe('dictation recordings', () => {
+  it('writes a 16-bit mono wav with the samples clamped', () => {
+    const wav = wavBytes(new Float32Array([0, 1, -1, 2]), 16_000)
+    const v = new DataView(wav.buffer)
+    expect(String.fromCharCode(...wav.slice(0, 4))).toBe('RIFF')
+    expect(String.fromCharCode(...wav.slice(8, 12))).toBe('WAVE')
+    expect(v.getUint16(22, true)).toBe(1)
+    expect(v.getUint32(24, true)).toBe(16_000)
+    expect(v.getUint32(40, true)).toBe(8)
+    expect([v.getInt16(44, true), v.getInt16(46, true), v.getInt16(48, true), v.getInt16(50, true)]).toEqual([0, 32767, -32768, 32767])
   })
 })

@@ -51,6 +51,36 @@ export interface Dump {
   text: string
   words: SpokenWord[]
   duration: number
+  // the recording, a 16 kHz wav in the project folder (scripts/dumps/<id>.wav). missing on dumps
+  // from before audio was kept
+  audio?: string
+}
+
+// 16-bit mono wav of float samples, for the dictation recordings
+export function wavBytes(samples: Float32Array, sampleRate: number): Uint8Array {
+  const out = new Uint8Array(44 + samples.length * 2)
+  const v = new DataView(out.buffer)
+  const text = (at: number, s: string): void => {
+    for (let i = 0; i < s.length; i++) out[at + i] = s.charCodeAt(i)
+  }
+  text(0, 'RIFF')
+  v.setUint32(4, 36 + samples.length * 2, true)
+  text(8, 'WAVE')
+  text(12, 'fmt ')
+  v.setUint32(16, 16, true)
+  v.setUint16(20, 1, true)
+  v.setUint16(22, 1, true)
+  v.setUint32(24, sampleRate, true)
+  v.setUint32(28, sampleRate * 2, true)
+  v.setUint16(32, 2, true)
+  v.setUint16(34, 16, true)
+  text(36, 'data')
+  v.setUint32(40, samples.length * 2, true)
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i] || 0))
+    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true)
+  }
+  return out
 }
 
 let counter = 0
@@ -342,7 +372,8 @@ export interface ScriptsApi {
   change(brandId: string, projectId: string, file: string, change: LineChange): Promise<ScriptView | null>
   setStatus(brandId: string, projectId: string, file: string, status: 'draft' | 'ready'): Promise<ScriptView | null>
   // a dictation that went to the agent, saved with its word times in the project
-  saveDump(brandId: string, projectId: string, t: Pick<Transcription, 'text' | 'words' | 'duration'>): Promise<{ id: string; words: number }>
+  // audio: the dictation as 16 kHz mono samples, saved as a wav next to it
+  saveDump(brandId: string, projectId: string, t: Pick<Transcription, 'text' | 'words' | 'duration'>, audio?: Float32Array): Promise<{ id: string; words: number; audio: string | null }>
   // speech outside a project, only for the cadence profile
   addSpeech(brandId: string, t: Pick<Transcription, 'text' | 'words' | 'duration'>): Promise<void>
   show(brandId: string, projectId: string, threadId: string | null): Promise<string>

@@ -239,7 +239,7 @@ export default function ChatView({
   useTakeTranscriber(brandId, cards)
   // dictation: finished words go into the draft, the part still being transcribed shows lighter
   const [partial, setPartial] = useState('')
-  const dictated = useRef<{ t: Transcription; offset: number }[]>([])
+  const dictated = useRef<{ t: Transcription; offset: number; audio: Float32Array }[]>([])
   const [talkMode, setTalkMode] = useState<TalkMode | null>(null)
   const [recording, setRecording] = useState(false)
   const [takeBusy, setTakeBusy] = useState(false)
@@ -563,13 +563,21 @@ export default function ChatView({
 
   // what was dictated since the last send, saved with its word times. returns a note for the agent
   const keepDictation = async (): Promise<string> => {
-    const joined = joinTranscripts(dictated.current)
+    const parts = dictated.current
+    const joined = joinTranscripts(parts)
     dictated.current = []
     if (!joined || !joined.text) return ''
     try {
       if (project) {
-        const dump = await window.trenddeckScripts.saveDump(brandId, project.id, joined)
-        return `\n\n(Dictated. Saved as dump ${dump.id} with word times.)`
+        // the audio goes with it, one after the other like the word times
+        const audio = new Float32Array(parts.reduce((n, p) => n + p.audio.length, 0))
+        let at = 0
+        for (const p of parts) {
+          audio.set(p.audio, at)
+          at += p.audio.length
+        }
+        const dump = await window.trenddeckScripts.saveDump(brandId, project.id, joined, audio)
+        return `\n\n(Dictated. Saved as dump ${dump.id} with word times${dump.audio ? ` and the audio, ${dump.audio}` : ''}.)`
       }
       await window.trenddeckScripts.addSpeech(brandId, joined)
     } catch {
@@ -644,15 +652,15 @@ export default function ChatView({
 
   const dictation = useDictation({
     onPartial: setPartial,
-    onText: (text, t) => {
+    onText: (text, t, audio) => {
       // hands-free while a reply runs: what you say goes straight in as a steer
       if (dictation.config?.handsFree && busy && thread) {
-        dictated.current.push({ t, offset: 0 })
+        dictated.current.push({ t, offset: 0, audio })
         void keepDictation().then((note) => sendToAgent(`${text}${note}`).catch((err) => setError(cleanError(err))))
         return
       }
       const offset = dictated.current.reduce((n, p) => n + p.t.duration, 0)
-      dictated.current.push({ t, offset })
+      dictated.current.push({ t, offset, audio })
       setDraft((current) => (current.trim() ? `${current.replace(/\s+$/, '')} ${text}` : text))
     },
     onPause: () => void send()

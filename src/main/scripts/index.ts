@@ -18,8 +18,10 @@ import {
   type Dump,
   type LineChange,
   type Script,
-  type ScriptView
+  type ScriptView,
+  wavBytes
 } from '@shared/script'
+import { VAD_SAMPLE_RATE } from '@shared/vad'
 import type { SpokenWord, Transcription } from '@shared/speech'
 import { ID_PATTERN } from '@shared/types'
 import { addSpeech, logFriction, readCadenceProfile } from '../brand-memory'
@@ -128,7 +130,10 @@ export async function scriptLines(brandId: string, projectId: string): Promise<{
 
 const dumpsDir = (dir: string): string => join(dir, 'scripts', 'dumps')
 
-export async function saveDump(brandId: string, projectId: string, t: Pick<Transcription, 'text' | 'words' | 'duration'>): Promise<Dump> {
+// the longest dictation recording kept, 20 minutes at 16 kHz
+const MAX_DUMP_SAMPLES = 20 * 60 * 16_000
+
+export async function saveDump(brandId: string, projectId: string, t: Pick<Transcription, 'text' | 'words' | 'duration'>, audio?: Float32Array | null): Promise<Dump> {
   const dir = await root(brandId, projectId)
   const at = Date.now()
   const id = `${new Date(at).toISOString().slice(0, 19).replace(/[-:T]/g, '')}-${randomUUID().slice(0, 4)}`
@@ -137,6 +142,12 @@ export async function saveDump(brandId: string, projectId: string, t: Pick<Trans
     .filter((w) => typeof w.text === 'string' && Number.isFinite(w.start) && Number.isFinite(w.end))
     .map((w) => ({ text: w.text.slice(0, 60), start: Math.round(w.start * 100) / 100, end: Math.round(w.end * 100) / 100 }))
   const dump: Dump = { id, at, text: t.text.slice(0, 200_000), words, duration: Number.isFinite(t.duration) ? t.duration : 0 }
+  // the recording too, so the agent can listen back and you can put it in an edit
+  if (audio?.length) {
+    await fs.mkdir(dumpsDir(dir), { recursive: true })
+    await fs.writeFile(join(dumpsDir(dir), `${id}.wav`), wavBytes(audio.subarray(0, MAX_DUMP_SAMPLES), VAD_SAMPLE_RATE))
+    dump.audio = `scripts/dumps/${id}.wav`
+  }
   await writeAtomic(join(dumpsDir(dir), `${id}.json`), JSON.stringify(dump))
   void addSpeech(brandId, words)
   return dump
@@ -253,13 +264,13 @@ export const SCRIPT_TOOLS: GatewayTool[] = [
     name: 'dumps_list',
     title: 'List brain dumps',
     risk: 'read',
-    description: "The creator's dictations for this project (brain dumps, re-spoken lines), newest last, with ids. Read one with dump_read.",
+    description: "The creator's dictations for this project (brain dumps, re-spoken lines), newest last, with ids and the recording of each (a wav in the project folder, for listening back or putting in the edit). Read one with dump_read.",
     inputSchema: obj({ projectId: PROJECT_ARG }),
     run: async (turn, args) => {
       const p = projectOf(turn, args.projectId)
       const dumps = await loadDumps(await root(turn.brandId, p.id))
       if (!dumps.length) return 'No dictation saved for this project yet. Ask the creator to talk the video through with the mic in the composer.'
-      return dumps.map((d) => ({ id: d.id, at: new Date(d.at).toISOString(), words: d.words.length || d.text.split(/\s+/).length, start: d.text.slice(0, 160) }))
+      return dumps.map((d) => ({ id: d.id, at: new Date(d.at).toISOString(), words: d.words.length || d.text.split(/\s+/).length, start: d.text.slice(0, 160), audio: d.audio ?? null }))
     }
   },
   {
@@ -272,7 +283,7 @@ export const SCRIPT_TOOLS: GatewayTool[] = [
       const p = projectOf(turn, args.projectId)
       const d = (await loadDumps(await root(turn.brandId, p.id))).find((x) => x.id === args.id)
       if (!d) throw new ToolError(`no dump ${String(args.id)} in this project`)
-      return { id: d.id, at: new Date(d.at).toISOString(), text: dumpText(d) }
+      return { id: d.id, at: new Date(d.at).toISOString(), text: dumpText(d), audio: d.audio ? `${d.audio} in the project folder, 16 kHz mono, the word times line up with it` : null }
     }
   },
   {
@@ -455,9 +466,9 @@ export function setupScripts(): void {
   ipcMain.handle('scripts:change', (e, b: unknown, p: unknown, f: unknown, c: unknown) => changeScript(...ids(e, b, p), fileArg(f), cleanChange(c)))
   ipcMain.handle('scripts:status', (e, b: unknown, p: unknown, f: unknown, s: unknown) => setScriptStatus(...ids(e, b, p), fileArg(f), s === 'ready' ? 'ready' : 'draft'))
   // every dictation that goes to the agent, kept with its word times
-  ipcMain.handle('scripts:save-dump', async (e, b: unknown, p: unknown, t: unknown) => {
-    const d = await saveDump(...ids(e, b, p), cleanTranscription(t))
-    return { id: d.id, words: d.words.length }
+  ipcMain.handle('scripts:save-dump', async (e, b: unknown, p: unknown, t: unknown, audio: unknown) => {
+    const d = await saveDump(...ids(e, b, p), cleanTranscription(t), audio instanceof Float32Array ? audio : null)
+    return { id: d.id, words: d.words.length, audio: d.audio ?? null }
   })
   // speech that isn't for a project still teaches the cadence profile
   ipcMain.handle('scripts:speech', (e, b: unknown, t: unknown) => {

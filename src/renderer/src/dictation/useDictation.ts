@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { DictationConfig, DictationOptions } from '@shared/dictation'
+import { DEFAULT_DICTATION_OPTIONS, type DictationConfig, type DictationOptions } from '@shared/dictation'
 import type { SpokenWord, Transcription } from '@shared/speech'
 import { createSegmenter, type Segmenter, type Utterance } from '@shared/vad'
 import { cleanError } from '../plain-error'
@@ -13,7 +13,8 @@ import { openMic, type Mic } from './mic'
 export type DictationState = 'idle' | 'starting' | 'listening' | 'finishing'
 
 export interface DictationHandlers {
-  onText: (text: string, t: Transcription) => void
+  // audio: the utterance as 16 kHz mono samples, kept with the dictation
+  onText: (text: string, t: Transcription, audio: Float32Array) => void
   // '' when nothing is pending
   onPartial: (text: string) => void
   // after a pause with auto-send on and nothing left to transcribe
@@ -99,7 +100,8 @@ export function useDictation(h: DictationHandlers): DictationControl {
     pauseTimer.current = window.setTimeout(() => {
       pauseTimer.current = null
       if (pending.current === 0 && !seg.current?.speaking) handlers.current.onPause?.()
-    }, c.autoSendPauseMs)
+      // 1.5 s was the old default and cut sentences in two, saved settings with it get the new one
+    }, c.autoSendPauseMs === 1_500 ? DEFAULT_DICTATION_OPTIONS.autoSendPauseMs : c.autoSendPauseMs)
   }
 
   const transcribe = (u: Utterance): void => {
@@ -114,7 +116,7 @@ export function useDictation(h: DictationHandlers): DictationControl {
         })
         if (controller?.signal.aborted) return
         const text = t.text.trim()
-        if (text) handlers.current.onText(text, t)
+        if (text) handlers.current.onText(text, t, u.audio)
       } catch (err) {
         if (!controller?.signal.aborted) setError(cleanError(err, 'Transcription failed.'))
       } finally {

@@ -353,7 +353,8 @@ export const DEFAULT_DICTATION_OPTIONS: DictationOptions = {
   localPrefs: {},
   language: '',
   autoSend: false,
-  autoSendPauseMs: 1_500,
+  // long enough for a breath mid sentence, short ones split what you say into two messages
+  autoSendPauseMs: 2_500,
   holdKey: 'Ctrl+Space',
   handsFree: false
 }
