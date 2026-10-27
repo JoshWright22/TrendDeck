@@ -296,7 +296,7 @@ async function runReply(brandId: string, live: Live): Promise<void> {
     // plain api agents are one request with no process and no tool calls, so they get no turn
     const needsTools = !(custom && custom.kind === 'api')
     const openTurn = async (): Promise<AgentSession | null> =>
-      needsTools ? (turn ??= await beginAgentTurn(brandId, attachKind(agentId))) : null
+      needsTools ? (turn ??= await beginAgentTurn(brandId, attachKind(agentId), { threadId: thread.id })) : null
 
     const run = async (adapter: ProviderAdapter, resume: string | undefined): Promise<void> => {
       const start: SessionStart = {
