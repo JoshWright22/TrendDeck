@@ -29,8 +29,10 @@ upload and post-mortems. Code in `src/main/content-map/`, the cards in
   the format's other settled videos stand in, never the video itself.
 - 1.5x and up is "well above usual", 0.6x and below "well below". Under 7 days is "first week" and
   isn't judged or used in what_worked.
-- Pillars are labels with keywords. The agent proposes them with `pillar_propose` (always asks); a
-  video goes to the pillar whose keywords its title hits most (title counts double).
+- Pillars are labels with keywords. The agent saves them with `pillar_propose` under the edit rule
+  (no approval by default; the creator removes them in Settings, Channels). It used to always ask,
+  and agents gave up on the call while the approval waited, so it read as a timeout. A video goes
+  to the pillar whose keywords its title hits most (title counts double).
 - Hook and title styles are plain rule-based labels so the groups are explainable.
 
 ## Snapshots and post-mortems

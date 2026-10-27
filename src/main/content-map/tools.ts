@@ -8,7 +8,7 @@ import { similar, whatWorked } from './baseline'
 import { changed, findVideo, mapView, setPillars, sync, videoDetail } from './service'
 import { loadMap } from './store'
 
-// what the agent reads from the content map. all read except pillar_propose, which always asks.
+// what the agent reads from the content map. all read except pillar_propose, which saves under the edit rule.
 // the agent gets numbers and titles, never how the channel is signed in
 
 const row = (r: MapRow): Record<string, unknown> => ({
@@ -157,12 +157,11 @@ export const CONTENT_MAP_TOOLS: GatewayTool[] = [
     name: 'pillar_propose',
     title: 'Set the content pillars',
     risk: 'edit',
-    alwaysAsk: true,
     description:
-      'Propose the brand\'s content pillars: a short label each and the keywords that put a video in it (matched against titles, tags and descriptions). The creator approves before they are saved. mode add keeps the existing ones (a same label is replaced), replace swaps them all.',
+      "Saves the brand's content pillars (the kinds of video the channel makes): a short label each and the keywords that put a video in it (matched against titles, tags and descriptions). It saves right away and works before a channel is connected or positioning.md is written. The creator sees and removes them in Settings, Channels. mode add keeps the existing ones (a same label is replaced), replace swaps them all.",
     inputSchema: obj(
       {
-        pillars: list('2 to 8 pillars', obj({ label: str('Short label, e.g. "Budget builds"', 60, 2), keywords: list('Keywords or short phrases', str('keyword', 40, 2), 20, 1), why: str('One line on why, from the videos', 300) }, ['label', 'keywords']), 8, 1),
+        pillars: list('1 to 8 pillars', obj({ label: str('Short label, e.g. "Budget builds"', 60, 2), keywords: list('Keywords or short phrases', str('keyword', 40, 2), 20, 1), why: str('One line on why', 300) }, ['label', 'keywords']), 8, 1),
         mode: oneOf('add (default) or replace', ['add', 'replace'])
       },
       ['pillars']
@@ -171,13 +170,16 @@ export const CONTENT_MAP_TOOLS: GatewayTool[] = [
       const p = (args.pillars as { label: string; keywords: string[] }[]) ?? []
       return `${args.mode === 'replace' ? 'Replace the pillars with' : 'Add pillars'} for ${brandOf(turn).name}: ${p.map((x) => `${x.label} (${x.keywords.slice(0, 4).join(', ')})`).join('; ')}`
     },
+    // saves straight away under the edit rule. it used to always wait for an approval, and agents
+    // give up on a tool call long before the approval timed out, so it came back as a timeout
     run: async (turn, args) => {
       brandOf(turn)
       const items = (args.pillars as { label: string; keywords: string[]; why?: string }[]).map((p) => ({ label: p.label, keywords: p.keywords, why: p.why ?? '' }))
-      const saved = await setPillars(turn.brandId, items, args.mode === 'replace' ? 'replace' : 'add')
+      const all = await setPillars(turn.brandId, items, args.mode === 'replace' ? 'replace' : 'add')
       changed(turn.brandId)
       const v = await mapView(turn.brandId)
-      return { saved: saved.map((p) => p.label), videosPerPillar: v.pillars.map((p) => `${p.label}: ${p.count}`) }
+      const counts = v.rows.length ? `videos per pillar: ${v.pillars.map((p) => `${p.label} ${p.count}`).join(', ')}` : 'no past videos are mapped yet, they are sorted into pillars once the channel is connected in Settings, Channels'
+      return `saved. the brand's pillars are now: ${all.map((p) => p.label).join(', ')}. ${counts}. the creator can remove them in Settings, Channels`
     }
   },
   {
