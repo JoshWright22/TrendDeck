@@ -36,14 +36,17 @@ function recompute(): void {
 const LIVE_KEY = 'trenddeck.editorsAtOnce'
 export const LIVE_CHOICES = [1, 2, 3, 4]
 
+// the window's storage, none in tests
+const store = (): Storage | null => (typeof localStorage === 'undefined' ? null : localStorage)
+
 export function liveMax(): number {
-  const n = Number(localStorage.getItem(LIVE_KEY))
+  const n = Number(store()?.getItem(LIVE_KEY))
   return LIVE_CHOICES.includes(n) ? n : MAX_LIVE
 }
 
 export function setLiveMax(n: number): void {
   if (!LIVE_CHOICES.includes(n)) return
-  localStorage.setItem(LIVE_KEY, String(n))
+  store()?.setItem(LIVE_KEY, String(n))
   recompute()
 }
 

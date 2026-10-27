@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { embedFor, pinEmbed, registerEmbed, setEmbedVisible } from './embed-owner'
+import { embedFor, newestOnDoc, pinEmbed, registerEmbed, setEmbedVisible } from './embed-owner'
 
 const cleanup: (() => void)[] = []
 afterEach(() => {
@@ -28,5 +28,14 @@ describe('Craft editor activation', () => {
     pinEmbed('unmounted-card')
     cleanup.push(registerEmbed('other-card', 'filmcraft', 'FilmCraft', 'other-project', 10))
     expect(embedFor('other-project')?.pinned).toBe(0)
+  })
+
+  it('points older cards on the same file to the newest one', () => {
+    cleanup.push(registerEmbed('old', 'filmcraft', 'FilmCraft', 'ep', 1))
+    cleanup.push(registerEmbed('new', 'filmcraft', 'FilmCraft', 'ep', 2))
+    cleanup.push(registerEmbed('photo', 'photocraft', 'PhotoCraft', 'ep', 3))
+    expect(newestOnDoc('old')).toBe('new')
+    expect(newestOnDoc('new')).toBe('new')
+    expect(newestOnDoc('photo')).toBe('photo')
   })
 })
