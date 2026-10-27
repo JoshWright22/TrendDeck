@@ -3,6 +3,7 @@ import type { Transcription } from './speech'
 import type { TakeDiff, TakeFeedback } from './take'
 import type { BrandFileName, ProposedRule } from './brand-memory'
 import type { MappedDip, SnapshotLabel } from './content-map'
+import type { VisualAsset, VisualSearch } from './visuals'
 
 // cards in the chat timeline that the agent's tools put there: a video to review, a suggestion,
 // a cloud copy, a project's history. main keeps them per brand, the chat shows the ones of the
@@ -212,7 +213,23 @@ export interface PostMortemCard extends CardBase {
   learnings: Learning[]
 }
 
+// options found online, from the agent's find_visuals: a grid to pick from
+export interface VisualsCard extends CardBase {
+  type: 'visuals'
+  search: VisualSearch
+  note: string
+}
+
+// one image in the chat: pasted, dropped from a browser, or a sketch. the file stays in TrendDeck's
+// visuals folder until it's added to the video files
+export interface VisualCard extends CardBase {
+  type: 'visual'
+  asset: VisualAsset
+}
+
 export type ChatCard =
+  | VisualsCard
+  | VisualCard
   | VideoCard
   | SuggestionCard
   | StorageCard

@@ -40,6 +40,7 @@ import { contextApi } from './context'
 import { mcpServersApi } from './mcp-servers'
 import { brandMemoryApi, scriptsApi, takesApi } from './voice-script'
 import { contentMapApi } from './content-map'
+import { visualsApi } from './visuals'
 import './qc'
 
 const api: TrendDeckApi = {
@@ -156,3 +157,4 @@ contextBridge.exposeInMainWorld('trenddeckScripts', scriptsApi)
 contextBridge.exposeInMainWorld('trenddeckTakes', takesApi)
 contextBridge.exposeInMainWorld('trenddeckBrandMemory', brandMemoryApi)
 contextBridge.exposeInMainWorld('trenddeckContentMap', contentMapApi)
+contextBridge.exposeInMainWorld('trenddeckVisuals', visualsApi)

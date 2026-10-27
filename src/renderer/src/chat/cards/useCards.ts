@@ -10,6 +10,8 @@ export interface CardActions {
   // to the agent: a steer while a reply runs, a new message otherwise
   sendToAgent: (text: string) => Promise<void>
   hasAgent: boolean
+  // the open chat, null for a new one
+  threadId?: string | null
 }
 
 // the open thread's cards, kept current from cards:changed

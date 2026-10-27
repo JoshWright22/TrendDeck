@@ -6,6 +6,7 @@ import { CRAFT_WEB_SCHEME } from '@shared/craft-web'
 import { getLib, thumbPath, validId } from './library'
 import { servedPath } from '../cards/files'
 import { servedModelFile } from '../dictation/models'
+import { servedVisualPath } from '../visuals/paths'
 
 // has to run before the app is ready, and only once for every scheme: the Craft web builds'
 // craft-web: (main/craft/web.ts) is a secure origin so WebGPU, OPFS and cross-origin isolation work
@@ -93,6 +94,13 @@ export function handleMediaScheme(): void {
         if (!path) return notFound()
         const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
         return await serveFile(path, TYPES[ext] ?? 'application/octet-stream', req.headers.get('range'))
+      }
+      // a sketch, pasted image or cached search thumbnail, td-media://visual/<brand>/<items|thumbs>/<file>
+      if (url.hostname === 'visual') {
+        const [b, ...rest] = url.pathname.split('/').filter(Boolean)
+        const hit = b && rest.length ? servedVisualPath(b, rest.map(decodeURIComponent).join('/')) : null
+        if (!hit) return notFound()
+        return await serveFile(hit.path, TYPES[hit.ext] ?? 'application/octet-stream', null)
       }
       // a local Whisper model file for the dictation worker, td-media://stt/<model>/<file>
       if (url.hostname === 'stt') {

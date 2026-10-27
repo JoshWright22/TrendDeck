@@ -1,0 +1,22 @@
+.ms-sources {
+  display: grid;
+  gap: 12px;
+}
+
+.ms-source {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.ms-source h4,
+.ms-source p {
+  margin: 0;
+}
+
+.ms-sources a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

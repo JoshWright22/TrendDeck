@@ -16,6 +16,7 @@ export function toAttachment(raw: unknown): Attachment | null {
     size: typeof o.size === 'number' && o.size >= 0 ? o.size : 0
   }
   if (o.media === true) a.media = true
+  else if (o.visual === true) a.visual = true
   return a
 }
 

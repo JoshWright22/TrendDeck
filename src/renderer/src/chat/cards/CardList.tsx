@@ -11,11 +11,16 @@ import { HistoryCard, StorageCard } from './StorageHistoryCards'
 import TakeCard from './TakeCard'
 import VideoCard from './VideoCard'
 import type { CardActions } from './useCards'
+import { VisualCardView, VisualsCardView } from '../visuals/VisualItems'
 import './cards.css'
 import './voice-cards.css'
 
 function Card({ c, a }: { c: ChatCard; a: CardActions }): ReactNode {
   switch (c.type) {
+    case 'visuals':
+      return <VisualsCardView card={c} a={a} />
+    case 'visual':
+      return <VisualCardView card={c} a={a} />
     case 'video':
       return <VideoCard card={c} a={a} />
     case 'suggestion':

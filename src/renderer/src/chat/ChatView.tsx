@@ -1,4 +1,5 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react'
+import type { VisualAsset } from '@shared/visuals'
 import type { Brand, TrendItem, TrendSource } from '@shared/types'
 import type { Project } from '@shared/workspace'
 import LoginRequests from './LoginRequests'
@@ -50,6 +51,10 @@ import MediaPicker from '../pages/media/MediaPicker'
 import { chat, newId } from './api'
 import { onDraft } from '../pages/voice/chatDraft'
 import { useChatDraft } from './useChatDraft'
+import SketchPad from './visuals/SketchPad'
+import FindVisuals from './visuals/FindVisuals'
+import { VisualAttachment } from './visuals/VisualItems'
+import { attachVisual, onChatNote, onSketch, type SketchRequest } from './visuals/actions'
 import './chat.css'
 
 interface Props {
@@ -153,6 +158,23 @@ function ObsIcon(): ReactNode {
   )
 }
 
+function SketchIcon(): ReactNode {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+      <path d="M2 12l1-3.2 6.6-6.6a1.5 1.5 0 0 1 2.2 2.2L5.2 11 2 12zM8.6 3.2l2.2 2.2" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function FindIcon(): ReactNode {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+      <circle cx="6" cy="6" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M9.1 9.1l3.4 3.4M3.6 7.4l1.6-1.5 1.3 1.1 1-0.9" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function ClipIcon(): ReactNode {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
@@ -248,6 +270,9 @@ export default function ChatView({
   const listEnd = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLTextAreaElement>(null)
   const [picking, setPicking] = useState(false)
+  // the sketch pad: false when closed, null for a blank page
+  const [sketch, setSketch] = useState<SketchRequest | null | false>(false)
+  const [finding, setFinding] = useState(false)
   const openRef = useRef<string | null>(null)
   openRef.current = openId
 
@@ -404,6 +429,17 @@ export default function ChatView({
         input.current?.focus()
       }),
     []
+  )
+
+  // the sketch pad opened from a card (draw on it), and lines handed to the draft
+  useEffect(() => onSketch(setSketch), [])
+  useEffect(
+    () =>
+      onChatNote((text) => {
+        setDraft((d) => (d.trim() ? `${d.trimEnd()}\n${text}` : text))
+        input.current?.focus()
+      }),
+    [setDraft]
   )
 
   // trend cards look themselves up in the cached feed, only fetched once a trend card shows up
@@ -568,7 +604,9 @@ export default function ChatView({
 
   const send = async (text = draft, how: 'steer' | 'queue' = 'steer'): Promise<void> => {
     let body = text.trim()
-    if (!body || !agentId) return
+    if ((!body && !(text === draft && files.length)) || !agentId) return
+    // a sketch or picked visual can go out on its own
+    if (!body) body = files.some((f) => f.visual) ? 'Here is what I picked, take a look.' : 'Take a look at the attached files.'
     if (text === draft) {
       if (!body) dictated.current = []
       const note = await keepDictation()
@@ -626,7 +664,7 @@ export default function ChatView({
       setOpenId(res.threadId)
     } else void loadThread(res.threadId)
   }
-  const cardActions: CardActions = { brand, project, sendToAgent, hasAgent: !!agentId }
+  const cardActions: CardActions = { brand, project, sendToAgent, hasAgent: !!agentId, threadId: openId }
 
   const dictation = useDictation({
     onPartial: setPartial,
@@ -728,15 +766,47 @@ export default function ChatView({
   const attach = (list: Attachment[]): void =>
     setFiles((f) => [...f, ...list.filter((a) => !f.some((x) => x.id === a.id))].slice(0, 20))
 
+  // a pasted or dropped image as a visual: a card in an open chat, an attachment in a new one
+  const addVisual = async (make: () => Promise<VisualAsset>): Promise<void> => {
+    try {
+      const asset = await make()
+      if (openId) await window.trenddeckVisuals.showCard(brandId, openId, asset.id)
+      else attachVisual(asset)
+    } catch (err) {
+      setError(cleanError(err))
+    }
+  }
+  const imageAsset = async (f: File): Promise<VisualAsset> => {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const r = new FileReader()
+      r.onload = () => resolve(String(r.result))
+      r.onerror = () => reject(new Error("That image couldn't be read."))
+      r.readAsDataURL(f)
+    })
+    return window.trenddeckVisuals.saveImage({ brandId, threadId: openId, dataUrl, origin: 'paste', name: f.name && f.name !== 'image.png' ? f.name : 'Pasted image' })
+  }
+  // a link dragged from a browser: the image it points at, or the page's preview image
+  const dropLink = (e: DragEvent): boolean => {
+    const raw = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain')
+    const url = raw.split(/\r?\n/).find((l) => /^https?:\/\//i.test(l.trim()))?.trim()
+    if (!url) return false
+    void addVisual(() => window.trenddeckVisuals.fetchLink(brandId, url))
+    return true
+  }
+
   // dropped or pasted files go into the brand's media library first, then get attached from there
   const addFiles = async (list: FileList | null): Promise<void> => {
     if (!list?.length) return
     const media = window.trenddeck.media
-    const paths = Array.from(list).map((f) => media.pathForFile(f)).filter(Boolean)
-    if (!paths.length) {
-      setError("That isn't a file on your computer. Save it first, then drop it in.")
-      return
-    }
+    const onDisk = Array.from(list).filter((f) => media.pathForFile(f))
+    // a copied screenshot or an image dragged out of a browser isn't a file on disk: it becomes a
+    // visual, a card in this chat with the same actions as everything else
+    const loose = Array.from(list).filter((f) => !media.pathForFile(f))
+    const images = loose.filter((f) => f.type.startsWith('image/'))
+    for (const f of images) await addVisual(() => imageAsset(f))
+    if (loose.length > images.length) setError("Only images can come straight from the clipboard or a browser. Save other files first, then drop them in.")
+    const paths = onDisk.map((f) => media.pathForFile(f))
+    if (!paths.length) return
     const { ids } = await media.addPaths(brandId, paths)
     const all = await media.list(brandId, {})
     const found = all.filter((m) => ids.includes(m.id))
@@ -975,6 +1045,9 @@ export default function ChatView({
           <MediaReview key={`${brandId}:${file.id}`} brandId={brandId} mediaId={file.id} project={project}
             onSend={agentId ? sendToAgent : null} />
         ))}
+        {m.attachments?.filter((file) => !file.media && file.visual).map((file) => (
+          <VisualAttachment key={`${brandId}:${file.id}`} id={file.id} a={cardActions} />
+        ))}
         {!busy && (
           <button className="cx-tool cx-edit-btn" onClick={() => setEditing({ id: m.id, text: m.text })}>
             Edit
@@ -985,7 +1058,27 @@ export default function ChatView({
 
   return (
     <section className="cx" aria-label="Chat">
-      <div className={`cx-main${home ? ' home' : ''}`}>
+      <div
+        className={`cx-main${home ? ' home' : ''}`}
+        // files, images and links dropped anywhere on the chat
+        onDragOver={(e) => {
+          const t = e.dataTransfer.types
+          if (t.includes('Files') || t.includes('text/uri-list')) {
+            e.preventDefault()
+            setDragging(true)
+          }
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false)
+        }}
+        onDrop={(e) => {
+          setDragging(false)
+          if (e.dataTransfer.files.length) {
+            e.preventDefault()
+            void addFiles(e.dataTransfer.files)
+          } else if (dropLink(e)) e.preventDefault()
+        }}
+      >
         <header className="cx-head">
           <h2 title={SHORTCUTS}>
             <span className="cx-head-title">{thread?.title ?? 'New chat'}</span>
@@ -1066,6 +1159,11 @@ export default function ChatView({
           </button>
         )}
 
+        {finding && (
+          <div className="cx-find-wrap">
+            <FindVisuals a={cardActions} onClose={() => setFinding(false)} />
+          </div>
+        )}
         <form
           className={`cx-composer${dragging ? ' dragging' : ''}`}
           onSubmit={(e) => {
@@ -1073,18 +1171,6 @@ export default function ChatView({
             if (approval) {
               if (draft.trim()) void respond('deny')
             } else void send()
-          }}
-          onDragOver={(e) => {
-            if (e.dataTransfer.types.includes('Files')) {
-              e.preventDefault()
-              setDragging(true)
-            }
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault()
-            setDragging(false)
-            void addFiles(e.dataTransfer.files)
           }}
         >
           {error && <p className="cx-error">{error}</p>}
@@ -1292,6 +1378,25 @@ export default function ChatView({
               >
                 <ClipIcon />
               </button>
+              <button
+                type="button"
+                className={`ui-menu-btn${sketch !== false ? ' on' : ''}`}
+                title="Draw a sketch for your agent: on a blank page, a frame from the editor or a pasted screenshot"
+                aria-label="Sketch"
+                onClick={() => setSketch(null)}
+              >
+                <SketchIcon />
+              </button>
+              <button
+                type="button"
+                className={`ui-menu-btn${finding ? ' on' : ''}`}
+                title="Find images, clips, GIFs and audio online"
+                aria-label="Find visuals online"
+                aria-expanded={finding}
+                onClick={() => setFinding(!finding)}
+              >
+                <FindIcon />
+              </button>
               <ComposerMic d={dictation} disabled={!agentId || !!approval || recording} />
               <button
                 type="button"
@@ -1337,7 +1442,7 @@ export default function ChatView({
                   className="cx-send"
                   title={busy ? 'Queue it' : 'Send'}
                   aria-label={busy ? 'Queue message' : 'Send'}
-                  disabled={!draft.trim() || !agentId}
+                  disabled={(!draft.trim() && !files.length) || !agentId}
                 >
                   <SendIcon />
                 </button>
@@ -1346,6 +1451,10 @@ export default function ChatView({
           </div>
         </form>
       </div>
+
+      {sketch !== false && (
+        <SketchPad key={sketch?.src ?? 'blank'} a={cardActions} start={sketch} onClose={() => setSketch(false)} />
+      )}
 
       {picking && (
         <MediaPicker

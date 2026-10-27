@@ -6,6 +6,7 @@ import VideoReview from './VideoReview'
 import { sendReview } from './cards/VideoCard'
 import { cleanError } from './cards/useCards'
 import { embedFor, useEmbeds } from './cards/embed-owner'
+import { openSketch } from './visuals/actions'
 import './cards/cards.css'
 
 // a file you dropped or attached: look at it, ask the agent about it, put it in the project,
@@ -151,6 +152,11 @@ export default function MediaReview({
           <button type="button" disabled={busy || !onSend} onClick={() => void ask()}>
             Ask about it
           </button>
+          {media.kind === 'image' && (
+            <button type="button" onClick={() => openSketch({ src, name: full })}>
+              Draw on it
+            </button>
+          )}
           <button
             type="button"
             className="primary"
@@ -170,6 +176,11 @@ export default function MediaReview({
         <button type="button" disabled={busy || !onSend} onClick={() => void ask()}>
           Ask about it
         </button>
+        {media.kind === 'image' && (
+          <button type="button" onClick={() => openSketch({ src, name: full })}>
+            Draw on it
+          </button>
+        )}
         <button type="button" disabled={busy || general || !!inProject} onClick={() => void add()} title={general ? 'Open a project to add files to it' : undefined}>
           {inProject ? 'In the project' : 'Add to project media'}
         </button>

@@ -184,8 +184,14 @@ function size(n: number): string {
 export function attachmentNote(files: Attachment[] | undefined): string {
   if (!files?.length) return ''
   const media = files.filter((f) => f.media)
-  const other = files.filter((f) => !f.media)
+  const visuals = files.filter((f) => !f.media && f.visual)
+  const other = files.filter((f) => !f.media && !f.visual)
   let note = ''
+  if (visuals.length) {
+    note += `\n\nVisuals the user attached (sketches, screenshots or options they picked). Look at each with the TrendDeck visual_get tool, and put one in the video files with visual_save:\n${visuals
+      .map((f) => `- ${oneLine(f.name, 120)} (${f.type || 'image'}, ${size(f.size)}), visual id ${f.id}`)
+      .join('\n')}`
+  }
   if (media.length) {
     note += `\n\nAttached by the user from their media library. You can't open them, but you can put one on a page with the TrendDeck upload_file tool using its media id:\n${media
       .map((f) => `- ${oneLine(f.name, 120)} (${f.type || 'file'}, ${size(f.size)}), media id ${f.id}`)

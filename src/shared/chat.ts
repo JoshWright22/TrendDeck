@@ -74,6 +74,8 @@ export interface Attachment {
   size: number
   // id is a media library id the agent can hand to upload_file
   media?: boolean
+  // id is a visual (sketch, pasted or found image) the agent can look at with visual_get
+  visual?: boolean
 }
 
 export type StepStatus = 'running' | 'done' | 'error'

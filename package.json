@@ -16,6 +16,7 @@
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test:gateway": "esbuild scripts/gateway-test.ts --bundle --platform=node --format=esm --outfile=out/test/gateway-test.mjs --log-level=warning && node out/test/gateway-test.mjs",
+    "check:visuals": "esbuild scripts/visuals-check.ts --bundle --platform=node --format=esm --outfile=out/test/visuals-check.mjs --log-level=warning --alias:@shared=./src/shared && node out/test/visuals-check.mjs",
     "test:craft-native": "node scripts/craft-native-test.cjs",
     "test": "vitest run",
     "secret:scan": "node scripts/secret-scan.cjs",

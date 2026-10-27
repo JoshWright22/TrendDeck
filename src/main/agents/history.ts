@@ -25,6 +25,7 @@ export function cleanAttachments(raw: unknown): Attachment[] {
       size: Number(o.size) || 0
     }
     if (o.media === true) file.media = true
+    else if (o.visual === true) file.visual = true
     return [file]
   })
 }

@@ -21,9 +21,10 @@ import McpServersSection from './mcp-servers/McpServersSection'
 import StorageSection from './storage/StorageSection'
 import DictationSettings from './dictation/DictationSettings'
 import ObsSettings from './obs/ObsSettings'
+import MediaSourcesSection from './MediaSourcesSection'
 
 const REPO_URL = 'https://github.com/JoshWright22/TrendDeck'
-const SECTIONS = ['Brand', 'Sites', 'Ad blocker', 'Tabs', 'Trends', 'Posting pace', 'Agents', 'Agent access', 'MCP servers', 'Context', 'Channels', 'Dictation', 'OBS', 'Craft apps', 'Storage', 'Saved logins', 'About'] as const
+const SECTIONS = ['Brand', 'Sites', 'Ad blocker', 'Tabs', 'Trends', 'Posting pace', 'Agents', 'Agent access', 'MCP servers', 'Context', 'Channels', 'Media sources', 'Dictation', 'OBS', 'Craft apps', 'Storage', 'Saved logins', 'About'] as const
 
 interface Props {
   data: AppData
@@ -334,6 +335,7 @@ export default function Settings(props: Props): ReactNode {
     'MCP servers': <McpServersSection key={brand.id} brand={brand} />,
     Context: <ContextSection key={brand.id} brand={brand} />,
     Channels: <ChannelsSection key={brand.id} brand={brand} />,
+    'Media sources': <MediaSourcesSection />,
     Dictation: <DictationSettings />,
     OBS: <ObsSettings key={brand.id} brand={brand} />,
     'Craft apps': <CraftSettings />,
