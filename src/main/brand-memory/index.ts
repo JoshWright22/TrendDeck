@@ -17,8 +17,7 @@ import { ID_PATTERN } from '@shared/types'
 import { addCard, changeCard, getCard, newCardId } from '../cards/store'
 import { addRule } from '../context/rules'
 import { changeContext, changed as contextChanged } from '../context/store'
-import { projectsRoot } from '../craft/paths'
-import { safeName } from '../craft/rules'
+import { brandRoot } from '../craft/root'
 import { brandOf } from '../gateway/tools/common'
 import { ToolError, type GatewayTool, type Turn } from '../gateway/types'
 import { broadcast } from '../gateway/wait'
@@ -58,7 +57,9 @@ function brandName(brandId: string): string {
 
 // Documents\TrendDeck\<brand>\brand
 export function brandFolder(brandId: string): string {
-  return join(projectsRoot(), safeName(brandName(brandId), 'Brand'), 'brand')
+  const b = getData()?.brands.find((x) => x.id === brandId)
+  if (!b) throw new Error('no brand with that id')
+  return join(brandRoot(b), 'brand')
 }
 
 // one change at a time per brand

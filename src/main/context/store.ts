@@ -3,8 +3,7 @@ import { promises as fs } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { ID_PATTERN } from '@shared/types'
 import type { ContextState, StyleRule } from '@shared/context'
-import { projectsRoot } from '../craft/paths'
-import { safeName } from '../craft/rules'
+import { brandRoot } from '../craft/root'
 import { broadcast } from '../gateway/wait'
 import { getData } from '../store'
 import { cleanDocsIndex, scanDocs, type DocsIndex } from './docs'
@@ -176,7 +175,7 @@ async function projectDirs(brandId: string): Promise<ProjectDir[]> {
   for (const p of brand.projects) {
     if (p.folder && isAbsolute(p.folder) && (await isDir(p.folder))) out.push({ name: p.name, dir: p.folder })
   }
-  const brandDir = join(projectsRoot(), safeName(brand.name, 'Brand'))
+  const brandDir = brandRoot(brand)
   try {
     for (const e of await fs.readdir(brandDir, { withFileTypes: true })) {
       if (!e.isDirectory() || e.name.startsWith('.') || e.name === 'node_modules') continue

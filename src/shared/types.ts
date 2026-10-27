@@ -86,6 +86,9 @@ export interface Brand {
   chatProjects?: ChatProjects
   // the stages a project runs through, each opens a workspace in the right pane
   pipeline: PipelineStage[]
+  // the brand's folder under Documents\TrendDeck when it isn't named after the brand any more:
+  // a rename keeps the folder it already had on disk. main sets it, see main/store.ts
+  folderName?: string
 }
 
 export interface Settings {

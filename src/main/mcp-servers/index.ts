@@ -1,5 +1,4 @@
 import { app, ipcMain, type IpcMainInvokeEvent } from 'electron'
-import { join } from 'node:path'
 import {
   MCP_PRESETS,
   MCP_SERVER_NAME,
@@ -10,7 +9,7 @@ import {
 } from '@shared/mcp-servers'
 import { ID_PATTERN } from '@shared/types'
 import { projectsRoot } from '../craft/paths'
-import { safeName } from '../craft/rules'
+import { brandRoot } from '../craft/root'
 import { registerToolSource } from '../gateway/call'
 import { registerSecretSource } from '../gateway/secrets'
 import { getData } from '../store'
@@ -56,7 +55,7 @@ function freeName(base: string, taken: string[]): string {
 function presetsFor(brandId: unknown): McpServerPreset[] {
   const brand = isBrand(brandId) ? getData()?.brands.find((b) => b.id === brandId) : undefined
   // the same folder projectFolder puts the brand's projects in
-  const folder = brand ? join(projectsRoot(), safeName(brand.name, 'Brand')) : projectsRoot()
+  const folder = brand ? brandRoot(brand) : projectsRoot()
   const put = (v: string): string => v.split(PROJECTS_FOLDER).join(folder)
   const taken = serversNow().map((s) => s.id)
   return MCP_PRESETS.map((p) => ({

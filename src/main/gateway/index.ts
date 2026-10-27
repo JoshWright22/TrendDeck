@@ -17,6 +17,7 @@ import { CONTEXT_TOOLS } from '../context'
 import { OBS_TOOLS } from '../obs'
 import { WORKSPACE_TOOLS } from '../workspace/tools'
 import { APP_TOOLS } from './tools/app'
+import { BRAND_TOOLS } from './tools/brand'
 
 export { callGatewayTool, mcpToolList, toolInfo } from './call'
 
@@ -30,6 +31,8 @@ registerTools(CONTEXT_TOOLS)
 registerTools(OBS_TOOLS)
 // TrendDeck's own version and updates, and cards that send the user to Settings
 registerTools(APP_TOOLS)
+// the brand's name and niche keywords
+registerTools(BRAND_TOOLS)
 
 const isId = (v: unknown): v is string => typeof v === 'string' && ID_PATTERN.test(v)
 // approvals and policy only from the app window, a site tab never gets to say yes

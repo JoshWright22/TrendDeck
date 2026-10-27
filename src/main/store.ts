@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { promises as fs } from 'node:fs'
+import { existsSync, promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import {
   cleanDomain,
@@ -18,6 +18,8 @@ import {
   TAB_CAP_MAX,
   TREND_SOURCES
 } from '@shared/types'
+import { projectsRoot } from './craft/root'
+import { safeName } from './craft/rules'
 import { cleanIdeaBoard, cleanSchedule } from './planner/clean'
 import { cleanChatProjects, cleanPipeline, cleanProjects } from './workspace/clean'
 
@@ -127,6 +129,7 @@ function cleanBrand(raw: unknown): Brand | null {
     ? b.ideas.map(cleanIdea).filter((i): i is Idea => i !== null)
     : []
   const pipeline = cleanPipeline(b.pipeline)
+  const folderName = typeof b.folderName === 'string' && b.folderName && safeName(b.folderName, '') === b.folderName ? b.folderName : ''
   return {
     id: b.id,
     name: b.name.slice(0, 60),
@@ -139,6 +142,7 @@ function cleanBrand(raw: unknown): Brand | null {
     ideas,
     schedule: cleanSchedule(b.schedule),
     pipeline,
+    ...(folderName ? { folderName } : {}),
     // brands from before projects get General. links from before chats could have several
     // projects come from each project's threadIds
     ...cleanChatProjects(b.chatProjects, cleanProjects(b.projects, pipeline, Date.now()))
@@ -197,9 +201,26 @@ export async function loadData(): Promise<AppData> {
 
 let queue: Promise<void> = Promise.resolve()
 
+// a brand's folder under Documents\TrendDeck is named after it, and its brand files and any folder
+// that isn't a project's are found by that name. a rename keeps the folder it had once it's on
+// disk, so nothing moves or gets lost. main owns folderName, whatever the renderer sends is ignored
+export function keepBrandFolders(next: AppData, prev: AppData | null, onDisk: (name: string) => boolean): AppData {
+  const before = new Map((prev?.brands ?? []).map((b) => [b.id, b]))
+  const brands = next.brands.map((b) => {
+    const { folderName: _ignored, ...rest } = b
+    const p = before.get(b.id)
+    if (!p) return rest
+    if (p.folderName) return { ...rest, folderName: p.folderName }
+    const old = safeName(p.name, 'Brand')
+    if (old !== safeName(b.name, 'Brand') && onDisk(old)) return { ...rest, folderName: old }
+    return rest
+  })
+  return { ...next, brands }
+}
+
 // writes go through a temp file and a queue so a crash mid-save can't leave half a file
 export function saveData(data: AppData): Promise<void> {
-  const clean = sanitize(data)
+  const clean = keepBrandFolders(sanitize(data), current, (name) => existsSync(join(projectsRoot(), name)))
   current = clean
   const run = async (): Promise<void> => {
     const file = filePath()
