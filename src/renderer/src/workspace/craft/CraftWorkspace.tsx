@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { CraftAppStatus } from '@shared/craft'
+import { craftBelongsTo } from '@shared/craft'
 import type { WorkspaceProps } from '../registry'
 import Placeholder from '../Placeholder'
 import { usePane } from '../pane'
@@ -158,10 +159,10 @@ function Files({ status, brandId, projectId, projectName }: { status: CraftAppSt
 }
 
 function Docked({ status }: { status: CraftAppStatus }): ReactNode {
-  const { collapsed } = usePane()
+  const { collapsed, dockPriority } = usePane()
   const box = useRef<HTMLDivElement>(null)
   const [error, setError] = useState('')
-  useDock(status.app.id, box, !collapsed)
+  useDock(status.app.id, box, !collapsed, dockPriority)
   return (
     <div className="page craft craft-docked">
       <div className="craft-bar">
@@ -203,14 +204,14 @@ function Docked({ status }: { status: CraftAppStatus }): ReactNode {
   )
 }
 
-export function CraftWorkspace({ appId, brand, project }: WorkspaceProps & { appId: string }): ReactNode {
+export function CraftWorkspace({ appId, brand, project }: Pick<WorkspaceProps, 'brand' | 'project'> & { appId: string }): ReactNode {
   const status = useCraftApp(appId)
   if (!craftApi()) {
     return <Placeholder title={craftName(appId)} text="This copy of TrendDeck can't run the Craft apps yet. Update it from Settings, About." />
   }
   if (status === undefined) return <div className="page craft" />
   if (status === null) return <Placeholder title={craftName(appId)} text="TrendDeck doesn't know this Craft app." />
-  if (status.running) return <Docked status={status} />
+  if (craftBelongsTo(status, brand.id, project.id)) return <Docked status={status} />
   if (status.install.kind !== 'installed') return <Install status={status} />
   return <Files status={status} brandId={brand.id} projectId={project.id} projectName={project.name} />
 }

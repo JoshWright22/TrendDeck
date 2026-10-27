@@ -1,5 +1,14 @@
 # Decisions: the Craft apps in the workspace, and pre-publish checks
 
+## Craft apps directly in chat
+
+- The chat now has an all-app Craft selector and a resizable interactive editor surface. It reuses the installed native editor and its existing MCP connection, rather than presenting screenshots as an editor. Selecting an uninstalled app shows its installation flow; selecting an installed app lists this project's files.
+- A Craft window opened by the agent automatically appears in the chat for its brand/project. Status includes both IDs; another brand's running editor is never mounted as this project's editor. Opening that same app for another project still uses the existing save/close confirmation flow.
+- Only one editor surface is expanded in a chat at a time. Other running apps remain selectable. Hiding the editor does not close it. The chat composer stays available while editing.
+- Dock targets coordinate ownership: an inline chat surface takes priority over the legacy right pane, and a hidden or unmounted right pane cannot hide the active chat editor. Scrolling, clipping, resizing, and overlapping app dialogs update native window visibility.
+- This uses the existing Windows native docking implementation. Non-Windows native embedding, timestamped video annotations, dictation/take recording, OBS setup, cloud media storage, and automatic Git synchronization are not implemented by this change.
+- The title bar search has been removed; navigation stays in the brand/project sidebar and the tool controls.
+
 ## FilmCraft replaces the built-in editor
 
 - The editor core (`src/shared/editor/`, `src/main/editor/`, `window.trenddeckEditor`, `DECISIONS-editor.md`) is gone. Video, images, sound and motion are done in the storytold Craft apps, which TrendDeck installs and docks over the workspace pane. The agent drives them through each app's own MCP server, see `src/shared/craft.ts` for the contract and `src/main/craft/` for main's side.

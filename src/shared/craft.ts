@@ -28,6 +28,8 @@ export interface CraftAppStatus {
   updateReady: string | null
   // its window is open
   running: boolean
+  brandId: string | null
+  projectId: string | null
   // the project file open in it, when TrendDeck opened it
   file: string | null
   // the agent's MCP connection to it
@@ -41,6 +43,14 @@ export interface CraftDock {
   bounds: { x: number; y: number; width: number; height: number } | null
   // false when the pane is hidden, another stage is showing, or a TrendDeck modal is open
   visible: boolean
+}
+
+export function craftBelongsTo(
+  status: Pick<CraftAppStatus, 'running' | 'brandId' | 'projectId'>,
+  brandId: string,
+  projectId: string
+): boolean {
+  return status.running && status.brandId === brandId && status.projectId === projectId
 }
 
 export interface CraftOpenRequest {

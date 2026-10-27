@@ -1,168 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { isHttpUrl, type Brand } from '@shared/types'
-import type { ThreadSummary } from '@shared/chat'
+import { useEffect, useState, type ReactNode } from 'react'
 import logo from '../../../../resources/logo.svg'
-import { SearchIcon } from './Icons'
-import { toolWorkspaces } from '../workspace/registry'
-
-export type SearchPick =
-  | { kind: 'trends'; query: string }
-  | { kind: 'workspace'; key: string }
-  | { kind: 'site'; id: string }
-  | { kind: 'settings' }
-  | { kind: 'brand'; id: string }
-  | { kind: 'project'; id: string }
-  | { kind: 'thread'; id: string }
-  | { kind: 'url'; url: string }
-
-interface Result {
-  key: string
-  label: string
-  hint: string
-  pick: SearchPick
-}
-
-interface Props {
-  brands: Brand[]
-  brand: Brand | null
-  threads: ThreadSummary[]
-  onPick: (pick: SearchPick) => void
-}
 
 const isMac = window.trenddeck.platform === 'darwin'
-const MAX_RESULTS = 8
-
-// "youtube.com/foo" or a full link, but not plain words
-function asUrl(text: string): string | null {
-  if (/\s/.test(text)) return null
-  const full = /^https?:\/\//i.test(text) ? text : /^[\w-]+(\.[\w-]+)+(\/|$)/.test(text) ? `https://${text}` : ''
-  return full && isHttpUrl(full) ? full : null
-}
-
-function results(query: string, brands: Brand[], brand: Brand | null, threads: ThreadSummary[]): Result[] {
-  const q = query.trim().toLowerCase()
-  if (!q) return []
-  const has = (s: string): boolean => s.toLowerCase().includes(q)
-  const out: Result[] = []
-  const url = asUrl(query.trim())
-  if (url) out.push({ key: 'url', label: `Open ${url}`, hint: 'Tab', pick: { kind: 'url', url } })
-  const trends: SearchPick = { kind: 'trends', query: query.trim() }
-  out.push({ key: 'trends', label: `Search trends for "${query.trim()}"`, hint: 'Trends', pick: trends })
-  for (const p of brand?.projects ?? []) {
-    if (has(p.name)) out.push({ key: `project:${p.id}`, label: p.name, hint: 'Project', pick: { kind: 'project', id: p.id } })
-  }
-  for (const t of threads) {
-    if (!t.archived && has(t.title)) out.push({ key: `thread:${t.id}`, label: t.title, hint: 'Chat', pick: { kind: 'thread', id: t.id } })
-  }
-  for (const [key, def] of toolWorkspaces()) {
-    if (has(def.label) || has(key)) out.push({ key: `ws:${key}`, label: def.label, hint: 'Tool', pick: { kind: 'workspace', key } })
-  }
-  if (has('Settings')) out.push({ key: 'settings', label: 'Settings', hint: 'App', pick: { kind: 'settings' } })
-  for (const s of brand?.sites ?? []) {
-    if (has(s.name) || has(s.url)) {
-      out.push({ key: `site:${s.id}`, label: s.name, hint: 'Site', pick: { kind: 'site', id: s.id } })
-    }
-  }
-  for (const b of brands) {
-    if (b.id !== brand?.id && has(b.name)) {
-      out.push({ key: `brand:${b.id}`, label: b.name, hint: 'Brand', pick: { kind: 'brand', id: b.id } })
-    }
-  }
-  for (const i of brand?.ideas ?? []) {
-    if (has(i.title)) {
-      out.push({ key: `idea:${i.id}`, label: i.title, hint: 'Idea', pick: { kind: 'workspace', key: 'ideas' } })
-    }
-  }
-  return out.slice(0, MAX_RESULTS)
-}
-
-function Search({ brands, brand, threads, onPick }: Props): ReactNode {
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const [index, setIndex] = useState(0)
-  const input = useRef<HTMLInputElement>(null)
-  const list = results(query, brands, brand, threads)
-
-  // ctrl+k jumps to search from anywhere in the app
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
-        e.preventDefault()
-        input.current?.focus()
-        input.current?.select()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
-
-  const choose = (r: Result | undefined): void => {
-    if (!r) return
-    onPick(r.pick)
-    setQuery('')
-    setOpen(false)
-    input.current?.blur()
-  }
-
-  return (
-    <div className="title-search">
-      <label className="search">
-        <SearchIcon />
-        <input
-          ref={input}
-          value={query}
-          placeholder="Search projects, chats, tools, trends or paste a link"
-          aria-label="Search"
-          spellCheck={false}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            setIndex(0)
-            setOpen(true)
-          }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowDown') {
-              e.preventDefault()
-              setIndex((i) => Math.min(i + 1, list.length - 1))
-            } else if (e.key === 'ArrowUp') {
-              e.preventDefault()
-              setIndex((i) => Math.max(i - 1, 0))
-            } else if (e.key === 'Enter') {
-              e.preventDefault()
-              choose(list[index])
-            } else if (e.key === 'Escape') {
-              setQuery('')
-              input.current?.blur()
-            }
-          }}
-        />
-        <kbd>{isMac ? 'Cmd' : 'Ctrl'} K</kbd>
-      </label>
-      {open && list.length > 0 && (
-        <ul className="search-results" role="listbox">
-          {list.map((r, i) => (
-            <li
-              key={r.key}
-              role="option"
-              aria-selected={i === index}
-              className={i === index ? 'on' : undefined}
-              // mousedown so it lands before the input's blur closes the list
-              onMouseDown={(e) => {
-                e.preventDefault()
-                choose(r)
-              }}
-              onMouseEnter={() => setIndex(i)}
-            >
-              <span className="label">{r.label}</span>
-              <span className="hint">{r.hint}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
 
 export function WindowButtons(): ReactNode {
   const [max, setMax] = useState(false)
@@ -218,13 +57,11 @@ export function WindowButtons(): ReactNode {
 }
 
 // the whole bar drags the window, double click maximizes. anything clickable opts out in css
-export default function TitleBar(props: Props): ReactNode {
+export default function TitleBar(): ReactNode {
   return (
     <header className={`titlebar${isMac ? ' mac' : ''}`}>
       <img className="title-logo" src={logo} alt="" draggable={false} />
       <span className="title-name">TrendDeck</span>
-      <span className="spacer" />
-      <Search {...props} />
       <span className="spacer" />
       {!isMac && <WindowButtons />}
     </header>

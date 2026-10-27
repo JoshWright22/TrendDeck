@@ -7,7 +7,7 @@ import { useLiveTabs } from './useLiveTabs'
 import Sidebar from './shell/Sidebar'
 import { useThreads } from './shell/useThreads'
 import SiteView from './components/SiteView'
-import TitleBar, { type SearchPick } from './components/TitleBar'
+import TitleBar from './components/TitleBar'
 import { PanelIcon } from './components/Icons'
 import ShareTab from './components/mcp/ShareTab'
 import { useAgentEvents } from './components/mcp/useAgentEvents'
@@ -213,12 +213,6 @@ export default function App(): ReactNode {
     if (brand) showWs(brand.id, v)
   }
 
-  // a stage that uses this workspace opens as that stage, otherwise it's a tool
-  const openWorkspace = (key: string): void => {
-    const stage = brand?.pipeline.find((s) => s.workspace === key)
-    openWs(stage ? { kind: 'stage', stageId: stage.id } : { kind: 'tool', key })
-  }
-
   // every link in the app lands here, never in the system browser
   const openUrl = (url: string): void => {
     if (!brand || !isHttpUrl(url)) return
@@ -367,19 +361,6 @@ export default function App(): ReactNode {
     }))
   }
 
-  const onSearch = (pick: SearchPick): void => {
-    if (pick.kind === 'brand') update((d) => ({ ...d, activeBrandId: pick.id }))
-    else if (pick.kind === 'url') openUrl(pick.url)
-    else if (pick.kind === 'trends') {
-      setTrendQuery(pick.query)
-      openWorkspace('trends')
-    } else if (pick.kind === 'workspace') openWorkspace(pick.key)
-    else if (pick.kind === 'site') openWs({ kind: 'site', id: pick.id })
-    else if (pick.kind === 'settings') setModal({ kind: 'settings' })
-    else if (pick.kind === 'project') openProject(pick.id)
-    else openThread(pick.id)
-  }
-
   const editing = modal?.kind === 'brand' ? data.brands.find((b) => b.id === modal.id) : undefined
   const siteKey = brand && site && !pane.collapsed ? `${brand.id}:${site.id}` : ''
 
@@ -397,7 +378,7 @@ export default function App(): ReactNode {
 
   return (
     <div className="app">
-      <TitleBar brands={data.brands} brand={brand} threads={threads} onPick={onSearch} />
+      <TitleBar />
       <div className="shell">
         <Sidebar
           brands={data.brands}
@@ -437,6 +418,8 @@ export default function App(): ReactNode {
                 onThreadCreated={fileThread}
                 context={project?.name}
                 headerRight={wsToggle}
+                project={project ?? undefined}
+                onInlineCraft={() => setPane((current) => current.collapsed ? current : { ...current, collapsed: true })}
               />
             </Suspense>
           )}

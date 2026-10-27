@@ -47,6 +47,8 @@ export function craftMock(): CraftApi {
       latest: '1.0.0',
       updateReady: null,
       running: false,
+      brandId: null,
+      projectId: null,
       file: null,
       agent: 'off',
       ...START[id]
@@ -89,12 +91,12 @@ export function craftMock(): CraftApi {
       if (get(req.appId).install.kind !== 'installed') await install(req.appId)
       const ext = `${req.appId.charAt(0)}${req.appId.endsWith('craft') ? 'c' : ''}proj`
       const file = req.file ?? FILES[req.appId]?.[0]?.name ?? `Main.${ext}`
-      set(req.appId, { running: true, file, agent: 'headless' })
+      set(req.appId, { running: true, brandId: req.brandId, projectId: req.projectId, file, agent: 'headless' })
       setTimeout(() => apps.get(req.appId)?.running && set(req.appId, { agent: 'bridge' }), 900)
       return get(req.appId)
     },
     close: async (id) => {
-      set(id, { running: false, file: null, agent: 'off' })
+      set(id, { running: false, brandId: null, projectId: null, file: null, agent: 'off' })
     },
     dock: (d: CraftDock) => {
       const line = JSON.stringify(d)

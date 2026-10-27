@@ -1,5 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { Brand, TrendItem, TrendSource } from '@shared/types'
+import type { Project } from '@shared/workspace'
+import CraftChat from './CraftChat'
 import type {
   AgentConfig,
   AgentInfo,
@@ -51,6 +53,8 @@ interface Props {
   context?: string
   // extra buttons for the header, e.g. the workspace toggle
   headerRight?: ReactNode
+  project?: Project
+  onInlineCraft?: () => void
 }
 
 const STARTERS = [
@@ -165,7 +169,9 @@ export default function ChatView({
   onOpenId: setOpenId,
   onThreadCreated,
   context,
-  headerRight
+  headerRight,
+  project,
+  onInlineCraft
 }: Props): ReactNode {
   const [agents, setAgents] = useState<AgentInfo[] | null>(null)
   const [config, setConfig] = useState<AgentConfig>({ defaultAgentId: null, custom: [] })
@@ -830,6 +836,7 @@ export default function ChatView({
           {headerRight}
         </header>
 
+        {project && <CraftChat key={`${brand.id}:${project.id}`} brand={brand} project={project} onActivate={onInlineCraft} />}
         <div className="cx-messages" ref={scroller} onScroll={onScroll}>
           <div className="cx-column">
             {thread && thread.messages.length > 0 ? (

@@ -91,13 +91,13 @@ export async function launch(opts: { appId: string; brandId: string; projectId: 
   child.once('exit', () => {
     running.delete(opts.appId)
     forget(opts.appId)
-    setLive(opts.appId, { running: false, file: null })
+    setLive(opts.appId, { running: false, brandId: null, projectId: null, file: null })
     for (const fn of exitHooks) fn(r)
     void applyStaged(opts.appId)
     done()
   })
   attach(opts.appId, pid)
-  setLive(opts.appId, { running: true, file: opts.file })
+  setLive(opts.appId, { running: true, brandId: opts.brandId, projectId: opts.projectId, file: opts.file })
   for (const fn of startHooks) fn(r)
   return r
 }

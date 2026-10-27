@@ -1,6 +1,9 @@
 import { useEffect, type RefObject } from 'react'
 import type { CraftDock } from '@shared/craft'
 import { craftApi } from './store'
+import { containedBy, DockTargets } from './dock-targets'
+
+const targets = new DockTargets((dock) => craftApi()?.dock(dock))
 
 // anything of TrendDeck's own that can sit over the pane. the app's window is native and always
 // on top of the page, so while one of these overlaps it the window is hidden instead
@@ -32,25 +35,28 @@ function covered(r: Rect): boolean {
 // or the pane is hidden; going away (another stage, another project) hides it too. minimizing
 // isn't sent, document.hidden is also true when other windows merely cover TrendDeck, and the
 // app's window is owned by TrendDeck's so it minimizes along with it
-export function useDock(appId: string, box: RefObject<HTMLElement | null>, active: boolean): void {
+export function useDock(appId: string, box: RefObject<HTMLElement | null>, active: boolean, priority = 0): void {
   useEffect(() => {
     const api = craftApi()
     if (!api) return
-    let last = ''
+    const target = Symbol(appId)
     let timer = 0
     const send = (d: CraftDock): void => {
-      const line = JSON.stringify(d)
-      if (line === last) return
-      last = line
-      api.dock(d)
+      targets.set(target, d, priority)
     }
     const measure = (): void => {
       timer = 0
       const el = box.current
-      if (!active || !el) return send({ appId, bounds: null, visible: false })
+      if (!active || !el) return targets.remove(target)
       const b = el.getBoundingClientRect()
       const bounds = { x: Math.round(b.left), y: Math.round(b.top), width: Math.round(b.width), height: Math.round(b.height) }
-      const visible = bounds.width > 0 && bounds.height > 0 && bounds.x < window.innerWidth && !covered(bounds)
+      let visible = bounds.width > 0 && bounds.height > 0 && containedBy(b, { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight }) && !covered(bounds)
+      for (let parent = el.parentElement; parent && visible; parent = parent.parentElement) {
+        const style = getComputedStyle(parent)
+        if (/(auto|scroll|hidden|clip)/.test(`${style.overflowX} ${style.overflowY}`)) {
+          visible = containedBy(b, parent.getBoundingClientRect())
+        }
+      }
       send({ appId, bounds, visible })
     }
     // many changes come in a burst, measure once a frame. a timer, not requestAnimationFrame,
@@ -67,6 +73,7 @@ export function useDock(appId: string, box: RefObject<HTMLElement | null>, activ
     const mo = new MutationObserver(soon)
     mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'aria-hidden', 'open'] })
     window.addEventListener('resize', soon)
+    document.addEventListener('scroll', soon, true)
     // a sliding pane moves without a resize or a mutation on every frame
     document.addEventListener('transitionend', soon, true)
     return () => {
@@ -74,8 +81,9 @@ export function useDock(appId: string, box: RefObject<HTMLElement | null>, activ
       ro.disconnect()
       mo.disconnect()
       window.removeEventListener('resize', soon)
+      document.removeEventListener('scroll', soon, true)
       document.removeEventListener('transitionend', soon, true)
-      api.dock({ appId, bounds: null, visible: false })
+      targets.remove(target)
     }
-  }, [appId, box, active])
+  }, [appId, box, active, priority])
 }
