@@ -15,6 +15,7 @@ import { qcTools } from '../qc/tools'
 import { STORAGE_TOOLS } from '../production-storage'
 import { CONTEXT_TOOLS } from '../context'
 import { OBS_TOOLS } from '../obs'
+import { FOOTAGE_TOOLS } from '../footage/tools'
 import { WORKSPACE_TOOLS } from '../workspace/tools'
 import { APP_TOOLS } from './tools/app'
 import { BRAND_TOOLS } from './tools/brand'
@@ -29,6 +30,8 @@ registerTools(STORAGE_TOOLS)
 registerTools(CONTEXT_TOOLS)
 // OBS: status, scenes, pictures, recording and streaming with the user's approval
 registerTools(OBS_TOOLS)
+// recordings anywhere on the computer: find them, look inside, add parts to a project
+registerTools(FOOTAGE_TOOLS)
 // TrendDeck's own version and updates, and cards that send the user to Settings
 registerTools(APP_TOOLS)
 // the brand's name and niche keywords

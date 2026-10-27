@@ -381,6 +381,21 @@ export function obsStatus(brandId: string): Promise<ObsStatus> {
   })
 }
 
+// where OBS puts recordings, for finding footage. the folder OBS has now, and the user's own
+// folder when TrendDeck pointed OBS at a project for a recording. empty when OBS isn't reachable
+export async function obsRecordFolders(brandId: string): Promise<string[]> {
+  assertBrand(brandId)
+  const out: string[] = []
+  for (const r of [owner, pending]) if (r && r.brandId === brandId) out.push(r.previous.directory)
+  try {
+    const now = await read(brandId, (client) => client.request('GetRecordDirectory'))
+    if (typeof now.recordDirectory === 'string' && now.recordDirectory) out.unshift(now.recordDirectory)
+  } catch {
+    // not running or not set up, the caller falls back to OBS's own config and its default
+  }
+  return out
+}
+
 // ---- scenes, audio, pictures ----
 
 async function scenesOf(client: ObsClient): Promise<ObsScenes> {
