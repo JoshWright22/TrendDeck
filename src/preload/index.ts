@@ -20,6 +20,7 @@ import { workspaceApi } from './workspace'
 import './gateway'
 import { craftApi } from './craft'
 import { cardsApi, storageApi } from './cards'
+import { embedApi } from './embed'
 import { contextApi } from './context'
 import { mcpServersApi } from './mcp-servers'
 import './qc'
@@ -130,6 +131,7 @@ contextBridge.exposeInMainWorld('trenddeckInbox', inboxApi)
 contextBridge.exposeInMainWorld('trenddeckWorkspace', workspaceApi)
 contextBridge.exposeInMainWorld('trenddeckCraft', craftApi)
 contextBridge.exposeInMainWorld('trenddeckCards', cardsApi)
+contextBridge.exposeInMainWorld('trenddeckEmbed', embedApi)
 contextBridge.exposeInMainWorld('trenddeckStorage', storageApi)
 contextBridge.exposeInMainWorld('trenddeckContext', contextApi)
 contextBridge.exposeInMainWorld('trenddeckMcpServers', mcpServersApi)

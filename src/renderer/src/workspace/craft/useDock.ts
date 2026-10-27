@@ -15,6 +15,9 @@ const OVERLAYS = [
   '[role="listbox"]',
   '.ui-pop',
   '.search-results',
+  // the chat's jump to latest button and thread list float over the messages
+  '.cx-jump',
+  '.cx-threads-pop',
   '[data-over-craft]'
 ].join(', ')
 
@@ -50,14 +53,20 @@ export function useDock(appId: string, box: RefObject<HTMLElement | null>, activ
       if (!active || !el) return targets.remove(target)
       const b = el.getBoundingClientRect()
       const bounds = { x: Math.round(b.left), y: Math.round(b.top), width: Math.round(b.width), height: Math.round(b.height) }
-      let visible = bounds.width > 0 && bounds.height > 0 && containedBy(b, { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight }) && !covered(bounds)
-      for (let parent = el.parentElement; parent && visible; parent = parent.parentElement) {
+      // what can be seen of the box: the window, then every scrolling or clipping parent. the app's
+      // window keeps the box's full size and is cut to that, so it follows scrolling smoothly
+      let seen = { left: Math.max(0, b.left), top: Math.max(0, b.top), right: Math.min(window.innerWidth, b.right), bottom: Math.min(window.innerHeight, b.bottom) }
+      for (let parent = el.parentElement; parent; parent = parent.parentElement) {
         const style = getComputedStyle(parent)
-        if (/(auto|scroll|hidden|clip)/.test(`${style.overflowX} ${style.overflowY}`)) {
-          visible = containedBy(b, parent.getBoundingClientRect())
-        }
+        if (!/(auto|scroll|hidden|clip)/.test(`${style.overflowX} ${style.overflowY}`)) continue
+        const p = parent.getBoundingClientRect()
+        seen = { left: Math.max(seen.left, p.left), top: Math.max(seen.top, p.top), right: Math.min(seen.right, p.right), bottom: Math.min(seen.bottom, p.bottom) }
       }
-      send({ appId, bounds, visible })
+      const clip = { x: Math.round(seen.left), y: Math.round(seen.top), width: Math.round(seen.right - seen.left), height: Math.round(seen.bottom - seen.top) }
+      // a sliver isn't worth showing, and an overlay over any of it hides the window
+      const visible = bounds.width > 0 && bounds.height > 0 && clip.width >= 40 && clip.height >= 40 && !covered(clip)
+      const whole = containedBy(b, seen)
+      send({ appId, bounds, visible, clip: visible && !whole ? clip : null })
     }
     // many changes come in a burst, measure once a frame. a timer, not requestAnimationFrame,
     // which stops while other windows cover TrendDeck

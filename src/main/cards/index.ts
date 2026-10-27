@@ -16,9 +16,14 @@ import { makeCheckpoint, restoreCheckpoint } from './checkpoint'
 import { checkProjectFile, newVideosSince, projectFileUrl, relativeIn } from './files'
 import { addCard, cardsDir, changeCard, dropCards, getCard, listCards, newCardId } from './store'
 import { cardTools, projectOf } from './tools'
+import { registerTurnNotes } from '../agents/context'
+import { setupCollab, turnNotes } from './collab'
+import { embedTools, setupEmbeds } from './embed'
+import { setupTurnEdits } from './turn-edits'
 
 export { servedPath } from './files'
 export { dropCards } from './store'
+export { recordFriction, type FrictionEvent } from './friction'
 
 // cards in the chat from the agent's tools, see @shared/cards. the window lists them per thread,
 // answers suggestion cards, saves review frames and checkpoints, and reads project history
@@ -113,6 +118,13 @@ function watchRenders(): void {
 export function setupCards(): void {
   registerTools(cardTools())
   watchRenders()
+  // the Craft apps live in the chat: craft_embed, a reply's edits as one undo group, and what the
+  // user changed in them between replies
+  registerTools(embedTools())
+  setupEmbeds({ addToProject })
+  setupTurnEdits()
+  setupCollab()
+  registerTurnNotes(turnNotes)
 
   ipcMain.handle('cards:list', (e, brandId: unknown, threadId: unknown) => {
     if (!fromApp(e) || !isId(brandId) || typeof threadId !== 'string') return []

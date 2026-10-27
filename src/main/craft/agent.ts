@@ -333,3 +333,22 @@ export function setupAgentSessions(): void {
 export async function stopAllSessions(): Promise<void> {
   await Promise.all([...sessions.keys()].map((id) => stopSession(id)))
 }
+
+// waits for the agent's bridge to an app window that just opened, false after the wait
+export async function waitForBridge(appId: string, ms = 20_000): Promise<boolean> {
+  const until = Date.now() + ms
+  while (Date.now() < until) {
+    const s = sessions.get(appId)
+    if (s?.mode === 'bridge') {
+      try {
+        await s.ready
+        return true
+      } catch {
+        // it retries with backoff
+      }
+    }
+    if (!runningApp(appId)) return false
+    await new Promise((r) => setTimeout(r, 250))
+  }
+  return false
+}

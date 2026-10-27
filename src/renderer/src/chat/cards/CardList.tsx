@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { ChatCard } from '@shared/cards'
+import CraftEmbed from './CraftEmbed'
 import SuggestionCard from './SuggestionCard'
 import { HistoryCard, StorageCard } from './StorageHistoryCards'
 import VideoCard from './VideoCard'
@@ -16,6 +17,8 @@ export default function CardList({ cards, a }: { cards: ChatCard[]; a: CardActio
           <VideoCard key={c.id} card={c} a={a} />
         ) : c.type === 'suggestion' ? (
           <SuggestionCard key={c.id} card={c} a={a} />
+        ) : c.type === 'craft' ? (
+          <CraftEmbed key={c.id} card={c} a={a} />
         ) : c.type === 'storage' ? (
           <StorageCard key={c.id} card={c} />
         ) : (

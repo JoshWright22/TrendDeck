@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import type { Brand, TrendItem, TrendSource } from '@shared/types'
 import type { Project } from '@shared/workspace'
-import CraftChat from './CraftChat'
 import LoginRequests from './LoginRequests'
 import ProjectProgress from './ProjectProgress'
 import type {
@@ -27,6 +26,7 @@ import Markdown from './Markdown'
 import { EmbedCard, type EmbedActions } from './Embeds'
 import MediaReview from './MediaReview'
 import CardList from './cards/CardList'
+import EmbedPicker from './cards/EmbedPicker'
 import { useCards, type CardActions } from './cards/useCards'
 import { Dictation } from './Dictation'
 import AgentSettings from './AgentSettings'
@@ -870,11 +870,11 @@ export default function ChatView({
             <span className="cx-head-title">{thread?.title ?? 'New chat'}</span>
           </h2>
           <span className="spacer" />
+          {project && <EmbedPicker brandId={brand.id} threadId={thread?.id ?? null} project={project} onOpened={onInlineCraft} />}
           {headerRight}
         </header>
 
         {project && <ProjectProgress key={`progress:${brand.id}:${project.id}`} brand={brand} project={project} actions={cardActions} />}
-        {project && <CraftChat key={`${brand.id}:${project.id}`} brand={brand} project={project} onActivate={onInlineCraft} />}
         <div className="cx-messages" ref={scroller} onScroll={onScroll}>
           <div className="cx-column">
             <LoginRequests brandId={brand.id} threadId={openId} onOpenSite={onOpenSite} />

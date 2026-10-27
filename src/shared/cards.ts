@@ -1,3 +1,5 @@
+import type { EmbedAlternatives, EmbedFocus, EmbedTurn } from './craft-embed'
+
 // cards in the chat timeline that the agent's tools put there: a video to review, a suggestion,
 // a cloud copy, a project's history. main keeps them per brand, the chat shows the ones of the
 // open thread under the reply that made them. shared by main, preload and the ui
@@ -93,7 +95,25 @@ export interface HistoryCard extends CardBase {
   note: string
 }
 
-export type ChatCard = VideoCard | SuggestionCard | StorageCard | HistoryCard
+// a live Craft editor in the chat, see ./craft-embed. one per reply and app project: the agent
+// posts it with craft_embed, and its edits in a reply show and update it on their own
+export interface CraftEmbedCard extends CardBase {
+  type: 'craft'
+  appId: string
+  appName: string
+  projectId: string
+  // the app's file, a name in the project folder. null for the newest of its type
+  file: string | null
+  focus: EmbedFocus | null
+  note: string
+  // this reply's edits in the app, null when it made none
+  turn: EmbedTurn | null
+  alternatives: EmbedAlternatives | null
+  // shown because the agent edited, not because it called craft_embed
+  auto: boolean
+}
+
+export type ChatCard = VideoCard | SuggestionCard | StorageCard | HistoryCard | CraftEmbedCard
 
 export interface CardsChanged {
   brandId: string

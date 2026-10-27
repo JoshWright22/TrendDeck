@@ -25,7 +25,7 @@ import {
 import { getData } from '../store'
 import { CLIS } from './catalog'
 import { getConfig, getCustom, removeCustom, saveCustom, setDefault } from './config'
-import { brandContext, flatPrompt, history, historyRoom, turnText, voiceHash, voiceRoom } from './context'
+import { brandContext, flatPrompt, history, historyRoom, turnNotes, turnText, voiceHash, voiceRoom } from './context'
 import { getBrandContext } from '../voice'
 import { addThread, cleanAttachments, dropChats, findThread, persist, removeThread, threadsFor } from './history'
 import { beginAgentTurn, type AgentKind, type AgentSession } from '../mcp'
@@ -253,7 +253,8 @@ async function runReply(brandId: string, live: Live): Promise<void> {
     const base = await brandContext(brand)
     // the user message and the empty reply are the last two
     const userMsg = thread.messages[thread.messages.length - 2]
-    const message = userMsg ? turnText(userMsg) : ''
+    // with what the user changed in the chat's Craft editors since the last reply
+    const message = userMsg ? turnText(userMsg) + (await turnNotes(brandId, thread.id)) : ''
     // every prompt carries the brand voice pack, cut to the brand's own size or to what still fits
     let voice = await getBrandContext(brandId)
     const room = voiceRoom(base.length + message.length)

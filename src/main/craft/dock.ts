@@ -22,7 +22,17 @@ interface User32 {
   PostMessageW: Fn
   GetWindowRect: Fn
   GetWindowTextLengthW: Fn
+  SetWinEventHook: Fn
+  UnhookWinEvent: Fn
+  SetWindowRgn: Fn
+  CreateRectRgn: Fn
 }
+
+const EVENT_OBJECT_SHOW = 0x8002
+const WINEVENT_OUTOFCONTEXT = 0
+// the hook's callback, kept so koffi doesn't free it
+let showCallback: unknown = null
+const hooks = new Map<string, unknown>()
 
 const GW_OWNER = 4
 const GWL_STYLE = -16
@@ -64,6 +74,7 @@ function user32(): User32 | null {
     // named types, the signatures below refer to them by name
     koffi.struct('CRAFT_RECT', { left: 'long', top: 'long', right: 'long', bottom: 'long' })
     koffi.proto('bool __stdcall CraftEnumProc(intptr_t hwnd, intptr_t lParam)')
+    const showProto = koffi.proto('void __stdcall CraftWinEventProc(intptr_t hook, uint32_t event, intptr_t hwnd, int32_t idObject, int32_t idChild, uint32_t thread, uint32_t time)')
     u32 = {
       EnumWindows: lib.func('bool __stdcall EnumWindows(CraftEnumProc *cb, intptr_t lParam)'),
       GetWindowThreadProcessId: lib.func('uint32_t __stdcall GetWindowThreadProcessId(intptr_t hwnd, _Out_ uint32_t *pid)'),
@@ -76,8 +87,18 @@ function user32(): User32 | null {
       ShowWindowAsync: lib.func('bool __stdcall ShowWindowAsync(intptr_t hwnd, int cmd)'),
       PostMessageW: lib.func('bool __stdcall PostMessageW(intptr_t hwnd, uint32_t msg, uintptr_t wp, intptr_t lp)'),
       GetWindowRect: lib.func('bool __stdcall GetWindowRect(intptr_t hwnd, _Out_ CRAFT_RECT *rect)'),
-      GetWindowTextLengthW: lib.func('int __stdcall GetWindowTextLengthW(intptr_t hwnd)')
+      GetWindowTextLengthW: lib.func('int __stdcall GetWindowTextLengthW(intptr_t hwnd)'),
+      SetWinEventHook: lib.func('intptr_t __stdcall SetWinEventHook(uint32_t min, uint32_t max, intptr_t mod, CraftWinEventProc *cb, uint32_t pid, uint32_t thread, uint32_t flags)'),
+      UnhookWinEvent: lib.func('bool __stdcall UnhookWinEvent(intptr_t hook)'),
+      SetWindowRgn: lib.func('int __stdcall SetWindowRgn(intptr_t hwnd, intptr_t rgn, bool redraw)'),
+      CreateRectRgn: koffi.load('gdi32.dll').func('intptr_t __stdcall CreateRectRgn(int l, int t, int r, int b)')
     }
+    // a docked app's window is put in place the moment it shows, so it never pops up on its own
+    // first. out of context hooks are called on this thread's message loop
+    showCallback = koffi.register((_hook: number, _event: number, _hwnd: number, idObject: number) => {
+      if (idObject !== 0) return
+      for (const e of docked.values()) if (!e.hwnd) place(e)
+    }, koffi.pointer(showProto))
   } catch (err) {
     console.error('craft: docking is off, user32 could not be loaded', err)
     u32 = null
@@ -112,6 +133,24 @@ function windowsOf(pid: number): number[] {
   return found.sort((a, b) => b.area - a.area).map((f) => f.hwnd)
 }
 
+// the process's other visible top level windows that are too small to be its main one, like
+// FilmCraft's empty 16 by 16 window at 0,0. they'd sit on the desktop on their own
+function strayWindows(pid: number, main: number): number[] {
+  const u = user32()
+  if (!u) return []
+  const out: number[] = []
+  u.EnumWindows((hwnd: number) => {
+    const out1 = [0]
+    u.GetWindowThreadProcessId(hwnd, out1)
+    if (out1[0] !== pid || Number(hwnd) === main || !u.IsWindowVisible(hwnd) || u.GetWindow(hwnd, GW_OWNER)) return true
+    const r = { left: 0, top: 0, right: 0, bottom: 0 }
+    u.GetWindowRect(hwnd, r)
+    if (r.right - r.left < 200 || r.bottom - r.top < 150) out.push(Number(hwnd))
+    return true
+  }, 0)
+  return out
+}
+
 function hwndOf(win: BrowserWindow): number {
   const buf = win.getNativeWindowHandle()
   return buf.length >= 8 ? Number(buf.readBigUInt64LE(0)) : buf.readUInt32LE(0)
@@ -125,9 +164,15 @@ interface Docked {
   exStyle: number
   bounds: CraftDock['bounds']
   visible: boolean
+  // the part of bounds that can be seen, the window is cut to it
+  clip: CraftDock['bounds']
+  // the cut last applied, '' for none
+  region: string
   // where it was last put, in screen pixels
   placed: { x: number; y: number; w: number; h: number } | null
   hidden: boolean
+  // small windows of the app hidden while it's docked
+  strays: number[]
 }
 
 const docked = new Map<string, Docked>()
@@ -152,8 +197,27 @@ export function setHost(win: BrowserWindow): void {
 // starts docking an app that was just launched. the window is looked for until it shows up
 export function attach(appId: string, pid: number): void {
   if (!user32()) return
-  docked.set(appId, { appId, pid, hwnd: null, style: 0, exStyle: 0, bounds: null, visible: false, placed: null, hidden: false })
+  docked.set(appId, { appId, pid, hwnd: null, style: 0, exStyle: 0, bounds: null, visible: false, clip: null, region: '', placed: null, hidden: false, strays: [] })
+  unhook(appId)
+  try {
+    const h = user32()!.SetWinEventHook(EVENT_OBJECT_SHOW, EVENT_OBJECT_SHOW, 0, showCallback, pid, 0, WINEVENT_OUTOFCONTEXT)
+    if (h) hooks.set(appId, h)
+  } catch (err) {
+    console.error('craft: no show hook, the 500 ms check finds the window instead', err)
+  }
   ensureTimer()
+}
+
+function unhook(appId: string): void {
+  const h = hooks.get(appId)
+  hooks.delete(appId)
+  if (h) {
+    try {
+      user32()?.UnhookWinEvent(h)
+    } catch {
+      // gone with the process
+    }
+  }
 }
 
 export function setDock(d: CraftDock): void {
@@ -161,6 +225,7 @@ export function setDock(d: CraftDock): void {
   if (!e) return
   e.bounds = d.bounds
   e.visible = d.visible
+  e.clip = d.clip ?? null
   place(e)
 }
 
@@ -204,24 +269,57 @@ function grab(e: Docked): boolean {
   return true
 }
 
-// the pane's css rect to screen pixels: zoom, the window's content origin, then the display's scale
-function target(e: Docked): { x: number; y: number; w: number; h: number } | null {
-  if (!host || host.isDestroyed() || !e.bounds) return null
+// a css rect of the content area to screen pixels: zoom, the window's content origin, then the display's scale
+function toScreen(b: NonNullable<CraftDock['bounds']>): { x: number; y: number; w: number; h: number } | null {
+  if (!host || host.isDestroyed()) return null
   const zoom = host.webContents.getZoomFactor()
   const c = host.getContentBounds()
   const dip = {
-    x: Math.round(c.x + e.bounds.x * zoom),
-    y: Math.round(c.y + e.bounds.y * zoom),
-    width: Math.max(1, Math.round(e.bounds.width * zoom)),
-    height: Math.max(1, Math.round(e.bounds.height * zoom))
+    x: Math.round(c.x + b.x * zoom),
+    y: Math.round(c.y + b.y * zoom),
+    width: Math.max(1, Math.round(b.width * zoom)),
+    height: Math.max(1, Math.round(b.height * zoom))
   }
   const r = process.platform === 'win32' ? screen.dipToScreenRect(host, dip) : dip
   return { x: r.x, y: r.y, w: r.width, h: r.height }
 }
 
+function target(e: Docked): { x: number; y: number; w: number; h: number } | null {
+  return e.bounds ? toScreen(e.bounds) : null
+}
+
+// cuts the window to the part of the box that can be seen, so a box partly scrolled out of view
+// keeps its window, just trimmed at the edge of what's around it
+function cut(e: Docked, t: { x: number; y: number; w: number; h: number }): void {
+  const u = user32()
+  if (!u || !e.hwnd) return
+  const c = e.clip ? toScreen(e.clip) : null
+  const r = c ? { l: Math.max(0, c.x - t.x), t: Math.max(0, c.y - t.y), r: Math.min(t.w, c.x - t.x + c.w), b: Math.min(t.h, c.y - t.y + c.h) } : null
+  const full = !r || (r.l <= 0 && r.t <= 0 && r.r >= t.w && r.b >= t.h)
+  const key = full ? '' : `${r!.l},${r!.t},${r!.r},${r!.b}`
+  if (key === e.region) return
+  try {
+    // the window owns the region once it's set, nothing to free
+    u.SetWindowRgn(e.hwnd, full ? 0 : u.CreateRectRgn(r!.l, r!.t, r!.r, r!.b), true)
+    e.region = key
+  } catch (err) {
+    console.error('craft: the window could not be cut to the visible part', err)
+  }
+}
+
+function hideStrays(e: Docked): void {
+  const u = user32()
+  if (!u || !e.hwnd) return
+  for (const h of strayWindows(e.pid, e.hwnd)) {
+    u.ShowWindowAsync(h, SW_HIDE)
+    if (!e.strays.includes(h)) e.strays.push(h)
+  }
+}
+
 function place(e: Docked): void {
   const u = user32()
   if (!u || !grab(e) || !e.hwnd) return
+  hideStrays(e)
   const hostShown = !!host && !host.isDestroyed() && host.isVisible() && !host.isMinimized()
   const t = hostShown && e.visible ? target(e) : null
   if (!t) {
@@ -235,15 +333,17 @@ function place(e: Docked): void {
   u.GetWindowRect(e.hwnd, rect)
   const now = { x: rect.left, y: rect.top, w: rect.right - rect.left, h: rect.bottom - rect.top }
   const same = now.x === t.x && now.y === t.y && now.w === t.w && now.h === t.h
-  if (e.hidden) {
-    u.ShowWindowAsync(e.hwnd, SW_SHOWNOACTIVATE)
-    e.hidden = false
-  }
+  // moved first, then shown, so it never shows where it was
   if (!same) {
     // a maximized or minimized app (from its own title bar buttons) ignores a move until it's restored
     if (Number(u.GetWindowLongPtrW(e.hwnd, GWL_STYLE)) & (WS_MAXIMIZE | WS_MINIMIZE)) u.ShowWindowAsync(e.hwnd, SW_RESTORE)
     u.SetWindowPos(e.hwnd, 0, t.x, t.y, t.w, t.h, SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS)
     e.placed = t
+  }
+  cut(e, t)
+  if (e.hidden) {
+    u.ShowWindowAsync(e.hwnd, SW_SHOWNOACTIVATE)
+    e.hidden = false
   }
 }
 
@@ -251,6 +351,7 @@ function place(e: Docked): void {
 export function release(appId: string): void {
   const e = docked.get(appId)
   docked.delete(appId)
+  unhook(appId)
   const u = user32()
   if (!u || !e?.hwnd || !u.IsWindow(e.hwnd)) return
   try {
@@ -258,7 +359,9 @@ export function release(appId: string): void {
     u.SetWindowLongPtrW(e.hwnd, GWL_STYLE, e.style)
     u.SetWindowLongPtrW(e.hwnd, GWL_EXSTYLE, e.exStyle)
     u.SetWindowPos(e.hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED | SWP_ASYNCWINDOWPOS)
+    if (e.region) u.SetWindowRgn(e.hwnd, 0, true)
     u.ShowWindowAsync(e.hwnd, SW_SHOWNOACTIVATE)
+    for (const h of e.strays) if (u.IsWindow(h)) u.ShowWindowAsync(h, SW_SHOWNOACTIVATE)
   } catch {
     // it's closing anyway
   }
@@ -270,6 +373,7 @@ export function releaseAll(): void {
 
 export function forget(appId: string): void {
   docked.delete(appId)
+  unhook(appId)
 }
 
 export function isDocked(appId: string): boolean {
@@ -286,4 +390,10 @@ export function askClose(pid: number): boolean {
   if (!hwnd) return false
   u.PostMessageW(hwnd, WM_CLOSE, 0, 0)
   return true
+}
+
+// the app's window is docked and showing right now
+export function isShown(appId: string): boolean {
+  const e = docked.get(appId)
+  return !!e?.hwnd && !e.hidden
 }

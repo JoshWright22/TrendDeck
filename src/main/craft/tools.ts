@@ -7,9 +7,10 @@ import { ContentResult, ToolError, type GatewayTool, type Turn } from '../gatewa
 import { obj, oneOf, str } from '../gateway/validate'
 import type { JsonSchema } from '../gateway/validate'
 import { cachedTools, markDirty, pickFile, saveSession, sessionFor } from './agent'
+import { countsAsEdit } from '@shared/craft-embed'
 import { APPS, spec } from './catalog'
-import type { McpContent } from './mcp'
-import { appFiles, projectFolder } from './paths'
+import type { McpCallResult, McpContent } from './mcp'
+import { appFiles, findProject, projectFolder } from './paths'
 import {
   commandIds,
   deletesFiles,
@@ -67,6 +68,56 @@ function content(items: McpContent[], folder: string): ContentResult['content'] 
   return out.length ? out : [{ type: 'text', text: 'done' }]
 }
 
+// ---- around the agent's edits in an app. cards/turn-edits.ts makes one undo group of a reply's
+// edits and shows the app in the chat. a hook failing never stops the edit ----
+
+export interface CraftEditCall {
+  turn: Turn
+  appId: string
+  projectId: string
+  folder: string
+  tool: string
+  args: Record<string, unknown>
+}
+
+const beforeEdits: ((c: CraftEditCall) => Promise<void>)[] = []
+const afterEdits: ((c: CraftEditCall, ok: boolean) => void)[] = []
+
+export function onCraftEdit(before: (c: CraftEditCall) => Promise<void>, after: (c: CraftEditCall, ok: boolean) => void): void {
+  beforeEdits.push(before)
+  afterEdits.push(after)
+}
+
+// one of an app's own tools called by TrendDeck itself (not the agent) on a project: the open
+// window when it shows the project, else the headless engine
+export async function appCall(
+  brandId: string,
+  projectId: string,
+  appId: string,
+  tool: string,
+  args: Record<string, unknown>,
+  opts: { needsWindow?: boolean; timeoutMs?: number; edits?: boolean } = {}
+): Promise<McpCallResult> {
+  const { project } = findProject(brandId, projectId)
+  const folder = await projectFolder(brandId, projectId)
+  const session = await sessionFor(appId, brandId, projectId, folder, () => pickFile(appId, folder, project.name, null), !!opts.needsWindow)
+  const r = await session.client.callTool(tool, args, { timeoutMs: opts.timeoutMs ?? 60_000 })
+  if (opts.edits) markDirty(appId)
+  return r
+}
+
+// the json an app's tool answered with, its first text part
+export function resultJson(r: McpCallResult): unknown {
+  const text = r.content.find((c) => c.type === 'text' && typeof c.text === 'string')?.text
+  if (r.isError) throw new Error((text ?? 'the app said no').slice(0, 300))
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
+}
+
 function appTool(appId: string, t: McpToolDef, bridgeOnly: boolean): GatewayTool {
   const sp = spec(appId)
   const { risk, alwaysAsk } = riskFor(t)
@@ -108,6 +159,10 @@ function appTool(appId: string, t: McpToolDef, bridgeOnly: boolean): GatewayTool
       if (risk !== 'read') {
         for (const p of paths) if (dirname(p) !== folder && isInside(folder, dirname(p))) await fs.mkdir(dirname(p), { recursive: true }).catch(() => {})
       }
+      const edit: CraftEditCall | null = risk !== 'read' && countsAsEdit(t.name, callArgs) ? { turn, appId, projectId: project.id, folder, tool: t.name, args: callArgs } : null
+      if (edit) {
+        for (const fn of beforeEdits) await fn(edit).catch((err) => console.error('craft: an edit hook failed', err))
+      }
       let session
       try {
         session = await sessionFor(appId, turn.brandId, project.id, folder, () => pickFile(appId, folder, project.name, null), bridgeOnly)
@@ -119,6 +174,7 @@ function appTool(appId: string, t: McpToolDef, bridgeOnly: boolean): GatewayTool
         // progress keeps a long export from timing out, it isn't shown anywhere yet
         const r = await session.client.callTool(t.name, callArgs, { signal: ac.signal, timeoutMs: 10 * 60_000, onProgress: () => {} })
         if (risk !== 'read') markDirty(appId)
+        if (edit) for (const fn of afterEdits) fn(edit, r.isError !== true)
         return new ContentResult(content(r.content, folder), r.isError === true)
       } catch (err) {
         throw new ToolError(`${sp.name}: ${hideRoot(err instanceof Error ? err.message : String(err), folder)}`)

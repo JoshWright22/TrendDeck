@@ -5,6 +5,7 @@ import type { Project } from '@shared/workspace'
 import VideoReview from './VideoReview'
 import { sendReview } from './cards/VideoCard'
 import { cleanError } from './cards/useCards'
+import { embedFor, useEmbeds } from './cards/embed-owner'
 import './cards/cards.css'
 
 // a file you dropped or attached: look at it, ask the agent about it, put it in the project,
@@ -33,6 +34,9 @@ export default function MediaReview({
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
+  // with a Craft app in the chat for this project, the file goes straight into its project
+  useEmbeds()
+  const embed = project ? embedFor(project.id) : null
 
   useEffect(() => {
     let active = true
@@ -142,7 +146,27 @@ export default function MediaReview({
       ) : media.kind === 'image' ? (
         <img className="cx-card2-image" src={src} alt={full} />
       ) : null}
-      <div className="cx-card2-actions">
+      {embed && window.trenddeckEmbed && (
+        <div className="cx-card2-actions">
+          <button type="button" disabled={busy || !onSend} onClick={() => void ask()}>
+            Ask about it
+          </button>
+          <button
+            type="button"
+            className="primary"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const out = await window.trenddeckEmbed!.importMedia(brandId, embed.id, mediaId)
+                setNote(out.imported.length ? `${out.note} ${out.imported.join(', ')}` : out.note)
+              })
+            }
+          >
+            Add to the {embed.appName} project
+          </button>
+        </div>
+      )}
+      {!embed && <div className="cx-card2-actions">
         <button type="button" disabled={busy || !onSend} onClick={() => void ask()}>
           Ask about it
         </button>
@@ -159,7 +183,7 @@ export default function MediaReview({
             </button>
           </>
         )}
-      </div>
+      </div>}
       {confirm && (
         <div className="cx-card2-actions" role="alertdialog" aria-label="Open FilmCraft">
           <span>FilmCraft isn't open on {project?.name}. Open it and {confirm === 'insert' ? 'insert there' : 'replace the selection there'}?</span>

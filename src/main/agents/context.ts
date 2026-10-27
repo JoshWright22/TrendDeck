@@ -96,6 +96,8 @@ export async function brandContext(brand: Brand): Promise<string> {
     'Manage the workflow for the user: inspect pipeline_get and run_list, propose appropriate changes with pipeline_propose_change, and use run_start and stage-status tools to keep progress accurate. Ask for missing creative decisions instead of asking the user to configure a pipeline manually.',
     'Use craft_list and craft_open to select and open the editors you need inside chat. Downloads follow the app permission policy. Do not claim an edit or installation succeeded before its tool result confirms it.',
     "Show, don't describe. When you have an idea for the video (an edit, a shot, a title, a thumbnail, a caption), call suggest so it pops up as a card the user can accept, put off or answer; don't bury ideas in long replies. To show progress, call show_video with the render, export or take from the project folder: the user can play it, highlight a range and send timestamped comments. For an edit, suggest with kind edit, render a preview when asked and report the result with card_update. Their answers come back as messages.",
+    "The Craft editors live in the chat. Post one with craft_embed when you start working in it or want the user to look at something; it's the real app and the user edits in it too. Make every edit with the app's own commands on the project file (FilmCraft: file.newSequence, timeline.place, timeline.razor, timeline.trim, timeline.move, edit.rippleDelete, captions.*, effects.*, markers.add), so the project holds each edit at its place and stays editable. Use render_frame and exports only to check frames; never hand over a separately rendered video as the edit. Your edits in one reply are one undo group the user can undo or keep. For alternatives, make each version a separate sequence in the same project (or a separate layer) and pass them to craft_embed as alternatives instead of describing them. Timeline comments from the user arrive with FilmCraft marker ids at their sequence times.",
+    "When a message comes with what the user changed in the editors since your last reply, respect those edits and build on them. Never silently revert them; if one conflicts with what you planned, say so and ask.",
     'Before you write or cut, check brand_docs_search, past_videos_search and the style rules below. When the user states a lasting preference (pacing, words to avoid, a look), propose it with remember_style; it is only kept once they confirm.',
     'Use login for website authentication. TrendDeck can request private credentials directly in chat; never ask the user to put passwords or two-factor codes into ordinary messages.',
     '',
@@ -123,6 +125,27 @@ export async function brandContext(brand: Brand): Promise<string> {
 
   lines.push('', '## Cards', EMBED_GUIDE)
   return lines.join('\n')
+}
+
+// notes for the start of the agent's turn, next to the user's message: e.g. what the user changed in
+// the Craft editors since the last reply (main/cards/collab.ts). a source failing adds nothing
+type TurnNotes = (brandId: string, threadId: string) => Promise<string>
+const turnNoteSources: TurnNotes[] = []
+
+export function registerTurnNotes(fn: TurnNotes): void {
+  turnNoteSources.push(fn)
+}
+
+export async function turnNotes(brandId: string, threadId: string): Promise<string> {
+  const parts: string[] = []
+  for (const fn of turnNoteSources) {
+    const text = await fn(brandId, threadId).catch((err) => {
+      console.error('a turn note source failed', err)
+      return ''
+    })
+    if (text.trim()) parts.push(text.trim())
+  }
+  return parts.length ? `\n\n${parts.join('\n\n')}` : ''
 }
 
 function size(n: number): string {

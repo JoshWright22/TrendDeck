@@ -48,8 +48,12 @@ function cleanDock(raw: unknown): CraftDock | null {
   if (!d || !isAppId(d.appId)) return null
   const b = d.bounds
   const num = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) < 100_000
-  const bounds = b && num(b.x) && num(b.y) && num(b.width) && num(b.height) && b.width > 0 && b.height > 0 ? { x: b.x, y: b.y, width: b.width, height: b.height } : null
-  return { appId: d.appId, bounds, visible: d.visible === true }
+  const rect = (r: unknown): { x: number; y: number; width: number; height: number } | null => {
+    const v = r as Partial<{ x: number; y: number; width: number; height: number }> | null
+    return v && num(v.x) && num(v.y) && num(v.width) && num(v.height) && v.width > 0 && v.height > 0 ? { x: v.x, y: v.y, width: v.width, height: v.height } : null
+  }
+  const bounds = rect(b)
+  return { appId: d.appId, bounds, visible: d.visible === true, clip: bounds ? rect(d.clip) : null }
 }
 
 // the TrendDeck window the apps dock to, from index.ts createWindow

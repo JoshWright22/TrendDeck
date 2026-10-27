@@ -1,0 +1,231 @@
+/* a live Craft editor in the chat. the stage is where the app's native window docks, so nothing
+   of ours is drawn over it while it's live; the still underneath shows when the window hides */
+.cx-embed .spacer {
+  flex: 1;
+}
+
+.cx-embed-head-row {
+  align-items: center;
+}
+
+.cx-embed-sizes {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.cx-card2 .cx-embed-sizes button {
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--smoke);
+}
+
+.cx-card2 .cx-embed-sizes button[aria-pressed='true'] {
+  background: var(--raised);
+  color: var(--chalk);
+}
+
+/* square, like the native window that docks over it; its height comes from stageHeight() */
+.cx-embed-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #000;
+}
+
+.cx-embed-stage[style] {
+  aspect-ratio: auto;
+}
+
+.cx-embed-still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.cx-embed-cover {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  color: var(--chalk);
+  text-align: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.cx-embed.dropping {
+  border-color: var(--chalk);
+}
+
+.cx-embed-foot {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.cx-embed-alts {
+  display: grid;
+  gap: 6px;
+}
+
+.cx-card2 .cx-embed-alts button[aria-pressed='true'] {
+  background: var(--hover);
+  color: var(--chalk);
+  font-weight: 500;
+}
+
+.cx-embed-fallback {
+  display: grid;
+  gap: 8px;
+}
+
+/* timeline comments */
+.cx-embed-review {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.cx-embed-review .muted {
+  color: var(--smoke);
+}
+
+.cx-embed-track {
+  position: relative;
+  height: 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: var(--felt);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.cx-embed-track:focus-visible {
+  outline: 2px solid var(--accent-strong);
+  outline-offset: 2px;
+}
+
+.cx-embed-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.cx-embed-pin {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--smoke);
+}
+
+.cx-embed-head {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--chalk);
+}
+
+.cx-embed-frame {
+  position: relative;
+  justify-self: start;
+  max-width: 100%;
+}
+
+.cx-embed-frame img {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 6px;
+}
+
+.cx-embed-frame.drawing {
+  cursor: crosshair;
+}
+
+.cx-embed-draw {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+}
+
+.cx-embed-box {
+  position: absolute;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.cx-embed-comments {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cx-embed-comments li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
+
+.cx-embed-comments img {
+  max-height: 60px;
+  border-radius: 4px;
+}
+
+.cx-embed-at {
+  color: var(--smoke);
+  font-variant-numeric: tabular-nums;
+}
+
+/* opening an editor by hand, in the chat header */
+.cx-embed-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cx-embed-picker select {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--chalk);
+  background: var(--raised);
+  font: inherit;
+  font-size: 13px;
+}
+
+.cx-embed-picker-error {
+  max-width: 260px;
+  overflow: hidden;
+  color: var(--pink);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+html[data-embed-fill] .cx-project-progress {
+  display: none;
+}

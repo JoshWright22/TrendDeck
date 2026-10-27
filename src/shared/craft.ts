@@ -43,6 +43,9 @@ export interface CraftDock {
   bounds: { x: number; y: number; width: number; height: number } | null
   // false when the pane is hidden, another stage is showing, or a TrendDeck modal is open
   visible: boolean
+  // the part of bounds that can be seen (same coordinates), when the box is partly scrolled out of
+  // view. the app's window keeps its full size and is cut to this. null or left out: all of it
+  clip?: { x: number; y: number; width: number; height: number } | null
 }
 
 export function craftBelongsTo(

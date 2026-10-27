@@ -150,6 +150,12 @@ describe('project folder containment', () => {
     rewritePaths({ path: 'exports/a.png', note: 'hello', paths: ['b.mov'] }, root, '', found)
     expect(found).toEqual([join(root, 'exports', 'a.png'), join(root, 'b.mov')])
   })
+  it('leaves plain words under keys that are only sometimes paths', () => {
+    expect(rewritePaths({ id: 'markers.add', params: { target: 'program', time: 1 } }, root)).toEqual({ id: 'markers.add', params: { target: 'program', time: 1 } })
+    expect(rewritePaths({ params: { target: 'renders/cut.mp4', output: 'out.mov' } }, root)).toEqual({ params: { target: join(root, 'renders', 'cut.mp4'), output: join(root, 'out.mov') } })
+    expect(() => rewritePaths({ params: { target: '..' } }, root)).toThrow(/outside/)
+    expect(() => rewritePaths({ params: { output: 'D:\\x' } }, root)).toThrow(/outside/)
+  })
   it('refuses absolute paths outside the folder whatever the key', () => {
     expect(() => rewritePaths({ params: { lut: 'C:\\Users\\me\\.ssh\\id_rsa' } }, root)).toThrow(/outside/)
     expect(() => rewritePaths({ steps: [{ id: 'x', params: { file: '..\\..\\x' } }] }, root)).toThrow(/outside/)

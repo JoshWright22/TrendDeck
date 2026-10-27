@@ -39,7 +39,13 @@ const MUTE_ALL = process.argv.includes('--mute-audio') || process.env.TRENDDECK_
 if (MUTE_ALL) app.commandLine.appendSwitch('mute-audio')
 // sites with a cast button make chromium look for tvs on the network, which opens a listening
 // socket and the windows firewall prompt. trenddeck never casts
-app.commandLine.appendSwitch('disable-features', 'MediaRouter,DialMediaRouteProvider,CastMediaRouteProvider,GlobalMediaControlsCastStartStop')
+// test runs set TRENDDECK_TEST_OFFSCREEN=1: the window opens off screen without taking focus or a
+// taskbar button, and keeps painting there so screenshots over CDP or capturePage still work
+const TEST_OFFSCREEN = process.env.TRENDDECK_TEST_OFFSCREEN === '1'
+app.commandLine.appendSwitch(
+  'disable-features',
+  `MediaRouter,DialMediaRouteProvider,CastMediaRouteProvider,GlobalMediaControlsCastStartStop${TEST_OFFSCREEN ? ',CalculateNativeWinOcclusion' : ''}`
+)
 
 // sites only play sound while you can see them
 function syncMute(win: BrowserWindow): void {
@@ -80,12 +86,14 @@ function createWindow(): void {
     trafficLightPosition: isMac ? { x: 14, y: 13 } : undefined,
     title: 'TrendDeck',
     icon: join(__dirname, '../../resources/icon.png'),
+    ...(TEST_OFFSCREEN ? { x: -12000, y: 0, skipTaskbar: true } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      webviewTag: true
+      webviewTag: true,
+      backgroundThrottling: !TEST_OFFSCREEN
     }
   })
 
@@ -95,7 +103,8 @@ function createWindow(): void {
   win.once('ready-to-show', () => {
     // a downloaded update that got this far works, boot.ts keeps using it
     bootInfo()?.markGood()
-    win.show()
+    if (TEST_OFFSCREEN) win.showInactive()
+    else win.show()
     // the ad blocker engine is big, give the first paint a head start
     setTimeout(startAdblock, 1000)
   })

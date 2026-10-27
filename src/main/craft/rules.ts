@@ -122,12 +122,18 @@ const PATH_KEY = /(^|_)(path|paths|dir|directory|folder|location)$|[a-z](Path|Pa
 // a value that looks like a path whatever its key: drive letter, UNC, unix root, home
 const LOOKS_ABSOLUTE = /^(?:[a-zA-Z]:[\\/]|\\\\|\/\/|~[\\/]|\/[^/\s])/
 
+// keys that are paths in some commands and plain words in others (FilmCraft's markers.add takes
+// target "program"), so there only a value that looks like a path counts. ".." always does
+const LOOSE_PATH_KEY = /^(output|input|inputs|target)$/i
+const LOOKS_LIKE_PATH = /[\\/]|\.\.|\.[a-z0-9]{1,8}$/i
+
 // every path in an agent's arguments rewritten to an absolute path inside the project folder.
 // relative ones under a path key are taken from the folder, absolute ones anywhere must be in it.
 // found collects the rewritten paths
 export function rewritePaths(value: unknown, root: string, key = '', found: string[] = []): unknown {
   if (typeof value === 'string') {
-    const isPath = PATH_KEY.test(key) ? value.trim() !== '' : LOOKS_ABSOLUTE.test(value.trim())
+    const v = value.trim()
+    const isPath = PATH_KEY.test(key) ? v !== '' && (!LOOSE_PATH_KEY.test(key) || LOOKS_LIKE_PATH.test(v) || LOOKS_ABSOLUTE.test(v)) : LOOKS_ABSOLUTE.test(v)
     if (!isPath) return value
     const full = resolveInProject(root, value)
     found.push(full)
