@@ -4,18 +4,18 @@ import {
   DEFAULT_STAGES,
   STAGE_KINDS,
   STAGE_STATUSES,
-  WORKSPACES,
+  MAX_STAGES,
+  WORKSPACE_KEY,
   type PipelineChange,
   type PipelineStage,
   type Run,
   type StageConfig,
   type StageKind,
   type StageState,
-  type StageStatus,
-  type Workspace
+  type StageStatus
 } from '../../shared/pipeline'
 
-export const MAX_STAGES = 30
+export { MAX_STAGES }
 const STAGE_ID = /^[a-z0-9][a-z0-9_-]{0,39}$/
 const ID = /^[A-Za-z0-9_-]{1,64}$/
 
@@ -51,7 +51,7 @@ export function cleanStage(raw: unknown): PipelineStage | null {
     id: s.id,
     label: s.label.trim().slice(0, 60),
     kind: (STAGE_KINDS as readonly string[]).includes(s.kind as string) ? (s.kind as StageKind) : 'custom',
-    workspace: (WORKSPACES as readonly string[]).includes(s.workspace as string) ? (s.workspace as Workspace) : 'chat',
+    workspace: typeof s.workspace === 'string' && WORKSPACE_KEY.test(s.workspace) ? s.workspace : 'none',
     config: cleanConfig(s.config),
     auto: s.auto === true
   }

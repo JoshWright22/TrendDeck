@@ -6,13 +6,17 @@ import { ID_PATTERN } from '@shared/types'
 import type { Pipeline, PipelineChanged, PipelineStage, Run, RunChanged, RunInput } from '@shared/pipeline'
 import { broadcast } from '../gateway/wait'
 import { cleanRun, cleanStages, defaultStages, newRun, syncRun } from './model'
+import { readBrandPipeline, writeBrandPipeline } from '../workspace'
 
-// one file per brand, pipeline/<brand>.json, holding the pipeline and its runs. apart from
-// trenddeck.json so the ui saving brand data never races an agent moving a run along
+// the stages are brand.pipeline in trenddeck.json, the one copy the ui also reads. they're written
+// through main/workspace, which pushes the saved data to the renderer so its next whole-file save
+// keeps the change. runs live here, one file per brand, pipeline/<brand>.json, so an agent moving
+// a run along never touches trenddeck.json
 const MAX_RUNS = 500
 
 interface BrandFile {
   version: 1
+  // filled from the brand on every load, never written to this file
   stages: PipelineStage[]
   updatedAt: number
   runs: Run[]
@@ -28,19 +32,30 @@ function checkId(brandId: string): void {
   if (!ID_PATTERN.test(brandId)) throw new Error('bad brand id')
 }
 
+function brandStages(brandId: string): PipelineStage[] {
+  try {
+    return readBrandPipeline(brandId)
+  } catch {
+    // brand gone or data not loaded yet
+    return defaultStages()
+  }
+}
+
 async function load(brandId: string): Promise<BrandFile> {
   const hit = cache.get(brandId)
-  if (hit) return hit
+  if (hit) {
+    hit.stages = brandStages(brandId)
+    return hit
+  }
   let raw: Partial<BrandFile> = {}
   try {
     raw = JSON.parse(await fs.readFile(file(brandId), 'utf8')) as Partial<BrandFile>
   } catch {
     // a brand that never had a pipeline starts with the defaults
   }
-  const stages = cleanStages(raw.stages)
   const out: BrandFile = {
     version: 1,
-    stages: stages.length ? stages : defaultStages(),
+    stages: brandStages(brandId),
     updatedAt: Number(raw.updatedAt) || 0,
     runs: Array.isArray(raw.runs)
       ? raw.runs.map((r) => cleanRun(r, brandId)).filter((r): r is Run => r !== null).slice(0, MAX_RUNS)
@@ -58,7 +73,7 @@ function change<T>(brandId: string, fn: (f: BrandFile) => T): Promise<T> {
     const out = fn(f)
     f.runs = f.runs.slice(0, MAX_RUNS)
     await fs.mkdir(dir(), { recursive: true })
-    await fs.writeFile(`${file(brandId)}.tmp`, JSON.stringify(f), 'utf8')
+    await fs.writeFile(`${file(brandId)}.tmp`, JSON.stringify({ version: f.version, updatedAt: f.updatedAt, runs: f.runs }), 'utf8')
     await fs.rename(`${file(brandId)}.tmp`, file(brandId))
     return out
   }
@@ -78,8 +93,10 @@ export async function getPipeline(brandId: string): Promise<Pipeline> {
 export async function setStages(brandId: string, raw: unknown): Promise<Pipeline> {
   const stages = cleanStages(raw)
   if (!stages.length) throw new Error('a pipeline needs at least one stage')
+  checkId(brandId)
+  const saved = await writeBrandPipeline(brandId, stages)
   const p = await change(brandId, (f) => {
-    f.stages = stages
+    f.stages = saved
     f.updatedAt = Date.now()
     f.runs = f.runs.map((r) => syncRun(r, stages))
     return structuredClone(pipelineOf(brandId, f))

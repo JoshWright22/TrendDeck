@@ -133,7 +133,7 @@ test('a new run starts at the first stage', () => {
   const r = newRun('r1', 'b1', stages, { title: 'x' }, 1)
   assert.equal(r.currentStageId, 'research')
   assert.equal(r.stageStates.research.status, 'running')
-  assert.equal(r.stageStates.publish.status, 'pending')
+  assert.equal(r.stageStates.post.status, 'pending')
 })
 test('advance finishes the stage and starts the next', () => {
   const stages = defaultStages()
@@ -141,10 +141,10 @@ test('advance finishes the stage and starts the next', () => {
   r = advanceRun(r, stages, { notes: 'found 3', artifacts: ['idea-1'] }, 2)
   assert.equal(r.stageStates.research.status, 'done')
   assert.deepEqual(r.stageStates.research.artifacts, ['idea-1'])
-  assert.equal(r.currentStageId, 'ideate')
-  assert.equal(r.stageStates.ideate.status, 'running')
+  assert.equal(r.currentStageId, 'idea')
+  assert.equal(r.stageStates.idea.status, 'running')
   r = advanceRun(r, stages, { skip: true }, 3)
-  assert.equal(r.stageStates.ideate.status, 'skipped')
+  assert.equal(r.stageStates.idea.status, 'skipped')
   r = advanceRun(r, stages, { toStageId: 'research' }, 4)
   assert.equal(r.currentStageId, 'research')
   assert.equal(r.stageStates.research.status, 'running')
@@ -152,9 +152,9 @@ test('advance finishes the stage and starts the next', () => {
 test('setting a stage running makes it current, finishing the last ends the run', () => {
   const stages = defaultStages().slice(0, 2)
   let r = newRun('r1', 'b1', stages, {}, 1)
-  r = setStage(r, stages, 'ideate', { status: 'running' }, 2)
-  assert.equal(r.currentStageId, 'ideate')
-  r = setStage(r, stages, 'ideate', { status: 'done' }, 3)
+  r = setStage(r, stages, 'idea', { status: 'running' }, 2)
+  assert.equal(r.currentStageId, 'idea')
+  r = setStage(r, stages, 'idea', { status: 'done' }, 3)
   assert.equal(r.currentStageId, 'research')
   r = advanceRun(r, stages, {}, 4)
   assert.equal(r.currentStageId, null)
@@ -164,21 +164,21 @@ test('setting a stage running makes it current, finishing the last ends the run'
 test('changes apply in order and show as a diff', () => {
   const before = defaultStages()
   const after = applyChanges(before, [
-    { op: 'add', stage: { label: 'Thumbnail', kind: 'produce', workspace: 'media', config: { size: '1280x720' }, auto: false }, index: 4 },
+    { op: 'add', stage: { label: 'Cover art', kind: 'thumbnail', workspace: 'media', config: { size: '1280x720' }, auto: false }, index: 4 },
     { op: 'remove', stageId: 'engage' },
-    { op: 'move', stageId: 'analyze', index: 0 },
-    { op: 'configure', stageId: 'publish', patch: { auto: true, config: { platforms: 'youtube,tiktok' } } }
+    { op: 'move', stageId: 'review', index: 0 },
+    { op: 'configure', stageId: 'post', patch: { auto: true, config: { platforms: 'youtube,tiktok' } } }
   ])
-  assert.equal(after[0].id, 'analyze')
-  assert.equal(after.find((s) => s.id === 'thumbnail')?.workspace, 'media')
+  assert.equal(after[0].id, 'review')
+  assert.equal(after.find((s) => s.id === 'cover-art')?.workspace, 'media')
   assert.ok(!after.some((s) => s.id === 'engage'))
-  assert.equal(after.find((s) => s.id === 'publish')?.auto, true)
+  assert.equal(after.find((s) => s.id === 'post')?.auto, true)
   const lines = diffStages(before, after)
   const kinds = Object.fromEntries(lines.map((l) => [l.stageId, l.kind]))
-  assert.equal(kinds.thumbnail, 'added')
+  assert.equal(kinds['cover-art'], 'added')
   assert.equal(kinds.engage, 'removed')
-  assert.equal(kinds.analyze, 'moved')
-  assert.equal(kinds.publish, 'changed')
+  assert.equal(kinds.review, 'moved')
+  assert.equal(kinds.post, 'changed')
   assert.equal(kinds.script, 'same')
   assert.equal(lines.length, before.length + 1)
 })
@@ -197,7 +197,7 @@ test('runs follow the pipeline when stages change', () => {
   const r = newRun('r1', 'b1', stages, {}, 1)
   const fewer = stages.filter((s) => s.id !== 'research')
   const synced = syncRun(r, fewer)
-  assert.equal(synced.currentStageId, 'ideate')
+  assert.equal(synced.currentStageId, 'idea')
   assert.ok(synced.stageStates.research, 'old state kept')
 })
 

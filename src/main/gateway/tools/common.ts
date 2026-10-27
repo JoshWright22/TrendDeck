@@ -1,6 +1,7 @@
 import type { Brand } from '@shared/types'
 import type { DataChanged } from '@shared/gateway'
-import { getData, saveData } from '../../store'
+import { getData } from '../../store'
+import { saveDataFromMain } from '../../workspace'
 import { broadcast } from '../wait'
 import { ToolError, type Turn } from '../types'
 
@@ -16,8 +17,9 @@ export function dataChanged(brandId: string, kind: DataChanged['kind']): void {
 
 let queue: Promise<unknown> = Promise.resolve()
 
-// changes one brand in trenddeck.json from main. the ui gets gateway:data-changed with kind 'app'
-// and loads the data again, so its next save has the change in it
+// changes one brand in trenddeck.json from main. the ui gets the saved data on data:changed and
+// swaps it in, so its next whole-file save has the change in it. gateway:data-changed still goes
+// out for views that reload their own data
 export function changeBrand<T>(brandId: string, fn: (b: Brand) => T): Promise<T> {
   const run = async (): Promise<T> => {
     const data = getData()
@@ -27,7 +29,7 @@ export function changeBrand<T>(brandId: string, fn: (b: Brand) => T): Promise<T>
     const out = fn(brand)
     const brands = data.brands.slice()
     brands[i] = brand
-    await saveData({ ...data, brands })
+    await saveDataFromMain({ ...data, brands })
     dataChanged(brandId, 'app')
     return out
   }

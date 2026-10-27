@@ -2,6 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron'
 import { ID_PATTERN, type AppData, type Brand } from '@shared/types'
 import type { PipelineStage, Project } from '@shared/workspace'
 import { getData, saveData } from '../store'
+import { setStages } from '../pipeline/store'
 
 // projects and the pipeline live on the brand in trenddeck.json. the renderer normally owns that
 // file and saves it whole, so anything main changes here is sent back with data:changed and the
@@ -13,26 +14,40 @@ function brandOf(brandId: unknown): Brand {
   return brand
 }
 
+// saves the whole data from main and sends the saved copy to the renderer
+export async function saveDataFromMain(next: AppData): Promise<AppData> {
+  await saveData(next)
+  const saved = getData() as AppData
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('data:changed', saved)
+  return saved
+}
+
 async function editBrand(brandId: string, fn: (b: Brand) => Brand): Promise<Brand> {
   const data = getData()
   if (!data) throw new Error('Data not loaded yet')
   const next: AppData = { ...data, brands: data.brands.map((b) => (b.id === brandId ? fn(b) : b)) }
-  await saveData(next)
-  // saveData cleans it, send the cleaned copy
-  const saved = getData() as AppData
-  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('data:changed', saved)
+  // saveData cleans it, the cleaned copy is what's sent
+  await saveDataFromMain(next)
   return brandOf(brandId)
 }
 
-export function getPipeline(brandId: string): PipelineStage[] {
+export function readBrandPipeline(brandId: string): PipelineStage[] {
   return brandOf(brandId).pipeline
 }
 
+// the raw write, only main/pipeline/store calls it so runs get synced and pipeline:changed is sent.
 // the stages are cleaned on save: bad ones dropped, an empty list goes back to the default.
 // projects on a stage that's gone move to the first stage
-export async function setPipeline(brandId: string, stages: PipelineStage[]): Promise<PipelineStage[]> {
+export async function writeBrandPipeline(brandId: string, stages: PipelineStage[]): Promise<PipelineStage[]> {
   brandOf(brandId)
   return (await editBrand(brandId, (b) => ({ ...b, pipeline: stages }))).pipeline
+}
+
+export const getPipeline = readBrandPipeline
+
+// everything else that changes the stages comes through here
+export async function setPipeline(brandId: string, stages: PipelineStage[]): Promise<PipelineStage[]> {
+  return (await setStages(brandId, stages)).stages
 }
 
 export function listProjects(brandId: string): Project[] {

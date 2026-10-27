@@ -3,42 +3,13 @@ import type { AppData } from './types'
 // brand -> projects -> threads, and the pipeline each project runs through.
 // shared by the store, the preload, the shell and anything else that reads or edits them
 
-export const STAGE_KINDS = [
-  'idea',
-  'script',
-  'record',
-  'edit',
-  'thumbnail',
-  'captions',
-  'schedule',
-  'post',
-  'review',
-  'custom'
-] as const
-export type StageKind = (typeof STAGE_KINDS)[number]
+// stages are defined once, in ./pipeline. brand.pipeline in trenddeck.json is the one copy:
+// the ui reads it from AppData, main/pipeline reads and writes it through main/workspace
+export { STAGE_KINDS, DEFAULT_STAGES as DEFAULT_PIPELINE } from './pipeline'
+export type { StageKind, PipelineStage } from './pipeline'
+import type { PipelineStage } from './pipeline'
 
-// one step of a brand's pipeline. workspace is the key of the view the right pane opens for it,
-// see renderer/src/workspace/registry.tsx. an unknown key shows a placeholder, it doesn't break
-export interface PipelineStage {
-  id: string
-  label: string
-  kind: StageKind
-  workspace: string
-}
-
-export const DEFAULT_PIPELINE: readonly PipelineStage[] = [
-  { id: 'idea', label: 'Idea', kind: 'idea', workspace: 'ideas' },
-  { id: 'script', label: 'Script', kind: 'script', workspace: 'writer' },
-  { id: 'record', label: 'Record', kind: 'record', workspace: 'media' },
-  { id: 'edit', label: 'Edit', kind: 'edit', workspace: 'editor' },
-  { id: 'thumbnail', label: 'Thumbnail', kind: 'thumbnail', workspace: 'editor' },
-  { id: 'captions', label: 'Captions', kind: 'captions', workspace: 'writer' },
-  { id: 'schedule', label: 'Schedule', kind: 'schedule', workspace: 'schedule' },
-  { id: 'post', label: 'Post', kind: 'post', workspace: 'posting' },
-  { id: 'review', label: 'Review', kind: 'review', workspace: 'analytics' }
-]
-
-export const MAX_STAGES = 24
+export { MAX_STAGES } from './pipeline'
 
 export const PROJECT_STATUSES = ['idle', 'running', 'waiting', 'done'] as const
 // idle: nothing going on. running: the agent is working on it. waiting: needs the user. done: posted and reviewed

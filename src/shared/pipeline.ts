@@ -3,36 +3,42 @@ import type { DiffLine } from './gateway'
 
 export const STAGE_KINDS = [
   'research',
-  'ideate',
+  'idea',
   'script',
-  'produce',
+  'record',
   'edit',
+  'thumbnail',
+  'captions',
   'review',
   'schedule',
-  'publish',
+  'post',
   'engage',
-  'analyze',
   'custom'
 ] as const
 export type StageKind = (typeof STAGE_KINDS)[number]
 
-// which workspace the ui shows for a stage
+// which view the right pane opens for a stage, a key from renderer/src/workspace/registry.tsx.
+// any plain key is allowed so new workspaces don't need a type change. an unknown one shows a
+// placeholder. these are the ones that exist, listed for the agent's tool docs
 export const WORKSPACES = [
-  'chat',
   'trends',
   'ideas',
   'writer',
   'voice',
   'media',
+  'editor',
   'schedule',
   'posting',
   'shorts',
   'inbox',
   'analytics',
-  'browser',
-  'phone'
+  'sites',
+  'phone',
+  'none'
 ] as const
-export type Workspace = (typeof WORKSPACES)[number]
+export type Workspace = string
+export const MAX_STAGES = 30
+export const WORKSPACE_KEY = /^[a-z0-9-]{1,40}$/
 
 export type StageConfig = Record<string, string | number | boolean>
 
@@ -170,16 +176,18 @@ export interface PipelineApi {
 }
 
 // the starting pipeline for a brand that never set one
-export const DEFAULT_STAGES: PipelineStage[] = [
+export const DEFAULT_STAGES: readonly PipelineStage[] = [
   { id: 'research', label: 'Research', kind: 'research', workspace: 'trends', config: {}, auto: true },
-  { id: 'ideate', label: 'Pick an idea', kind: 'ideate', workspace: 'ideas', config: {}, auto: false },
-  { id: 'script', label: 'Write', kind: 'script', workspace: 'writer', config: {}, auto: true },
-  { id: 'produce', label: 'Make the media', kind: 'produce', workspace: 'media', config: {}, auto: false },
-  { id: 'review', label: 'Review', kind: 'review', workspace: 'writer', config: {}, auto: false },
+  { id: 'idea', label: 'Idea', kind: 'idea', workspace: 'ideas', config: {}, auto: false },
+  { id: 'script', label: 'Script', kind: 'script', workspace: 'writer', config: {}, auto: true },
+  { id: 'record', label: 'Record', kind: 'record', workspace: 'media', config: {}, auto: false },
+  { id: 'edit', label: 'Edit', kind: 'edit', workspace: 'editor', config: {}, auto: false },
+  { id: 'thumbnail', label: 'Thumbnail', kind: 'thumbnail', workspace: 'editor', config: {}, auto: false },
+  { id: 'captions', label: 'Captions', kind: 'captions', workspace: 'writer', config: {}, auto: true },
   { id: 'schedule', label: 'Schedule', kind: 'schedule', workspace: 'schedule', config: {}, auto: true },
-  { id: 'publish', label: 'Publish', kind: 'publish', workspace: 'posting', config: {}, auto: false },
-  { id: 'engage', label: 'Reply to comments', kind: 'engage', workspace: 'inbox', config: {}, auto: false },
-  { id: 'analyze', label: 'Check results', kind: 'analyze', workspace: 'analytics', config: {}, auto: true }
+  { id: 'post', label: 'Post', kind: 'post', workspace: 'posting', config: {}, auto: false },
+  { id: 'engage', label: 'Replies', kind: 'engage', workspace: 'inbox', config: {}, auto: false },
+  { id: 'review', label: 'Review', kind: 'review', workspace: 'analytics', config: {}, auto: true }
 ]
 
 declare global {

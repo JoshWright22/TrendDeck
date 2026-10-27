@@ -1,38 +1,22 @@
 import { ID_PATTERN } from '@shared/types'
 import {
-  DEFAULT_PIPELINE,
   GENERAL_PROJECT_ID,
   generalProject,
-  MAX_STAGES,
   PROJECT_STATUSES,
-  STAGE_KINDS,
   type PipelineStage,
   type Project,
-  type ProjectStatus,
-  type StageKind
+  type ProjectStatus
 } from '@shared/workspace'
+import { cleanStages, defaultStages } from '../pipeline/model'
 
 const MAX_PROJECTS = 2000
 const MAX_THREADS_PER_PROJECT = 1000
-// workspace keys pick a view in the renderer, so only plain names
-const WORKSPACE_KEY = /^[a-z0-9-]{1,40}$/
 
-function cleanStage(raw: unknown): PipelineStage | null {
-  const s = raw as Partial<PipelineStage> | null
-  if (!s || typeof s.id !== 'string' || !ID_PATTERN.test(s.id)) return null
-  const label = typeof s.label === 'string' ? s.label.trim().slice(0, 40) : ''
-  if (!label) return null
-  const kind: StageKind = (STAGE_KINDS as readonly string[]).includes(s.kind as string) ? (s.kind as StageKind) : 'custom'
-  const workspace = typeof s.workspace === 'string' && WORKSPACE_KEY.test(s.workspace) ? s.workspace : 'none'
-  return { id: s.id, label, kind, workspace }
-}
-
-// a brand with no pipeline, or an empty or broken one, gets the default
+// a brand with no pipeline, or an empty or broken one, gets the default.
+// the stage rules live with the pipeline engine so the agent and the ui agree on them
 export function cleanPipeline(raw: unknown): PipelineStage[] {
-  const stages = Array.isArray(raw) ? raw.map(cleanStage).filter((s): s is PipelineStage => s !== null) : []
-  const seen = new Set<string>()
-  const unique = stages.filter((s) => !seen.has(s.id) && seen.add(s.id)).slice(0, MAX_STAGES)
-  return unique.length ? unique : DEFAULT_PIPELINE.map((s) => ({ ...s }))
+  const stages = cleanStages(raw)
+  return stages.length ? stages : defaultStages()
 }
 
 function cleanProject(raw: unknown, stageIds: Set<string>, firstStage: string): Project | null {
