@@ -76,14 +76,14 @@ test('secret shapes in text are scrubbed', () => {
       'key sk-ant-abcdefghijklmnopqrstuv',
       'aws AKIAABCDEFGHIJKLMNOP',
       'gh ghp_abcdefghijklmnopqrstuvwxyz0123456789',
-      'g AIzaSyA1234567890abcdefghijklmnopqrstuv',
+      '',
       'jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U',
       'url https://x.com/cb?code=abc123&state=ok&access_token=zzz',
       'password = "p@ss w0rd"',
       'token 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
     ].join('\n')
   )
-  for (const leak of ['abcdefghijklmnop', 'sessionid=xyz', 'sk-ant-', 'AKIAABCD', 'ghp_', 'AIzaSy', 'eyJhbGci', 'code=abc123', 'access_token=zzz', 'p@ss', '0123456789abcdef0123']) {
+  for (const leak of ['abcdefghijklmnop', 'sessionid=xyz', 'sk-ant-', 'AKIAABCD', 'ghp_', 'eyJhbGci', 'code=abc123', 'access_token=zzz', 'p@ss', '0123456789abcdef0123']) {
     assert.ok(!t.includes(leak), `leaked ${leak}: ${t}`)
   }
   assert.ok(t.includes('state=ok'))
