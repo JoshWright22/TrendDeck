@@ -1,3 +1,5 @@
+// first: a downloaded update links the installed app's native files before anything loads them
+import './unpacked-link'
 import { app, BrowserWindow, ipcMain, session, webContents, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
