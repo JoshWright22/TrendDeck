@@ -4,6 +4,7 @@ import type { TakeDiff, TakeFeedback } from './take'
 import type { BrandFileName, ProposedRule } from './brand-memory'
 import type { MappedDip, SnapshotLabel } from './content-map'
 import type { VisualAsset, VisualSearch } from './visuals'
+import type { SettingsSection } from './settings'
 
 // cards in the chat timeline that the agent's tools put there: a video to review, a suggestion,
 // a cloud copy, a project's history. main keeps them per brand, the chat shows the ones of the
@@ -177,6 +178,14 @@ export interface BrandFileCard extends CardBase {
   state: 'proposed' | 'kept' | 'dropped'
 }
 
+// the agent asking you to do something in Settings it can't do itself (import the OBS password,
+// add a key): why, and a button that opens Settings there
+export interface SettingsCard extends CardBase {
+  type: 'settings'
+  section: SettingsSection
+  why: string
+}
+
 // OBS in the chat: connection, preview, scenes, record and stop, recent takes
 export interface ObsCard extends CardBase {
   type: 'obs'
@@ -240,6 +249,7 @@ export type ChatCard =
   | RuleCard
   | BrandFileCard
   | ObsCard
+  | SettingsCard
   | ContentMapCard
   | PostMortemCard
   | CraftJobCard

@@ -22,9 +22,10 @@ import StorageSection from './storage/StorageSection'
 import DictationSettings from './dictation/DictationSettings'
 import ObsSettings from './obs/ObsSettings'
 import MediaSourcesSection from './MediaSourcesSection'
+import { SETTINGS_SECTIONS } from '@shared/settings'
 
 const REPO_URL = 'https://github.com/JoshWright22/TrendDeck'
-const SECTIONS = ['Brand', 'Sites', 'Ad blocker', 'Tabs', 'Trends', 'Posting pace', 'Agents', 'Agent access', 'MCP servers', 'Context', 'Channels', 'Media sources', 'Dictation', 'OBS', 'Craft apps', 'Storage', 'Saved logins', 'About'] as const
+const SECTIONS = SETTINGS_SECTIONS
 
 interface Props {
   data: AppData

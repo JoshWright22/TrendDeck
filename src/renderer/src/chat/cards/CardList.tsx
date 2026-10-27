@@ -5,6 +5,7 @@ import CraftEmbed from './CraftEmbed'
 import CraftJobCard from './CraftJobCard'
 import { BrandFileCard, RuleCard } from './MemoryCards'
 import ObsCard from './ObsCard'
+import SettingsCard from './SettingsCard'
 import ScriptCard from './ScriptCard'
 import SuggestionCard from './SuggestionCard'
 import { HistoryCard, StorageCard } from './StorageHistoryCards'
@@ -47,6 +48,8 @@ function Card({ c, a }: { c: ChatCard; a: CardActions }): ReactNode {
       return <PostMortemCard card={c} a={a} />
     case 'craft-job':
       return <CraftJobCard card={c} a={a} />
+    case 'settings':
+      return <SettingsCard card={c} />
   }
 }
 

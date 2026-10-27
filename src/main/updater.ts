@@ -15,6 +15,12 @@ const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases?per_page=15`
 let ready: string | null = null
 let installNow: (() => void) | null = null
 let checkNow: (() => Promise<'latest' | 'downloading'>) | null = null
+// the last check that finished, for the agent's app_status
+let lastCheck: { at: number; result: 'latest' | 'downloading' | 'error' } | null = null
+
+export function updateStatus(): { ready: string | null; lastCheck: typeof lastCheck } {
+  return { ready, lastCheck }
+}
 
 ipcMain.handle('update:state', () => ready)
 ipcMain.handle('update:install', () => installNow?.())
@@ -193,10 +199,15 @@ export async function setupUpdater(): Promise<void> {
   }
 
   const run = async (): Promise<'latest' | 'downloading'> => {
-    const code = await checkApp()
-    if (code !== 'full') return code
-    const result = await autoUpdater.checkForUpdates()
-    return result?.isUpdateAvailable ? 'downloading' : 'latest'
+    try {
+      const code = await checkApp()
+      const result = code !== 'full' ? code : (await autoUpdater.checkForUpdates())?.isUpdateAvailable ? 'downloading' : 'latest'
+      lastCheck = { at: Date.now(), result }
+      return result
+    } catch (err) {
+      lastCheck = { at: Date.now(), result: 'error' }
+      throw err
+    }
   }
 
   const check = async (): Promise<void> => {

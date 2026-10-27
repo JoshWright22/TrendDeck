@@ -16,6 +16,7 @@ import { STORAGE_TOOLS } from '../production-storage'
 import { CONTEXT_TOOLS } from '../context'
 import { OBS_TOOLS } from '../obs'
 import { WORKSPACE_TOOLS } from '../workspace/tools'
+import { APP_TOOLS } from './tools/app'
 
 export { callGatewayTool, mcpToolList, toolInfo } from './call'
 
@@ -27,6 +28,8 @@ registerTools(STORAGE_TOOLS)
 registerTools(CONTEXT_TOOLS)
 // OBS: status, scenes, pictures, recording and streaming with the user's approval
 registerTools(OBS_TOOLS)
+// TrendDeck's own version and updates, and cards that send the user to Settings
+registerTools(APP_TOOLS)
 
 const isId = (v: unknown): v is string => typeof v === 'string' && ID_PATTERN.test(v)
 // approvals and policy only from the app window, a site tab never gets to say yes
