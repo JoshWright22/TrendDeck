@@ -19,7 +19,7 @@ import {
   TREND_SOURCES
 } from '@shared/types'
 import { cleanIdeaBoard, cleanSchedule } from './planner/clean'
-import { cleanPipeline, cleanProjects } from './workspace/clean'
+import { cleanChatProjects, cleanPipeline, cleanProjects } from './workspace/clean'
 
 const FILE_NAME = 'trenddeck.json'
 
@@ -43,6 +43,7 @@ function defaultData(): AppData {
   }
   brand.pipeline = cleanPipeline(undefined)
   brand.projects = cleanProjects(undefined, brand.pipeline, Date.now())
+  brand.chatProjects = {}
   return {
     version: 1,
     activeBrandId: brand.id,
@@ -138,8 +139,9 @@ function cleanBrand(raw: unknown): Brand | null {
     ideas,
     schedule: cleanSchedule(b.schedule),
     pipeline,
-    // brands from before projects get General, which picks up every chat they already have
-    projects: cleanProjects(b.projects, pipeline, Date.now())
+    // brands from before projects get General. links from before chats could have several
+    // projects come from each project's threadIds
+    ...cleanChatProjects(b.chatProjects, cleanProjects(b.projects, pipeline, Date.now()))
   }
 }
 

@@ -206,17 +206,6 @@
   min-width: 0;
 }
 
-.cx-embed-picker select {
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--line-strong);
-  border-radius: 6px;
-  color: var(--chalk);
-  background: var(--raised);
-  font: inherit;
-  font-size: 13px;
-}
-
 .cx-embed-picker-error {
   max-width: 260px;
   overflow: hidden;

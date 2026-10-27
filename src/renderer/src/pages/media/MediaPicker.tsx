@@ -71,7 +71,7 @@ export default function MediaPicker({ brandId, onPick, onClose, multiple = true,
                   {m.name}
                 </div>
                 <div className="muted small media-card-meta">
-                  {m.ext.toUpperCase()} · {formatSize(m.size)}
+                  {m.ext.toUpperCase()}, {formatSize(m.size)}
                 </div>
               </li>
             ))}

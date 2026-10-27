@@ -1,20 +1,25 @@
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import ffmpegStatic from 'ffmpeg-static'
-import ffprobeStatic from 'ffprobe-static'
 import type { VideoInfo } from './checks'
 
 // the bundled ffmpeg and ffprobe. in a packaged app they sit in app.asar.unpacked because a
 // process can't be spawned from inside the asar archive
 
+// any archive, the installed app.asar or a downloaded <version>.asar (see unpacked-link.ts)
 function unpacked(p: string): string {
-  return p.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1')
+  return p.replace(/\.asar([\\/])/, '.asar.unpacked$1')
 }
 
 let paths: { ffmpeg: string; ffprobe: string } | null = null
 
 export function ffmpegPaths(): { ffmpeg: string; ffprobe: string } {
   if (paths) return paths
+  // required here, not imported at the top: these packages live in app.asar.unpacked, which a
+  // downloaded update reaches only after unpacked-link.ts has run
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const ffmpegStatic = require('ffmpeg-static') as string | null
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const ffprobeStatic = require('ffprobe-static') as { path: string }
   const ffmpeg = process.env.TRENDDECK_FFMPEG || unpacked(ffmpegStatic ?? '')
   const ffprobe = process.env.TRENDDECK_FFPROBE || unpacked(ffprobeStatic.path)
   if (!ffmpeg || !existsSync(ffmpeg)) throw new Error('ffmpeg binary is missing')

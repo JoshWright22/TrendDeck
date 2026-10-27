@@ -118,8 +118,7 @@ body.resizing webview {
 }
 
 .dot.waiting {
-  background: linear-gradient(90deg, var(--yellow) 50%, transparent 50%);
-  box-shadow: inset 0 0 0 1px var(--yellow);
+  background: var(--chalk);
 }
 
 .dot.done {
@@ -138,14 +137,14 @@ body.resizing webview {
   }
 }
 
-/* sidebar */
+/* sidebar: brands are groups, each a flat list of its chats, newest first. like t3code */
 
 .sb {
   position: relative;
   display: flex;
   flex-direction: column;
   flex: none;
-  width: 330px;
+  width: 300px;
   min-height: 0;
   border-right: 1px solid var(--hair);
   background: var(--felt);
@@ -155,148 +154,302 @@ body.resizing webview {
 .sb-scroll {
   flex: 1;
   min-height: 0;
-  padding: 8px 6px;
+  padding: 6px 8px 8px;
   overflow-y: auto;
   scrollbar-width: thin;
 }
 
-.tree-brand + .tree-brand {
-  margin-top: 2px;
+.sb-brand + .sb-brand {
+  margin-top: 10px;
 }
 
-.tree-row {
+.sb-brand-head {
   display: flex;
   align-items: center;
-  gap: 7px;
-  width: 100%;
+  gap: 2px;
+  height: 30px;
+}
+
+.sb-brand-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
   height: 28px;
   padding: 0 6px;
   border-radius: 6px;
-  color: var(--smoke);
-  text-align: left;
-  cursor: pointer;
-}
-
-.tree-row:hover {
-  background: var(--hover);
-  color: var(--chalk);
-}
-
-.tree-row.active {
-  background: var(--raised);
-  color: var(--chalk);
-}
-
-.tree-row.brand {
   color: var(--chalk);
   font-weight: 600;
+  text-align: left;
 }
 
-.tree-brand:not(.active) .tree-row.brand {
-  color: var(--smoke);
-  font-weight: 500;
-}
-
-.tree-row.pipeline svg {
-  flex: none;
-  color: var(--faint);
-}
-
-.tree-row.thread {
-  height: 76px;
-  align-items: flex-start;
-  padding-top: 10px;
-  font-size: 12.5px;
-}
-
-.sb-overview { display: grid; gap: 5px; padding: 18px 16px 14px; border-bottom: 1px solid var(--hair); }
-.sb-overview strong { color: var(--chalk); font-size: 14px; }
-.sb-overview > span { color: var(--smoke); font-size: 12px; }
-.sb-attention { max-height: 30%; overflow: auto; padding: 4px 10px 10px; border-bottom: 1px solid var(--hair); }
-.sb-attention h3 { margin: 12px 6px 6px; font-size: 11px; color: var(--smoke); text-transform: uppercase; letter-spacing: .06em; }
-.sb-attention h3 span { margin-left: 6px; color: var(--faint); }
-.sb-attention-chat { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px; border-radius: 6px; text-align: left; }
-.sb-attention-chat:hover { background: var(--hover); }
-.sb-attention-chat > span:last-child { display: grid; gap: 4px; min-width: 0; }
-.sb-attention-chat strong { color: var(--chalk); font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sb-attention-chat small { color: var(--smoke); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tree-chat-info { display: grid; flex: 1; gap: 5px; min-width: 0; }
-.tree-chat-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: var(--chalk); }
-.tree-chat-details { display: flex; gap: 8px; font-size: 10.5px; color: var(--faint); overflow: hidden; white-space: nowrap; }
-.tree-chat-details time { margin-left: auto; }
-.tree-chat-preview { color: var(--smoke); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tree-chat-details .tree-needs-you { color: var(--pink); }
-.tree-chat-details .tree-working { color: var(--accent); }
-.tree-row.thread > .dot, .tree-row.thread > .dot-space { margin-top: 4px; }
-.sb-resize { position: absolute; top: 0; right: -3px; bottom: 0; width: 6px; z-index: 4; cursor: col-resize; touch-action: none; }
-.sb-resize:hover, .sb-resize:focus-visible { background: var(--accent); }
-
-.tree-row.thread.archived .tree-name {
-  color: var(--faint);
-}
-
-.tree-children {
-  padding-left: 12px;
-}
-
-.tree-project .tree-children {
-  padding-left: 10px;
-}
-
-.tree-caret {
-  flex: none;
-  color: var(--faint);
-  transition: transform 0.12s var(--ease);
-}
-
-.tree-caret.open {
-  transform: rotate(90deg);
-}
-
-.tree-name {
-  flex: 1;
-  min-width: 0;
+.sb-brand-name > span {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.tree-meta {
-  flex: none;
-  color: var(--faint);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
+.sb-brand-name:hover {
+  background: var(--hover);
 }
 
-.tree-menu .ui-menu-btn {
-  width: 20px;
-  height: 20px;
+.sb-caret {
+  flex: none;
+  color: var(--smoke);
+  transition: transform 0.12s var(--ease);
+}
+
+.sb-caret.open {
+  transform: rotate(90deg);
+}
+
+.sb-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--smoke);
   opacity: 0;
 }
 
-.tree-row:hover .tree-menu .ui-menu-btn,
-.tree-row:focus-within .tree-menu .ui-menu-btn,
-.tree-menu .ui-menu-btn[aria-expanded='true'] {
+.sb-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+.sb-icon:hover {
+  background: var(--hover);
+  color: var(--chalk);
+}
+
+.sb-brand-head:hover .sb-icon,
+.sb-brand-head:focus-within .sb-icon,
+.sb-brand-head:hover .sb-menu .ui-menu-btn,
+.sb-brand-head:focus-within .sb-menu .ui-menu-btn {
   opacity: 1;
 }
 
-/* the time makes room for the menu on hover */
-.tree-row:hover .tree-meta {
-  display: none;
+.sb-group {
+  display: grid;
+  gap: 1px;
+  padding-left: 10px;
 }
 
-.tree-rename {
+/* a chat: title and state on one line, the videos it's linked to under it */
+.sb-chat {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 4px 5px 8px;
+  border-radius: 6px;
+  color: var(--chalk);
+  cursor: pointer;
+}
+
+.sb-chat:hover {
+  background: var(--hover);
+}
+
+.sb-chat.active {
+  background: var(--raised);
+}
+
+.sb-chat-text {
+  display: grid;
+  gap: 2px;
   flex: 1;
   min-width: 0;
+}
+
+.sb-chat-title,
+.sb-chat-projects {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.sb-chat-title {
+  color: var(--text-2);
+}
+
+.sb-chat.active .sb-chat-title,
+.sb-chat.unread .sb-chat-title {
+  color: var(--accent);
+}
+
+.sb-chat.unread .sb-chat-title {
+  font-weight: 600;
+}
+
+.sb-chat.archived .sb-chat-title {
+  color: var(--smoke);
+}
+
+.sb-chat-projects {
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.sb-chat-state {
+  flex: none;
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  height: 19px;
+  color: var(--smoke);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--chalk);
+}
+
+.sb-needs-you,
+.sb-unread {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sb-spinner {
+  flex: none;
+  animation: sb-spin 0.9s linear infinite;
+}
+
+@keyframes sb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb-spinner {
+    animation: none;
+  }
+}
+
+/* the options button takes the state's place on hover */
+.sb-chat .sb-menu {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+.sb-menu .ui-menu-btn {
+  width: 22px;
   height: 22px;
+  opacity: 0;
+}
+
+.sb-chat:hover .sb-menu .ui-menu-btn,
+.sb-chat:focus-within .sb-menu .ui-menu-btn,
+.sb-menu .ui-menu-btn[aria-expanded='true'] {
+  opacity: 1;
+  background: var(--raised);
+}
+
+.sb-chat:hover .sb-chat-state,
+.sb-chat:focus-within .sb-chat-state {
+  visibility: hidden;
+}
+
+.sb-videos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--smoke);
+  text-align: left;
+}
+
+.sb-videos:hover {
+  background: var(--hover);
+  color: var(--chalk);
+}
+
+.sb-videos.active {
+  background: var(--raised);
+  color: var(--chalk);
+}
+
+.sb-count {
+  margin-left: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sb-empty {
+  margin: 2px 0;
+  padding: 4px 8px;
+  color: var(--smoke);
+}
+
+.sb-more {
+  display: flex;
+  gap: 2px;
+}
+
+.sb-more button {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--smoke);
+  font-size: 12px;
+}
+
+.sb-more button:hover {
+  background: var(--hover);
+  color: var(--chalk);
+}
+
+.sb-add-brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  margin-top: 10px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--smoke);
+}
+
+.sb-add-brand svg {
+  width: 12px;
+  height: 12px;
+}
+
+.sb-add-brand:hover {
+  background: var(--hover);
+  color: var(--chalk);
+}
+
+.sb-rename {
+  flex: 1;
+  min-width: 0;
+  height: 24px;
   padding: 0 6px;
-  border: 1px solid var(--accent);
+  border: 1px solid var(--line-strong);
   border-radius: 4px;
   background: var(--felt);
+  color: var(--chalk);
   outline: none;
 }
 
-.tree-confirm {
+.sb-rename:focus {
+  border-color: var(--accent-strong);
+}
+
+.sb-confirm {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -305,22 +458,14 @@ body.resizing webview {
   font-size: 12px;
 }
 
-.tree-confirm .pill {
+.sb-confirm .pill {
   padding: 2px 8px;
 }
 
-.tree-empty {
-  margin: 2px 0;
-  padding: 0 6px 0 20px;
-  color: var(--faint);
-  font-size: 12px;
-}
+.sb-resize { position: absolute; top: 0; right: -3px; bottom: 0; width: 6px; z-index: 4; cursor: col-resize; touch-action: none; }
+.sb-resize:hover, .sb-resize:focus-visible { background: var(--line-strong); }
 
-.tree-row-actions {
-  display: flex;
-  gap: 2px;
-}
-
+/* quiet text buttons other lists still use */
 .tree-add {
   display: flex;
   align-items: center;
@@ -328,7 +473,7 @@ body.resizing webview {
   height: 26px;
   padding: 0 6px;
   border-radius: 6px;
-  color: var(--faint);
+  color: var(--smoke);
   font-size: 12.5px;
 }
 
@@ -342,8 +487,120 @@ body.resizing webview {
   color: var(--chalk);
 }
 
-.tree-add.brand-add {
-  margin-top: 6px;
+/* videos: a plain table of the brand's video projects, centered like the chat column */
+
+.vl {
+  flex: 1;
+  width: 100%;
+  max-width: calc(var(--chat-max) + 16rem);
+  min-height: 0;
+  margin: 0 auto;
+  padding: 28px var(--chat-pad);
+  overflow-y: auto;
+}
+
+.vl-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vl-head h1 {
+  margin: 0;
+  color: var(--chalk);
+  font: 600 18px/1.3 var(--head);
+}
+
+.vl-note,
+.vl-empty {
+  max-width: 60ch;
+  margin: 8px 0 18px;
+  color: var(--smoke);
+}
+
+.vl-new {
+  display: flex;
+  max-width: 320px;
+  margin-bottom: 12px;
+}
+
+.vl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.vl-table th {
+  padding: 6px 10px 6px 0;
+  border-bottom: 1px solid var(--line-strong);
+  color: var(--smoke);
+  font-weight: 500;
+  text-align: left;
+}
+
+.vl-table td {
+  padding: 8px 10px 8px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-2);
+  vertical-align: middle;
+}
+
+.vl-table td:last-child,
+.vl-table th:last-child {
+  width: 30px;
+  padding-right: 0;
+}
+
+.vl-table tr:hover .sb-menu .ui-menu-btn,
+.vl-table tr:focus-within .sb-menu .ui-menu-btn {
+  opacity: 1;
+}
+
+.vl-name {
+  padding: 0;
+  color: var(--accent);
+  font-weight: 500;
+  text-align: left;
+}
+
+.vl-name:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.vl-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vl-folder {
+  max-width: 280px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--smoke);
+  font-size: 12px;
+  user-select: text;
+}
+
+.vl-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.vl-needs-you {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 /* jobs: one line at the bottom, opens up into the list */
@@ -606,7 +863,6 @@ button.ws-head-btn:hover,
 
 .ws-stage.current .ws-stage-dot {
   background: var(--accent);
-  box-shadow: 0 0 0 3px var(--teal-soft);
 }
 
 .ws-stage.open {
@@ -711,7 +967,7 @@ button.ws-head-btn:hover,
 .ws-placeholder-body {
   max-width: 340px;
   padding: 24px;
-  text-align: center;
+  text-align: left;
 }
 
 .ws-placeholder-body h2 {
@@ -763,13 +1019,6 @@ button.ws-head-btn:hover,
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
-/* a reply finished while you were in another chat */
-.dot.unread {
-  width: 5px;
-  height: 5px;
-  margin: 0 1px;
-  background: var(--smoke);
-}
 
 /* the strip's dots follow the project's run when it has one */
 .ws-stage.run-running .ws-stage-dot {
@@ -779,8 +1028,7 @@ button.ws-head-btn:hover,
 }
 
 .ws-stage.run-waiting_user .ws-stage-dot {
-  background: linear-gradient(90deg, var(--yellow) 50%, transparent 50%);
-  box-shadow: inset 0 0 0 1px var(--yellow);
+  background: var(--chalk);
 }
 
 .ws-stage.run-done .ws-stage-dot {

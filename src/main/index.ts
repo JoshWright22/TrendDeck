@@ -1,3 +1,5 @@
+// first: a downloaded update links the installed app's native files before anything loads them
+import './unpacked-link'
 import { app, BrowserWindow, ipcMain, session, webContents, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -39,12 +41,13 @@ const MUTE_ALL = process.argv.includes('--mute-audio') || process.env.TRENDDECK_
 if (MUTE_ALL) app.commandLine.appendSwitch('mute-audio')
 // sites with a cast button make chromium look for tvs on the network, which opens a listening
 // socket and the windows firewall prompt. trenddeck never casts
-// test runs set TRENDDECK_TEST_OFFSCREEN=1: the window opens off screen without taking focus or a
-// taskbar button, and keeps painting there so screenshots over CDP or capturePage still work
-const TEST_OFFSCREEN = process.env.TRENDDECK_TEST_OFFSCREEN === '1'
+// test runs only: the window opens far off screen, never takes focus and stays off the taskbar,
+// so screenshots over the debugging port don't pop up on the desktop. it keeps painting there, and
+// the Craft apps docked over it still follow it
+const offscreen = process.env.TRENDDECK_TEST_OFFSCREEN === '1'
 app.commandLine.appendSwitch(
   'disable-features',
-  `MediaRouter,DialMediaRouteProvider,CastMediaRouteProvider,GlobalMediaControlsCastStartStop${TEST_OFFSCREEN ? ',CalculateNativeWinOcclusion' : ''}`
+  `MediaRouter,DialMediaRouteProvider,CastMediaRouteProvider,GlobalMediaControlsCastStartStop${offscreen ? ',CalculateNativeWinOcclusion' : ''}`
 )
 
 // sites only play sound while you can see them
@@ -75,6 +78,7 @@ function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
+    ...(offscreen ? { x: -10000, y: -10000, focusable: false, skipTaskbar: true } : {}),
     minWidth: 960,
     minHeight: 600,
     show: false,
@@ -86,14 +90,13 @@ function createWindow(): void {
     trafficLightPosition: isMac ? { x: 14, y: 13 } : undefined,
     title: 'TrendDeck',
     icon: join(__dirname, '../../resources/icon.png'),
-    ...(TEST_OFFSCREEN ? { x: -12000, y: 0, skipTaskbar: true } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
       webviewTag: true,
-      backgroundThrottling: !TEST_OFFSCREEN
+      backgroundThrottling: !offscreen
     }
   })
 
@@ -103,7 +106,7 @@ function createWindow(): void {
   win.once('ready-to-show', () => {
     // a downloaded update that got this far works, boot.ts keeps using it
     bootInfo()?.markGood()
-    if (TEST_OFFSCREEN) win.showInactive()
+    if (offscreen) win.showInactive()
     else win.show()
     // the ad blocker engine is big, give the first paint a head start
     setTimeout(startAdblock, 1000)

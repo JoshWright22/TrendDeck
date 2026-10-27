@@ -5,6 +5,7 @@ import type { Brand } from '@shared/types'
 import type { Project } from '@shared/workspace'
 import { useRun } from '../workspace/WorkspacePane'
 import { draftChat } from '../pages/voice/chatDraft'
+import { Menu } from './ui'
 import { HistoryCard } from './cards/StorageHistoryCards'
 import { cleanError, type CardActions } from './cards/useCards'
 import './cards/cards.css'
@@ -59,41 +60,35 @@ export default function ProjectProgress({ brand, project, actions }: { brand: Br
     }
   }
 
+  const ask = (): void =>
+    draftChat(
+      run
+        ? `Tell me where ${project.name} stands, what you're doing now and what you need from me. Update the steps with your pipeline tools if anything changed.`
+        : `Set up the steps for ${project.name}. Look at the pipeline with your tools, fit it to this video and start its run. Ask me only for creative decisions, then tell me the first step.`
+    )
+
+  // one quiet row: the video, where it is, what's next. clicking it shows the steps, the rest is in the menu
   return (
-    <section className="cx-project-progress" aria-label="Project progress">
+    <section className="cx-project-progress" aria-label={`${project.name} progress`}>
       <div className="cx-progress-top">
-        <div className="cx-progress-title">
-          <strong>{headline}</strong>
-          <span className="muted">
+        <button type="button" className="cx-progress-row" aria-expanded={open} disabled={!run} onClick={() => setOpen(!open)}>
+          <span className="cx-progress-name">{project.name}</span>
+          <span className="cx-progress-headline">{headline}</span>
+          <span className="cx-progress-detail">
             {run
               ? `${done} of ${stages.length} steps done${made ? `, ${made} thing${made === 1 ? '' : 's'} made` : ''}${next ? `. Next: ${next.label}` : ''}`
-              : 'Your agent sets up the steps for this video.'}
+              : 'Your agent sets up the steps for this video'}
           </span>
-        </div>
-        <span className="spacer" />
-        {run && (
-          <button type="button" className="ws-head-btn" aria-expanded={open} onClick={() => setOpen(!open)}>
-            {open ? 'Hide steps' : 'Steps'}
-          </button>
-        )}
-        {actions && (
-          <button type="button" className="ws-head-btn" aria-expanded={!!history} onClick={() => void showHistory()}>
-            History
-          </button>
-        )}
-        <button
-          type="button"
-          className="ws-head-btn"
-          onClick={() =>
-            draftChat(
-              run
-                ? `Tell me where ${project.name} stands, what you're doing now and what you need from me. Update the steps with your pipeline tools if anything changed.`
-                : `Set up the steps for ${project.name}. Look at the pipeline with your tools, fit it to this video and start its run. Ask me only for creative decisions, then tell me the first step.`
-            )
-          }
-        >
-          {run ? 'Ask for an update' : 'Ask your agent to set it up'}
         </button>
+        <Menu
+          label={`${project.name} options`}
+          className="cx-progress-menu"
+          items={[
+            ...(run ? [{ label: open ? 'Hide steps' : 'Show steps', onSelect: () => setOpen(!open) }] : []),
+            { label: run ? 'Ask for an update' : 'Ask your agent to set it up', onSelect: ask },
+            ...(actions ? [{ label: history ? 'Hide history' : 'History', onSelect: () => void showHistory() }] : [])
+          ]}
+        />
       </div>
       {state?.notes && <p className="cx-progress-notes">{state.notes.slice(0, 280)}</p>}
       {open && run && (
