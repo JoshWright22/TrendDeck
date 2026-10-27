@@ -229,9 +229,16 @@
   scrollbar-gutter: stable;
 }
 
-/* the chat keeps its place by the messages around an editor, not by the editor: it changes size
-   and swaps between a live editor and a still while you scroll */
-.cx-embed {
+/* a chat with an editor lays every message out at its real size, never a guessed one that
+   corrects itself as you scroll (an editor can fill the view, then nothing would keep the chat in
+   place while it does). the editor's header can hold the chat's place, the stage inside can't: it
+   swaps between a live editor and a still */
+.cx-column:has(.cx-embed) > *,
+.cx-column:has(.cx-embed) > * > .cx-msg {
+  content-visibility: visible !important;
+}
+
+.cx-embed-stage {
   overflow-anchor: none;
 }
 
