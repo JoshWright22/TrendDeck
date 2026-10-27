@@ -204,10 +204,19 @@ export async function addThread(brandId: string, thread: Thread): Promise<void> 
   ;(await threadsFor(brandId)).push(thread)
 }
 
+// a deleted chat is copied to chats/removed/ first, one line per chat, so nothing you wrote is lost
+async function keepRemoved(brandId: string, threads: Thread[]): Promise<void> {
+  if (!threads.length) return
+  const at = Date.now()
+  const lines = threads.map((t) => JSON.stringify({ removedAt: at, thread: t }) + '\n').join('')
+  await fs.mkdir(join(dir(), 'removed'), { recursive: true })
+  await fs.appendFile(join(dir(), 'removed', `${brandId}.jsonl`), lines, 'utf8')
+}
+
 export async function removeThread(brandId: string, threadId: string): Promise<void> {
   const threads = await threadsFor(brandId)
   const i = threads.findIndex((t) => t.id === threadId)
-  if (i >= 0) threads.splice(i, 1)
+  if (i >= 0) await keepRemoved(brandId, threads.splice(i, 1))
   await persist(brandId)
 }
 
@@ -228,6 +237,7 @@ export function persist(brandId: string): Promise<void> {
 
 export async function dropChats(brandId: string): Promise<void> {
   if (!ID_PATTERN.test(brandId)) return
+  await keepRemoved(brandId, await threadsFor(brandId)).catch(() => {})
   loaded.delete(brandId)
   await (queues.get(brandId) ?? Promise.resolve()).catch(() => {})
   await fs.rm(file(brandId), { force: true })
