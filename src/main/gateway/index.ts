@@ -15,11 +15,12 @@ import { qcTools } from '../qc/tools'
 import { STORAGE_TOOLS } from '../production-storage'
 import { CONTEXT_TOOLS } from '../context'
 import { OBS_TOOLS } from '../obs'
+import { WORKSPACE_TOOLS } from '../workspace/tools'
 
 export { callGatewayTool, mcpToolList, toolInfo } from './call'
 
 // every tool an agent can call, in the order tools/list shows them
-registerTools([...SITE_TOOLS, ...CONTENT_TOOLS, ...PUBLISH_TOOLS, ...PIPELINE_TOOLS])
+registerTools([...SITE_TOOLS, ...CONTENT_TOOLS, ...PUBLISH_TOOLS, ...PIPELINE_TOOLS, ...WORKSPACE_TOOLS])
 registerTools(qcTools())
 // project history and cloud copies, then the brand's docs, past videos and style memory
 registerTools(STORAGE_TOOLS)

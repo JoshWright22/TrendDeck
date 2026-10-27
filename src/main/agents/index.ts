@@ -250,7 +250,7 @@ async function runReply(brandId: string, live: Live): Promise<void> {
   try {
     const brand = getData()?.brands.find((b) => b.id === brandId)
     if (!brand) throw new Error('That brand is gone')
-    const base = await brandContext(brand)
+    const base = await brandContext(brand, thread.id)
     // the user message and the empty reply are the last two
     const userMsg = thread.messages[thread.messages.length - 2]
     const message = userMsg ? turnText(userMsg) : ''

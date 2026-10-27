@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import fs from 'original-fs'
 import { bootInfo, newer, readState, updatesDir, writeState } from './boot-state'
 import { loadData } from './store'
+import { linkUnpacked, unlinkUnpacked } from './unpacked-link'
 
 const SIX_HOURS = 6 * 60 * 60 * 1000
 const REPO = 'JoshWright22/TrendDeck'
@@ -114,6 +115,7 @@ async function download(m: Manifest & { url: string }): Promise<string> {
     throw new Error('app update failed its hash check')
   }
   fs.renameSync(part, file)
+  linkUnpacked(file)
   return file
 }
 
@@ -123,8 +125,12 @@ function cleanUp(): void {
     const keep = readState()?.file
     for (const name of fs.readdirSync(updatesDir())) {
       const full = join(updatesDir(), name)
-      if (name === 'state.json' || full === keep) continue
-      fs.rmSync(full, { force: true, recursive: true })
+      if (name === 'state.json' || full === keep || full === `${keep}.unpacked`) continue
+      // a link (the native-files link next to a downloaded archive) is removed as a link. a
+      // recursive rm goes through a windows junction and deletes what it points to, which once
+      // emptied the installed app's app.asar.unpacked
+      if (fs.lstatSync(full).isSymbolicLink()) unlinkUnpacked(full)
+      else fs.rmSync(full, { force: true, recursive: true })
     }
   } catch {
     // no folder yet

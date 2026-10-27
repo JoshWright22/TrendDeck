@@ -4,6 +4,7 @@ import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
 import { SOURCE_NAMES, type Brand, type TrendFeed } from '@shared/types'
 import { EMBED_LANG, type Attachment, type Thread, type ThreadMessage } from '@shared/chat'
+import { chatProjectIds, videoProjects } from '@shared/workspace'
 import { styleContext } from '../context'
 import { brandMemoryContext } from '../brand-memory'
 
@@ -12,6 +13,7 @@ import { brandMemoryContext } from '../brand-memory'
 
 const TOP_TRENDS = 12
 const MAX_IDEAS = 15
+const MAX_PROJECTS = 40
 // older turns get dropped first so the prompt stays a sane size, and under
 // the windows command line limit for agents that take it as an argument
 const MAX_HISTORY_CHARS = 14_000
@@ -89,7 +91,7 @@ To show a playable media review inside chat, use a video card with a real mediaI
 
 Use a trend card when you talk about a specific trend, an idea card for each post idea, a draft card for anything ready to post and a site card to point at where to post it. Keep normal text short around the cards.`
 
-export async function brandContext(brand: Brand): Promise<string> {
+export async function brandContext(brand: Brand, threadId: string | null = null): Promise<string> {
   const lines: string[] = []
   lines.push(
     'You are the creative production agent inside TrendDeck, a chat-first desktop workspace for making content across brands.',
@@ -121,6 +123,24 @@ export async function brandContext(brand: Brand): Promise<string> {
   lines.push('', '## Saved ideas')
   if (ideas.length === 0) lines.push('None yet.')
   for (const i of ideas) lines.push(`- ${oneLine(i.title)}`)
+
+  // the chat is brand-wide: every video project is listed, the linked ones are what it's about
+  const linked = chatProjectIds(brand, threadId)
+  const projects = videoProjects(brand.projects)
+  const shown = [...projects.filter((p) => linked.includes(p.id)), ...projects.filter((p) => !linked.includes(p.id)).reverse()].slice(0, MAX_PROJECTS)
+  lines.push('', '## Video projects')
+  lines.push(
+    linked.length
+      ? `This chat is linked to ${linked.length === 1 ? 'one project' : `${linked.length} projects`}, marked below. You can see and work on every project in the brand.`
+      : 'This chat is not linked to a project yet. You can see and work on every project in the brand.',
+    'Use project_list for details, project_create when the user starts a new video, and chat_link_projects to link this chat to the projects it is about.'
+  )
+  if (shown.length === 0) lines.push('None yet.')
+  for (const p of shown) {
+    const stage = brand.pipeline.find((s) => s.id === p.stageId)?.label ?? 'no stage'
+    lines.push(`- [${p.id}] ${oneLine(p.name, 80)}: ${stage}, ${p.status}${linked.includes(p.id) ? ', linked to this chat' : ''}`)
+  }
+  if (projects.length > shown.length) lines.push(`${projects.length - shown.length} older projects not shown, see project_list.`)
 
   const style = await styleContext(brand.id)
   if (style) lines.push('', style)

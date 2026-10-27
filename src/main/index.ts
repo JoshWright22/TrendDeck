@@ -1,3 +1,5 @@
+// first: a downloaded update links the installed app's native files before anything loads them
+import './unpacked-link'
 import { app, BrowserWindow, ipcMain, session, webContents, type WebContents } from 'electron'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -66,10 +68,15 @@ function openInApp(host: WebContents | null | undefined, url: string): void {
   if (host && !host.isDestroyed() && isHttpUrl(url)) host.send('open:url', url)
 }
 
+// test runs only: the window opens far off screen, never takes focus and stays off the taskbar,
+// so screenshots over the debugging port don't pop up on the desktop
+const offscreen = process.env.TRENDDECK_TEST_OFFSCREEN === '1'
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
     height: 900,
+    ...(offscreen ? { x: -10000, y: -10000, focusable: false, skipTaskbar: true } : {}),
     minWidth: 960,
     minHeight: 600,
     show: false,
@@ -92,15 +99,6 @@ function createWindow(): void {
 
   // craft apps dock over this window's workspace pane
   craftHost(win)
-
-  // test runs: the window lives off screen and never takes focus, screenshots go through
-  // capturePage or the devtools protocol
-  const offscreen = process.env.TRENDDECK_TEST_OFFSCREEN === '1'
-  if (offscreen) {
-    win.setPosition(-10000, -10000)
-    win.setSkipTaskbar(true)
-    win.setFocusable(false)
-  }
 
   win.once('ready-to-show', () => {
     // a downloaded update that got this far works, boot.ts keeps using it

@@ -5,7 +5,7 @@
      emphasis comes from brightness: --accent is the brightest text, --accent-soft a faint fill.
      old names kept so every page follows */
   --bg-rgb: 10 10 10;
-  --fg-rgb: 232 232 232;
+  --fg-rgb: 236 236 236;
   --felt: rgb(var(--bg-rgb));
   --panel: #121212;
   --raised: #1a1a1a;
@@ -13,9 +13,13 @@
   --line: rgba(255, 255, 255, 0.08);
   --line-strong: rgba(255, 255, 255, 0.14);
   --hair: rgba(255, 255, 255, 0.06);
+  /* text contrast on --felt / on --raised (WCAG): chalk 16.8 / 14.7 and --text-2 13.4 / 11.7 for
+     body (AAA), --smoke 9.1 / 8.0 for secondary (AAA), --faint 5.7 / 5.0 for hints (AA).
+     nothing that carries meaning goes below --faint */
   --chalk: rgb(var(--fg-rgb));
-  --smoke: #9a9a9a;
-  --faint: #666666;
+  --text-2: #d4d4d4;
+  --smoke: #b0b0b0;
+  --faint: #8a8a8a;
   /* light fill for primary buttons and chips, text on it is --felt */
   --card: #e6e6e6;
   /* emphasis. --teal is its old name and what most pages use */
@@ -32,13 +36,19 @@
   --yellow: rgb(var(--warn-rgb));
   --pink: rgb(var(--danger-rgb));
   --radius: 8px;
+  /* the chat column: messages, cards, composer and the new chat screen sit in one centered
+     column this wide (t3code uses 46rem), text inside it stays left-aligned */
+  --chat-max: 46rem;
+  --chat-pad: 24px;
   /* plain and quick for everyday motion */
   --ease: cubic-bezier(0.2, 0, 0, 1);
   /* springy, only for small wins */
   --spring: cubic-bezier(0.34, 1.7, 0.5, 1);
-  --body: 'Inter', system-ui, sans-serif;
-  /* headings are plain Inter now, no display face */
-  --head: 'Inter', system-ui, sans-serif;
+  /* the native Windows 11 UI face: it's hinted for ClearType at 12 to 14 px, where most of the
+     app's text is. Inter is bundled as the fallback on systems without it. see docs/BRAND.md */
+  --body: 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', 'Inter', system-ui, sans-serif;
+  /* headings are the same family, no display face */
+  --head: 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', 'Inter', system-ui, sans-serif;
   color-scheme: dark;
 }
 
@@ -59,7 +69,7 @@ body {
   font: 13px/1.45 var(--body);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
-  /* only 400 to 600 are bundled, heavier weights render as 600 instead of a smeared fake bold */
+  /* only 400 to 600 of the Inter fallback are bundled, heavier weights render as 600 instead of a smeared fake bold */
   font-synthesis-weight: none;
 }
 
@@ -347,8 +357,6 @@ select:focus-visible,
   color: var(--smoke);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .side-item {
@@ -607,7 +615,7 @@ select:focus-visible,
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--raised);
-  text-align: center;
+  text-align: left;
 }
 
 .coming-soon-card h2 {
@@ -732,7 +740,7 @@ select:focus-visible,
 
 .chat-empty {
   margin: auto 0;
-  text-align: center;
+  text-align: left;
   color: var(--smoke);
 }
 
@@ -1307,8 +1315,6 @@ select:focus-visible,
   padding-left: 10px;
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .trend-card .source {
@@ -1495,8 +1501,6 @@ select:focus-visible,
   color: var(--smoke);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
 }
 
 .modal-section:first-of-type {
@@ -1538,9 +1542,7 @@ select:focus-visible,
   display: flex;
   flex-direction: column;
   height: 100%;
-  background:
-    radial-gradient(ellipse 50% 45% at 50% 0%, rgb(var(--accent-rgb) / 0.26), transparent 70%),
-    var(--felt);
+  background: var(--felt);
 }
 
 .onboard .skip {

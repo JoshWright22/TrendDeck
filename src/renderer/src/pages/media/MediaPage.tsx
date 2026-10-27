@@ -336,7 +336,7 @@ export default function MediaPage({ brand, chatOpen, onToggleChat }: PageProps):
                     {m.name}
                   </div>
                   <div className="muted small media-card-meta">
-                    {[m.ext.toUpperCase(), formatSize(m.size), resolution(m)].filter(Boolean).join(' · ')}
+                    {[m.ext.toUpperCase(), formatSize(m.size), resolution(m)].filter(Boolean).join(', ')}
                   </div>
                   {m.posts.length > 0 && <span className="media-posted-dot" title={postedLine(m)} />}
                 </li>

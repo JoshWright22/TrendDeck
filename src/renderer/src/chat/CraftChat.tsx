@@ -5,6 +5,7 @@ import { craftBelongsTo } from '@shared/craft'
 import { CraftWorkspace } from '../workspace/craft/CraftWorkspace'
 import { useCraftApps } from '../workspace/craft/store'
 import { PaneContext } from '../workspace/pane'
+import { Dropdown } from './ui'
 import './craft-chat.css'
 
 interface Props {
@@ -38,15 +39,21 @@ export default function CraftChat({ brand, project, onActivate }: Props): ReactN
   return (
     <section className={`craft-chat${expanded && selected ? ' is-expanded' : ''}`} aria-label="Craft editors in chat">
       <div className="craft-chat-tools">
-        <label htmlFor="chat-craft-app">Create with</label>
-        <select id="chat-craft-app" value={selected} disabled={!apps} onChange={(event) => choose(event.target.value)}>
-          <option value="">{apps ? 'Choose a Craft app' : 'Loading Craft apps...'}</option>
-          {apps?.map((status) => (
-            <option key={status.app.id} value={status.app.id}>
-              {status.app.name}{status.install.kind === 'installed' ? '' : ' (install required)'}
-            </option>
-          ))}
-        </select>
+        <Dropdown
+          label="Open an editor"
+          className="craft-chat-pick"
+          value={selected}
+          disabled={!apps}
+          onChange={choose}
+          options={[
+            { value: '', label: apps ? 'Open an editor' : 'Loading editors' },
+            ...(apps ?? []).map((status) => ({
+              value: status.app.id,
+              label: status.app.name,
+              hint: status.install.kind === 'installed' ? undefined : 'Needs to be installed first'
+            }))
+          ]}
+        />
         {running.filter((status) => status.app.id !== selected).map((status) => (
           <button key={status.app.id} className="ws-head-btn" onClick={() => choose(status.app.id)}>
             {status.app.name}
