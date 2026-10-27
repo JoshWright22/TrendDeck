@@ -6,7 +6,8 @@ import { brandOf } from '../gateway/tools/common'
 import { ContentResult, ToolError, type GatewayTool, type Turn } from '../gateway/types'
 import { obj, oneOf, str } from '../gateway/validate'
 import type { JsonSchema } from '../gateway/validate'
-import { cachedTools, pickFile, saveSession, sessionCall, sessionFor } from './agent'
+import { cachedTools, pickFile, saveSession, sessionCall, sessionFor, withSession } from './agent'
+import { connectError, connectionFor } from './connection'
 import { countsAsEdit } from '@shared/craft-embed'
 import { APPS, spec } from './catalog'
 import type { McpCallResult, McpContent } from './mcp'
@@ -24,6 +25,8 @@ import {
   type McpToolDef
 } from './rules'
 import { liveOf, status } from './state'
+import { webLiveOn } from './web'
+import { webSpec } from '@shared/craft-web'
 
 // the craft apps for the agent: craft_list, craft_open, craft_files, and every installed app's
 // own MCP tools as <app>_<tool>. the agent names a TrendDeck project by id (its chat's project
@@ -100,9 +103,10 @@ export async function appCall(
 ): Promise<McpCallResult> {
   const { project } = findProject(brandId, projectId)
   const folder = await projectFolder(brandId, projectId)
-  const session = await sessionFor(appId, brandId, projectId, folder, () => pickFile(appId, folder, project.name, null), !!opts.needsWindow)
-  const r = await sessionCall(session, !!opts.edits, () => session.client.callTool(tool, args, { timeoutMs: opts.timeoutMs ?? 60_000 }), { tool, args })
-  return r
+  return withSession(
+    () => sessionFor(appId, brandId, projectId, folder, () => pickFile(appId, folder, project.name, null), !!opts.needsWindow),
+    (session) => sessionCall(session, !!opts.edits, () => session.client.callTool(tool, args, { timeoutMs: opts.timeoutMs ?? 60_000 }), { tool, args })
+  )
 }
 
 // the json an app's tool answered with, its first text part
@@ -162,20 +166,18 @@ function appTool(appId: string, t: McpToolDef, bridgeOnly: boolean): GatewayTool
       if (edit) {
         for (const fn of beforeEdits) await fn(edit).catch((err) => console.error('craft: an edit hook failed', err))
       }
-      let session
-      try {
-        session = await sessionFor(appId, turn.brandId, project.id, folder, () => pickFile(appId, folder, project.name, null), bridgeOnly)
-      } catch (err) {
-        throw new ToolError(err instanceof Error ? err.message : String(err))
-      }
       const ac = forTurn(turn.id)
       try {
-        // progress keeps a long export from timing out, it isn't shown anywhere yet
-        const r = await sessionCall(session, risk !== 'read', () => session.client.callTool(t.name, callArgs, { signal: ac.signal, timeoutMs: 10 * 60_000, onProgress: () => {} }), { tool: t.name, args: callArgs })
+        const r = await withSession(
+          () => sessionFor(appId, turn.brandId, project.id, folder, () => pickFile(appId, folder, project.name, null), bridgeOnly),
+          // progress keeps a long export from timing out, it isn't shown anywhere yet
+          (session) => sessionCall(session, risk !== 'read', () => session.client.callTool(t.name, callArgs, { signal: ac.signal, timeoutMs: 10 * 60_000, onProgress: () => {} }), { tool: t.name, args: callArgs })
+        )
         if (edit) for (const fn of afterEdits) fn(edit, r.isError !== true)
         return new ContentResult(content(r.content, folder), r.isError === true)
       } catch (err) {
-        throw new ToolError(`${sp.name}: ${hideRoot(err instanceof Error ? err.message : String(err), folder)}`)
+        const why = hideRoot(err instanceof Error ? err.message : String(err), folder)
+        throw new ToolError(connectError(sp.name, why))
       } finally {
         turnCalls.get(turn.id)?.delete(ac)
       }
@@ -206,8 +208,10 @@ export function craftTools(open: (turn: Turn, appId: string, projectId: string, 
       risk: 'read',
       run: async (turn) => {
         const brand = brandOf(turn)
+        const chatProject = projectIdForThread(brand.projects, turn.threadId ?? '')
         const apps = APPS.map((a) => {
           const s = status(a.id)
+          const inChat = brand.projects.filter((p) => webLiveOn(a.id, brand.id, p.id))
           return {
             app: a.id,
             name: a.name,
@@ -217,7 +221,8 @@ export function craftTools(open: (turn: Turn, appId: string, projectId: string, 
             projectId: s.brandId === brand.id ? s.projectId : null,
             openElsewhere: s.running && s.brandId !== brand.id,
             openFile: s.brandId === brand.id && s.file ? basename(s.file) : null,
-            connection: s.agent,
+            inChat: inChat.map((p) => p.id),
+            connection: connectionFor(s, inChat.some((p) => p.id === chatProject), brand.id, chatProject || null),
             fileTypes: a.exts,
             tools: cachedTools(a.id).length ? `${a.id}_*` : null
           }
@@ -255,8 +260,19 @@ export function craftTools(open: (turn: Turn, appId: string, projectId: string, 
         } catch (err) {
           throw new ToolError(err instanceof Error ? err.message : String(err))
         }
-        const s = status(String(args.app))
-        return { opened: s.app.name, project: project.name, file: s.file ? basename(s.file) : null, connection: s.agent }
+        const appId = String(args.app)
+        const s = status(appId)
+        if (webSpec(appId)) {
+          // the card the chat shows it in loads the project, see cards/embed.ts
+          const files = await appFiles(await projectFolder(turn.brandId, project.id), appId).catch(() => [])
+          return {
+            opened: s.app.name,
+            project: project.name,
+            file: files[0]?.name ?? null,
+            connection: `the editor in the chat. it loads in a few seconds, use the ${appId}_* tools now: a call made while it loads waits for it`
+          }
+        }
+        return { opened: s.app.name, project: project.name, file: s.file ? basename(s.file) : null, connection: connectionFor(s, false, turn.brandId, project.id) }
       }
     }
   ]

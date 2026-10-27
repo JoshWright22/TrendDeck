@@ -34,6 +34,11 @@ export interface Session {
 
 const sessions = new Map<string, Session>()
 
+// the connection went away before a call reached the app: an editor in the chat took the project
+// over from a headless engine that was starting, or the card let go. nothing ran, so the call is
+// made again on whatever has the project now (withSession)
+export class SessionGone extends Error {}
+
 // the web builds open in the chat (web.ts). a project open in one is worked on there, not by a
 // headless engine, and saved by its own save. kept out of sessions: two cards can be live at once
 export interface WebHooks {
@@ -49,6 +54,8 @@ const current = (s: Session): boolean => (s.mode === 'web' ? !!web?.alive(s) : s
 const sessionQueues = new Map<string, Promise<unknown>>()
 const savedAt = new WeakMap<Session, number>()
 const livePlans = new WeakMap<Session, LiveSavePlan>()
+// sessions stopSession let go of on purpose
+const stopped = new WeakSet<Session>()
 
 // TrendDeck can save this session itself: the app has a save step and, for an open window, a
 // verified live save plan for its version. when it can't, the app's own save prompt handles it
@@ -134,7 +141,11 @@ export async function loadAllToolCaches(): Promise<void> {
 
 // ---- sessions ----
 
+// apps whose last connection failed, until the next one
+const erred = new Set<string>()
+
 function agentState(appId: string): void {
+  erred.delete(appId)
   const s = sessions.get(appId)
   setLive(appId, {
     agent: s && s.mode !== 'web' ? s.mode : 'off',
@@ -181,6 +192,7 @@ async function startSession(s: Omit<Session, 'client' | 'ready' | 'dirty' | 'idl
     if (session.idle) clearTimeout(session.idle)
     if (why !== 'closed') {
       console.error(`craft: ${s.appId} agent connection ${why}`)
+      erred.add(s.appId)
       setLive(s.appId, {
         agent: 'error',
         autosave: s.mode === 'bridge' && runningApp(s.appId) ? { state: 'unavailable', savedAt: null, note: 'Live autosave is disconnected. Save in the editor while TrendDeck reconnects.' } : undefined
@@ -191,8 +203,11 @@ async function startSession(s: Omit<Session, 'client' | 'ready' | 'dirty' | 'idl
   try {
     await session.ready
   } catch (err) {
+    // stopped while it started (an editor in the chat took the project): handed over, not broken
+    if (stopped.has(session)) throw new SessionGone(`${sp.name} was taken over while it started`)
     client.close()
     if (sessions.get(s.appId) === session) sessions.delete(s.appId)
+    erred.add(s.appId)
     setLive(s.appId, {
       agent: 'error',
       autosave: s.mode === 'bridge' && runningApp(s.appId) ? { state: 'unavailable', savedAt: null, note: 'Live autosave could not connect. Save in the editor.' } : undefined
@@ -292,7 +307,7 @@ export async function saveSession(appId: string): Promise<void> {
 
 export async function sessionCall<T>(s: Session, edits: boolean, call: () => Promise<T>, request?: { tool: string; args: Record<string, unknown> }): Promise<T> {
   return projectOperation(s.folder, async () => {
-    if (!current(s)) throw new Error('Craft session changed before the editor call')
+    if (!current(s)) throw new SessionGone('Craft session changed before the editor call')
     if (request && switchesLiveDocument(s.appId, request.tool, request.args)) {
       throw new Error('Changing documents through an existing Craft session is not safe. Open the document through craft_open, or use the editor manually; automatic saves will not retarget it.')
     }
@@ -340,6 +355,7 @@ export async function stopSession(appId: string, save = true): Promise<void> {
     // unsaved changes are reported instead of blocking the stop forever
     else if (save && s.dirty) console.warn(`craft: ${appId} has changes TrendDeck can't save; save them in the editor`)
     sessions.delete(appId)
+    stopped.add(s)
     s.cancelAutosave()
     if (s.idle) clearTimeout(s.idle)
     s.client.close()
@@ -387,7 +403,9 @@ async function getSession(
   // open in the chat: the agent works in that editor, ui tools included
   const inChat = web?.session(appId, brandId, projectId)
   if (inChat) {
-    await inChat.ready
+    await webReady(inChat)
+    // a connection that failed before the editor took over isn't the editor's
+    if (erred.has(appId) && !sessions.has(appId)) agentState(appId)
     return inChat
   }
   const run = runningApp(appId)
@@ -417,8 +435,58 @@ async function getSession(
   if (have) await stopSession(appId)
   const file = await mainFile()
   const s = await startSession({ appId, mode: 'headless', file, folder, brandId, projectId }, null)
+  // an editor in the chat opened on the project while the engine started: it has the project now
+  if (webTook(appId, brandId, projectId)) {
+    await stopSession(appId)
+    throw new SessionGone(`${spec(appId).name} opened in the chat while it started`)
+  }
   touch(s)
   return s
+}
+
+function webTook(appId: string, brandId: string, projectId: string): boolean {
+  try {
+    return !!web?.session(appId, brandId, projectId)
+  } catch {
+    return true
+  }
+}
+
+// an editor in the chat still loading is waited for, up to a point. one that closed or failed on
+// the way is handed over: the call goes to a headless engine on the saved file instead
+export const WEB_READY_MS = 120_000
+let webReadyMs = WEB_READY_MS
+export function setWebReadyMs(ms: number): void {
+  webReadyMs = ms
+}
+
+async function webReady(s: Session): Promise<void> {
+  let timer: NodeJS.Timeout | undefined
+  const late = new Promise<'late'>((ok) => {
+    timer = setTimeout(() => ok('late'), webReadyMs)
+  })
+  try {
+    if ((await Promise.race([s.ready.then(() => 'ok' as const), late])) === 'late') {
+      throw new Error(`${spec(s.appId).name} in the chat is still loading. Try again in a moment, or ask the user to scroll to it so it can finish.`)
+    }
+  } catch (err) {
+    if (web && !web.alive(s)) throw new SessionGone(`${spec(s.appId).name} in the chat closed`)
+    throw err
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// opens the connection and makes the call, again on the next connection when it was handed over
+// before the call reached the app
+export async function withSession<T>(open: () => Promise<Session>, use: (s: Session) => Promise<T>, tries = 3): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await use(await open())
+    } catch (err) {
+      if (!(err instanceof SessionGone) || i >= tries) throw err
+    }
+  }
 }
 
 const step = (st: { name: string; args: Record<string, unknown> }): [string, Record<string, unknown>, { timeoutMs: number }] => [
