@@ -218,9 +218,10 @@ html[data-embed-fill] .cx-project-progress {
   display: none;
 }
 
-html[data-embed-fill] .cx-column {
-  max-width: none;
-  padding: 0 0 12px;
+/* the chat keeps its centered column, an editor at Whole chat breaks out of it to the chat's full
+   width (cqw is the message list's width without its scrollbar) */
+.cx-messages:has(.cx-embed) {
+  container-type: inline-size;
 }
 
 .cx-column > :has(.cx-embed) {
@@ -252,6 +253,32 @@ html[data-embed-fill] .cx-jump {
   background: var(--felt);
 }
 
+/* over a running editor until you click into it, so the wheel scrolls the chat */
+.cx-embed-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.cx-embed-shield span {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--smoke);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+  pointer-events: none;
+}
+
+.cx-embed-shield:hover span {
+  opacity: 1;
+}
+
 .cx-embed-controls {
   display: flex;
   flex-wrap: wrap;
@@ -272,6 +299,9 @@ html[data-embed-fill] .cx-jump {
 }
 
 .cx-embed.size-fill {
+  width: 100cqw;
+  max-width: none;
+  margin-left: calc(50% - 50cqw);
   padding: 0;
   border-right: 0;
   border-left: 0;

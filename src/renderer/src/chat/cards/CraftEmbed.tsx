@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import type { WebviewTag } from 'electron'
 import type { CraftEmbedCard, ProjectFileRef } from '@shared/cards'
 import { stageHeight, type EmbedSize } from '@shared/craft-embed'
@@ -7,7 +7,7 @@ import { craftApi, putCraft, useCraftApp } from '../../workspace/craft/store'
 import VideoReview from '../VideoReview'
 import CraftTimelineReview from './CraftTimelineReview'
 import CraftVisualReview from './CraftVisualReview'
-import { pinEmbed, registerEmbed, setEmbedVisible, useLiveEmbeds } from './embed-owner'
+import { pinEmbed, registerEmbed, setEmbedVisible, takeReveal, useLiveEmbeds } from './embed-owner'
 import { cleanError, type CardActions } from './useCards'
 import { sendReview } from './VideoCard'
 import './craft-embed.css'
@@ -63,6 +63,9 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   const [preview, setPreview] = useState<ProjectFileRef | null | undefined>(undefined)
   const [page, setPage] = useState<{ src: string; partition: string } | null>(null)
   const [web, setWeb] = useState<WebEmbedState | null>(null)
+  // the editor has the wheel. until you click into it, a wheel over it scrolls the chat: the
+  // editors draw on one canvas that takes every wheel event, so none would ever reach the chat
+  const [active, setActive] = useState(false)
   const project = a.brand.projects.find((p) => p.id === card.projectId)
 
   const inChat = !!webSpec(card.appId)
@@ -78,6 +81,14 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   const live = !!page && web?.state === 'ready'
 
   useEffect(() => registerEmbed(card.id, card.appId, card.appName, card.projectId, card.at), [card.id, card.appId, card.appName, card.projectId, card.at])
+
+  // opened from the picker or Open here: the chat scrolls to it, it starts once it's in view. again
+  // while it grows into its size and opens, so it ends up at the top of the chat
+  const revealAt = useRef(0)
+  useEffect(() => {
+    if (takeReveal(card.id)) revealAt.current = Date.now()
+    if (Date.now() - revealAt.current < 4000) rootRef.current?.scrollIntoView({ block: 'start' })
+  })
 
   // any of it in view counts as visible
   useEffect(() => {
@@ -154,14 +165,46 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
       }
       void api.webAttach(a.brand.id, card.id, id).then((s) => s && setWeb(s), (err: unknown) => setError(cleanError(err)))
     }
+    // a wheel the editor didn't use scrolls the chat (see preload/craft-web.ts)
+    const onMessage = (e: Electron.IpcMessageEvent): void => {
+      const dy = Number(e.args[0])
+      if (e.channel === 'craft-web:wheel' && Number.isFinite(dy)) scroller(rootRef.current)?.scrollBy({ top: dy })
+    }
     attach()
     view.addEventListener('did-attach', attach)
     view.addEventListener('dom-ready', attach)
+    view.addEventListener('ipc-message', onMessage)
     return () => {
       view.removeEventListener('did-attach', attach)
       view.removeEventListener('dom-ready', attach)
+      view.removeEventListener('ipc-message', onMessage)
     }
   }, [page, api, a.brand.id, card.id])
+
+  // a click anywhere else in TrendDeck gives the wheel back to the chat
+  useEffect(() => {
+    if (!active) return
+    const away = (e: PointerEvent): void => {
+      if (!stageRef.current?.contains(e.target as Node)) setActive(false)
+    }
+    document.addEventListener('pointerdown', away, true)
+    return () => document.removeEventListener('pointerdown', away, true)
+  }, [active])
+  useEffect(() => {
+    if (!page) setActive(false)
+  }, [page])
+
+  // the click that hands it the wheel goes through to the editor too
+  const activate = (e: ReactMouseEvent<HTMLDivElement>): void => {
+    const view = viewRef.current
+    const box = e.currentTarget.getBoundingClientRect()
+    setActive(true)
+    if (!view) return
+    const at = { x: Math.round(e.clientX - box.left), y: Math.round(e.clientY - box.top), button: 'left' as const, clickCount: 1 }
+    view.focus()
+    view.sendInputEvent({ type: 'mouseDown', ...at })
+    view.sendInputEvent({ type: 'mouseUp', ...at })
+  }
 
   // filling the chat, the plan bar above the messages folds away to give the editor the room
   useEffect(() => {
@@ -371,6 +414,11 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
               webpreferences="backgroundThrottling=no"
               title={`${card.appName} editor`}
             />
+          )}
+          {live && !active && (
+            <div className="cx-embed-shield" onClick={activate}>
+              <span>Click to edit. The wheel scrolls the chat until you do.</span>
+            </div>
           )}
           {cover && still && <img className="cx-embed-still" src={still} alt="" />}
           {cover && (

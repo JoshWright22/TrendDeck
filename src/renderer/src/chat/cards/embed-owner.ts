@@ -48,7 +48,16 @@ export function setEmbedVisible(id: string, visible: boolean): void {
   recompute()
 }
 
+// embeds you just asked for, the chat scrolls to them: one only starts while you can see it
+const reveal = new Set<string>()
+
+// true once for an embed that should scroll into view
+export function takeReveal(id: string): boolean {
+  return reveal.delete(id)
+}
+
 export function pinEmbed(id: string): void {
+  reveal.add(id)
   const e = entries.get(id)
   if (!e) {
     requested.set(id, Date.now())
