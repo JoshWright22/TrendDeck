@@ -209,6 +209,8 @@ export interface TrendDeckApi extends VoiceApi {
   onUpdateReady(fn: (version: string) => void): () => void
   // closes the app, installs the update and opens it again
   installUpdate(): Promise<void>
+  // writes the window's storage (chat drafts) to disk now
+  flushDrafts(): void
   checkUpdate(): Promise<'latest' | 'downloading' | 'installing' | 'error' | 'dev'>
   loadData(): Promise<AppData>
   saveData(data: AppData): Promise<void>

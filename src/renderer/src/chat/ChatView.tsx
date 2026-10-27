@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react'
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react'
 import type { VisualAsset } from '@shared/visuals'
 import type { Brand, TrendItem, TrendSource } from '@shared/types'
 import type { Project } from '@shared/workspace'
@@ -895,6 +895,20 @@ export default function ChatView({
     )
   }
 
+  // cards that came from outside a reply (an editor you opened, OBS) sit in the chat where they
+  // came in, by time, so later messages go under them and they scroll up with the chat
+  const loose = thread ? cards.filter((c) => !c.messageId || !thread.messages.some((m) => m.id === c.messageId)) : []
+  const looseIndex = (at: number): number => {
+    const msgs = thread?.messages ?? []
+    let i = -1
+    while (i + 1 < msgs.length && msgs[i + 1].at <= at) i++
+    return i
+  }
+  const looseAfter = (i: number): ReactNode => {
+    const here = loose.filter((c) => looseIndex(c.at) === i)
+    return here.length ? <CardList key={`loose-${i}`} cards={here} a={cardActions} /> : null
+  }
+
   // who answered shows once, then again only when the agent or model changes
   const showWho = (m: ThreadMessage, i: number): boolean => {
     if (m.status === 'stopped' || m.handoffFrom?.length) return true
@@ -1068,7 +1082,15 @@ export default function ChatView({
           <div className="cx-column">
             <LoginRequests brandId={brand.id} threadId={openId} onOpenSite={onOpenSite} />
             {thread && thread.messages.length > 0 ? (
-              thread.messages.map((m, i) => (m.role === 'user' ? userMessage(m) : agentMessage(m, i)))
+              <>
+                {looseAfter(-1)}
+                {thread.messages.map((m, i) => (
+                  <Fragment key={m.id}>
+                    {m.role === 'user' ? userMessage(m) : agentMessage(m, i)}
+                    {looseAfter(i)}
+                  </Fragment>
+                ))}
+              </>
             ) : noAgents ? (
               <SetupSteps agents={agents ?? []} scanning={scanning} onRescan={() => void loadAgents(true)} onAdd={() => setManage(true)} />
             ) : (
@@ -1104,12 +1126,7 @@ export default function ChatView({
                 </ul>
               </div>
             )}
-            {thread && (
-              <CardList
-                cards={cards.filter((c) => !c.messageId || !thread.messages.some((m) => m.id === c.messageId))}
-                a={cardActions}
-              />
-            )}
+            {thread && !thread.messages.length && <CardList cards={loose} a={cardActions} />}
             {asked.map((item) => (
               <PendingQuestion
                 key={item.id}

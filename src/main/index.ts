@@ -270,6 +270,12 @@ void app.whenReady().then(() => {
   })
 })
 
+// what you type in the chat lives in the window's storage, which chromium writes to disk when it
+// gets round to it. the window asks for it after you stop typing, and closing writes it too, so a
+// draft survives the app closing or being stopped
+ipcMain.on('drafts:flush', (e) => e.sender.session.flushStorageData())
+app.on('before-quit', () => session.defaultSession.flushStorageData())
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
