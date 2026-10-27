@@ -31,7 +31,7 @@ The surface is always Felt with an indigo spotlight glow. Accents stay small: on
 
 ### Inside the app
 
-The table above is for the logo, the installer and the landing page. The app itself is plainer, after t3code's dark theme and learnharness: neutral grays with no tint, white-alpha hairlines, a light monochrome primary button, and one blue accent kept for focus, selection, links and live status. Tokens live at the top of `src/renderer/src/styles.css`.
+The table above is for the landing page. The app, its icon and the installer are black, white and grays only, like t3code's dark theme and learnharness: neutral grays with no tint, white-alpha hairlines, light primary buttons. Emphasis comes from brightness, not hue. The only color is red, for errors. Tokens live at the top of `src/renderer/src/styles.css`.
 
 | Token | Value | Use |
 |---|---|---|
@@ -42,8 +42,8 @@ The table above is for the logo, the installer and the landing page. The app its
 | `--chalk` | `#E8E8E8` | main text |
 | `--smoke` / `--faint` | `#9A9A9A` / `#666666` | secondary, hints |
 | `--card` | `#E6E6E6` | primary buttons, text on it is `--felt` |
-| `--accent` / `--accent-strong` | `#6895F4` / `#346BF1` | the one accent: text and dots / fills and focus rings |
-| `--success` `--yellow` `--pink` | `#34D399` `#FBBF24` `#F87171` | status dots and text only |
+| `--accent` / `--accent-strong` | `#F5F5F5` / `#8D8D8D` | emphasis text and dots / focus rings |
+| `--pink` | `#F87171` | errors only |
 
 ## Type
 

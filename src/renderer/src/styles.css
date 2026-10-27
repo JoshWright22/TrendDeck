@@ -1,8 +1,9 @@
 /* colors and type follow docs/BRAND.md */
 :root {
-  /* palette from t3code (dark) and learnharness: neutral grays with no tint, white-alpha
-     hairlines, a light monochrome primary, and t3's blue as the one accent, kept for focus,
-     selection, links and live status. old names kept so every page follows */
+  /* black, white and grays, like t3code's dark theme and learnharness: neutral grays with no
+     tint, white-alpha hairlines, light primary buttons. no hue anywhere except red for errors.
+     emphasis comes from brightness: --accent is the brightest text, --accent-soft a faint fill.
+     old names kept so every page follows */
   --bg-rgb: 10 10 10;
   --fg-rgb: 232 232 232;
   --felt: rgb(var(--bg-rgb));
@@ -17,16 +18,16 @@
   --faint: #666666;
   /* light fill for primary buttons and chips, text on it is --felt */
   --card: #e6e6e6;
-  /* the one accent. --teal is its old name and what most pages use */
-  --accent-rgb: 104 149 244;
+  /* emphasis. --teal is its old name and what most pages use */
+  --accent-rgb: 245 245 245;
   --accent: rgb(var(--accent-rgb));
-  --accent-strong: #346bf1;
+  --accent-strong: #8d8d8d;
   --teal: var(--accent);
-  --teal-soft: rgb(var(--accent-rgb) / 0.12);
-  --indigo: var(--accent-strong);
-  /* status only, small dots and text */
-  --success: #34d399;
-  --warn-rgb: 251 191 36;
+  --teal-soft: rgb(var(--accent-rgb) / 0.08);
+  --indigo: #3a3a3a;
+  /* status: done and waiting are grays, only errors get a color */
+  --success: #d4d4d4;
+  --warn-rgb: 180 180 180;
   --danger-rgb: 248 113 113;
   --yellow: rgb(var(--warn-rgb));
   --pink: rgb(var(--danger-rgb));
