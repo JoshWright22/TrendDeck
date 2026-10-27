@@ -17,7 +17,8 @@ import { LiveIdentityError, liveSaveCall, liveSavePlan, switchesLiveDocument, ve
 
 export interface Session {
   appId: string
-  mode: 'bridge' | 'headless'
+  // web: the app's web build open in a chat card, see web.ts
+  mode: 'bridge' | 'headless' | 'web'
   // headless: the project file it loaded, null for an empty one
   file: string | null
   folder: string
@@ -32,6 +33,19 @@ export interface Session {
 }
 
 const sessions = new Map<string, Session>()
+
+// the web builds open in the chat (web.ts). a project open in one is worked on there, not by a
+// headless engine, and saved by its own save. kept out of sessions: two cards can be live at once
+export interface WebHooks {
+  session(appId: string, brandId: string, projectId: string): Session | null
+  alive(s: Session): boolean
+  save(s: Session, reason: string): Promise<void>
+}
+let web: WebHooks | null = null
+export function setWebHooks(h: WebHooks): void {
+  web = h
+}
+const current = (s: Session): boolean => (s.mode === 'web' ? !!web?.alive(s) : sessions.get(s.appId) === s)
 const sessionQueues = new Map<string, Promise<unknown>>()
 const savedAt = new WeakMap<Session, number>()
 const livePlans = new WeakMap<Session, LiveSavePlan>()
@@ -39,6 +53,7 @@ const livePlans = new WeakMap<Session, LiveSavePlan>()
 // TrendDeck can save this session itself: the app has a save step and, for an open window, a
 // verified live save plan for its version. when it can't, the app's own save prompt handles it
 export function canAutosave(s: Session): boolean {
+  if (s.mode === 'web') return true
   return !!spec(s.appId).save && !!s.file && (s.mode === 'headless' || livePlans.has(s))
 }
 // a headless engine nobody used for this long is saved and stopped
@@ -122,7 +137,7 @@ export async function loadAllToolCaches(): Promise<void> {
 function agentState(appId: string): void {
   const s = sessions.get(appId)
   setLive(appId, {
-    agent: s ? s.mode : 'off',
+    agent: s && s.mode !== 'web' ? s.mode : 'off',
     ...(!s ? { autosave: runningApp(appId) ? { state: 'unavailable' as const, savedAt: null, note: 'Live autosave is disconnected. Save in the editor.' } : undefined } : {})
   })
 }
@@ -238,7 +253,12 @@ async function verifyBridgeFile(s: Session): Promise<void> {
 
 async function saveCurrent(s: Session, reason: string, force = false): Promise<void> {
   await s.ready
-  if (sessions.get(s.appId) !== s) throw new Error('Craft session changed before saving')
+  if (!current(s)) throw new Error('Craft session changed before saving')
+  if (s.mode === 'web') {
+    await web!.save(s, reason)
+    s.dirty = false
+    return
+  }
   const saveStep = spec(s.appId).save
   if (!force && s.mode === 'headless' && !s.dirty) return
   if (!s.file || !saveStep) {
@@ -272,7 +292,7 @@ export async function saveSession(appId: string): Promise<void> {
 
 export async function sessionCall<T>(s: Session, edits: boolean, call: () => Promise<T>, request?: { tool: string; args: Record<string, unknown> }): Promise<T> {
   return projectOperation(s.folder, async () => {
-    if (sessions.get(s.appId) !== s) throw new Error('Craft session changed before the editor call')
+    if (!current(s)) throw new Error('Craft session changed before the editor call')
     if (request && switchesLiveDocument(s.appId, request.tool, request.args)) {
       throw new Error('Changing documents through an existing Craft session is not safe. Open the document through craft_open, or use the editor manually; automatic saves will not retarget it.')
     }
@@ -364,6 +384,12 @@ async function getSession(
   mainFile: () => Promise<string | null>,
   needsWindow: boolean
 ): Promise<Session> {
+  // open in the chat: the agent works in that editor, ui tools included
+  const inChat = web?.session(appId, brandId, projectId)
+  if (inChat) {
+    await inChat.ready
+    return inChat
+  }
   const run = runningApp(appId)
   const onWindow = !!run && run.brandId === brandId && run.projectId === projectId
   if (onWindow && !spec(appId).bridgeArgs) {

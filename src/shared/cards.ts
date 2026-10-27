@@ -117,6 +117,22 @@ export interface CraftEmbedCard extends CardBase {
   auto: boolean
 }
 
+// heavy work for a Craft editor in the chat, done by the app's native engine in the background:
+// an export of what the editor shows, or proxies for big footage so the editor plays it smoothly
+export interface CraftJobCard extends CardBase {
+  type: 'craft-job'
+  appId: string
+  appName: string
+  projectId: string
+  kind: 'export' | 'proxy'
+  label: string
+  // 0 to 1, null while it doesn't know yet
+  progress: number | null
+  state: 'running' | 'done' | 'failed'
+  output: ProjectFileRef | null
+  note: string
+}
+
 // a recording of the creator: from the composer's recorder or an OBS recording that stopped.
 // main transcribes it (through the window's Whisper) and fills in cadence and the script diff
 export interface TakeCard extends CardBase {
@@ -209,6 +225,7 @@ export type ChatCard =
   | ObsCard
   | ContentMapCard
   | PostMortemCard
+  | CraftJobCard
 
 export interface CardsChanged {
   brandId: string

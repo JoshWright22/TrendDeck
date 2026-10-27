@@ -201,7 +201,7 @@ export function craftTools(open: (turn: Turn, appId: string, projectId: string, 
       name: 'craft_list',
       title: 'List the craft apps',
       description:
-        "The Craft App Suite: native editors (video, photo, audio, vector, layout, documents...) TrendDeck can install, open over its workspace and that you can drive through their own tools, named <app>_<tool>. Shows each app's install state, whether its window is open and on which project, and how you're connected to it.",
+        "The Craft App Suite: editors (video, photo, audio, vector, layout, documents...) TrendDeck can install, show in the chat and that you can drive through their own tools, named <app>_<tool>. Shows each app's install state, whether its window is open and on which project, and how you're connected to it.",
       inputSchema: obj(),
       risk: 'read',
       run: async (turn) => {
@@ -242,7 +242,7 @@ export function craftTools(open: (turn: Turn, appId: string, projectId: string, 
       name: 'craft_open',
       title: 'Open a craft app',
       description:
-        "Opens a real interactive Craft editor inside the chat for the selected brand/project, so the user can edit manually while you use the app's available MCP tools. Every app in craft_list can be opened this way; automation depends on the app's connection and exposed tools. Installs it from GitHub first if needed. file is a name in the project folder, leave it out for the newest file of the app's type (a new one is made when there's none).",
+        "Opens a real interactive Craft editor in the chat for the selected brand/project (FilmCraft and PhotoCraft run in the chat itself, the other apps open in their own window), so the user can edit manually while you use the app's tools. In the chat, FilmCraft exports and proxies run in the native engine in the background with a progress card. Installs it from GitHub first if needed. file is a name in the project folder, leave it out for the newest file of the app's type (a new one is made when there's none).",
       inputSchema: obj({ app: APP_ARG, projectId: PROJECT_ARG, file: str('a file name in the project folder', 260) }, ['app']),
       risk: 'edit',
       mustAsk: async (_turn, args) =>

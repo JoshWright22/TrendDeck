@@ -17,5 +17,15 @@ export const embedApi: EmbedApi = {
   importFiles: (brandId, cardId, paths) => ipcRenderer.invoke('embed:import-files', brandId, cardId, paths),
   importMedia: (brandId, cardId, mediaId) => ipcRenderer.invoke('embed:import-media', brandId, cardId, mediaId),
   latestRender: (brandId, cardId) => ipcRenderer.invoke('embed:latest-render', brandId, cardId),
-  pathForFile: (file) => webUtils.getPathForFile(file)
+  pathForFile: (file) => webUtils.getPathForFile(file),
+  webOpen: (brandId, cardId) => ipcRenderer.invoke('embed:web-open', brandId, cardId),
+  webAttach: (brandId, cardId, guestId) => ipcRenderer.invoke('embed:web-attach', brandId, cardId, guestId),
+  webRelease: (brandId, cardId) => ipcRenderer.invoke('embed:web-release', brandId, cardId),
+  webState: (cardId) => ipcRenderer.invoke('embed:web-state', cardId),
+  onWebState: (fn) => {
+    const listener = (_event: unknown, s: Parameters<typeof fn>[0]): void => fn(s)
+    ipcRenderer.on('craft-web:state', listener)
+    return () => ipcRenderer.removeListener('craft-web:state', listener)
+  },
+  openFull: (brandId, cardId) => ipcRenderer.invoke('embed:open-full', brandId, cardId)
 }

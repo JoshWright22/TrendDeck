@@ -4,8 +4,9 @@ import { createWriteStream, promises as fs } from 'node:fs'
 import { dirname, join } from 'node:path'
 import yauzl from 'yauzl'
 import { loadData } from '../store'
+import { webSpec } from '@shared/craft-web'
 import { APPS, spec } from './catalog'
-import { newer, parseSums, pickAsset, versionFromTag, zipTarget } from './rules'
+import { newer, parseSums, pickAsset, versionFromTag, webAssetName, zipTarget } from './rules'
 import { liveOf, setLive } from './state'
 
 // each app is the portable zip from its GitHub release, unpacked into
@@ -37,6 +38,8 @@ interface Release {
   size: number
   sumsUrl: string
   publishedAt: string
+  // the release's web build, <id>-web-<version>.zip. undefined in caches from before it was read
+  web?: { asset: string; url: string; size: number } | null
 }
 
 interface ReleaseCache {
@@ -118,9 +121,13 @@ async function fetchRelease(id: string): Promise<Release | null> {
   const asset = version ? pickAsset(names, id, version, process.arch) : null
   const zip = r.assets.find((a) => a.name === asset)
   const sums = r.assets.find((a) => a.name === 'SHA256SUMS.txt')
+  const web = version ? r.assets.find((a) => a.name === webAssetName(id, version)) : undefined
   const release: Release | null =
     version && zip && sums && !r.draft
-      ? { version, asset: zip.name, url: zip.browser_download_url, size: zip.size, sumsUrl: sums.browser_download_url, publishedAt: r.published_at }
+      ? {
+          version, asset: zip.name, url: zip.browser_download_url, size: zip.size, sumsUrl: sums.browser_download_url, publishedAt: r.published_at,
+          web: web ? { asset: web.name, url: web.browser_download_url, size: web.size } : null
+        }
       : null
   c.apps[id] = { etag: res.headers.get('etag'), release }
   return release
@@ -145,7 +152,7 @@ export async function refreshReleases(maxAge = SIX_HOURS): Promise<void> {
 async function releaseFor(id: string): Promise<Release> {
   const c = await loadCache()
   let r = c.apps[id]?.release ?? null
-  if (!r || Date.now() - c.checkedAt > 10 * 60_000) {
+  if (!r || (r.web === undefined && webSpec(id)) || Date.now() - c.checkedAt > 10 * 60_000) {
     r = await fetchRelease(id)
     await writeJson(cacheFile(), c).catch(() => {})
   }
@@ -157,7 +164,7 @@ async function releaseFor(id: string): Promise<Release> {
 // ---- download and unpack ----
 
 // progress only shows for a first install, an update downloads quietly behind the installed app
-async function download(id: string, r: Release, file: string, progress: boolean): Promise<void> {
+async function download(id: string, r: Pick<Release, 'asset' | 'url' | 'size' | 'sumsUrl' | 'version'>, file: string, progress: boolean): Promise<void> {
   const sumsRes = await net.fetch(r.sumsUrl, { cache: 'no-store' })
   if (!sumsRes.ok) throw new Error(`couldn't get the checksums: ${sumsRes.status}`)
   const want = parseSums(await sumsRes.text()).get(r.asset)
@@ -261,6 +268,81 @@ async function fetchVersion(id: string, r: Release, progress: boolean): Promise<
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
   }
+  // the web build goes in with the app it belongs to. the desktop app works without it
+  if (webSpec(id)) await fetchWeb(id, r).catch((err) => console.error(`craft: no web build for ${id} ${r.version}`, err))
+}
+
+// ---- the web build, <craft>\<id>\<version>\web\ (index.html and its files) ----
+
+export const webDirOf = (id: string, version: string): string => join(versionDir(id, version), 'web')
+
+async function hasWeb(dir: string): Promise<boolean> {
+  return fs.access(join(dir, 'index.html')).then(() => true, () => false)
+}
+
+// the release of exactly this version, so the web build always matches the installed app
+async function releaseOf(id: string, version: string): Promise<Release> {
+  const latest = await releaseFor(id).catch(() => null)
+  if (latest?.version === version) return latest
+  const res = await net.fetch(`https://api.github.com/repos/${spec(id).repo}/releases/tags/v${version}`, { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' })
+  if (!res.ok) throw new Error(`GitHub said ${res.status} for ${spec(id).name} ${version}`)
+  const g = (await res.json()) as GhRelease
+  const sums = g.assets.find((a) => a.name === 'SHA256SUMS.txt')
+  const web = g.assets.find((a) => a.name === webAssetName(id, version))
+  if (!sums) throw new Error(`${spec(id).name} ${version} has no SHA256SUMS.txt`)
+  return {
+    version, asset: '', url: '', size: 0, sumsUrl: sums.browser_download_url, publishedAt: g.published_at,
+    web: web ? { asset: web.name, url: web.browser_download_url, size: web.size } : null
+  }
+}
+
+// downloads the web zip, checks it against the release's SHA256SUMS.txt, unpacks it next to the app
+async function fetchWeb(id: string, r: Release): Promise<string> {
+  const final = webDirOf(id, r.version)
+  if (await hasWeb(final)) return final
+  const rel = r.web === undefined ? await releaseOf(id, r.version) : r
+  if (!rel.web) throw new Error(`${spec(id).name} ${r.version} has no web build`)
+  const tmpDir = join(appDir(id), '.download-web')
+  await fs.mkdir(tmpDir, { recursive: true })
+  const zip = join(tmpDir, `${rel.web.asset}.part`)
+  const partial = join(tmpDir, 'web')
+  try {
+    await download(id, { ...rel.web, sumsUrl: rel.sumsUrl, version: r.version }, zip, false)
+    await fs.rm(partial, { recursive: true, force: true })
+    await unzip(zip, partial, rel.web.asset.replace(/\.zip$/, ''))
+    if (!(await hasWeb(partial))) throw new Error('the web zip has no index.html')
+    await fs.rm(final, { recursive: true, force: true })
+    await fs.rename(partial, final)
+    return final
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
+const webBusy = new Map<string, Promise<string>>()
+
+// the installed version's web build, downloaded when it isn't there yet (an app installed before
+// TrendDeck knew about web builds)
+export function ensureWeb(id: string): Promise<string> {
+  const running = webBusy.get(id)
+  if (running) return running
+  const job = (async () => {
+    const have = await installed(id)
+    if (!have) throw new Error(`${spec(id).name} isn't installed`)
+    const dir = webDirOf(id, have.version)
+    if (await hasWeb(dir)) return dir
+    return fetchWeb(id, await releaseOf(id, have.version))
+  })().finally(() => webBusy.delete(id))
+  webBusy.set(id, job)
+  return job
+}
+
+// the installed web build's folder, null when there's none yet
+export async function installedWeb(id: string): Promise<string | null> {
+  const have = await installed(id)
+  if (!have) return null
+  const dir = webDirOf(id, have.version)
+  return (await hasWeb(dir)) ? dir : null
 }
 
 // files the app wrote next to its exe in portable mode (settings, presets, crash recovery)
@@ -274,7 +356,8 @@ async function carryOver(id: string, from: string, to: string): Promise<void> {
   }
   const shipped = new Set((await fs.readdir(to)).map((n) => n.toLowerCase()))
   for (const name of names) {
-    if (shipped.has(name.toLowerCase())) continue
+    // the web build belongs to its version, the new one has its own
+    if (shipped.has(name.toLowerCase()) || name.toLowerCase() === 'web') continue
     await fs.cp(join(from, name), join(to, name), { recursive: true, errorOnExist: false, force: false }).catch((err) =>
       console.error(`craft: couldn't carry ${name} over for ${id}`, err)
     )

@@ -27,6 +27,7 @@ import { setupReuse } from './reuse'
 import { dropBrandPhone, setupEmulator } from './emulator'
 import { setupWorkspace } from './workspace'
 import { craftHost, setupCraft } from './craft'
+import { CRAFT_WEB_PARTITION, CRAFT_WEB_SCHEME } from '@shared/craft-web'
 import { setupQc } from './qc'
 import { dropCards, setupCards } from './cards'
 import { dropStorageBrand, setupStorageSettings } from './production-storage'
@@ -132,13 +133,21 @@ function createWindow(): void {
     openInApp(win.webContents, event.url)
   })
 
-  // site tabs get no preload and no node, and must live in a brand partition
+  // site tabs get no preload and no node, and must live in a brand partition. the Craft editors in
+  // the chat live in their own partition on craft-web: with a preload that only passes dropped files on
   win.webContents.on('will-attach-webview', (event, webPreferences, params) => {
     delete webPreferences.preload
     webPreferences.nodeIntegration = false
     webPreferences.contextIsolation = true
     webPreferences.sandbox = true
     const partition = params.partition ?? ''
+    if (partition === CRAFT_WEB_PARTITION) {
+      if (!(params.src ?? '').startsWith(`${CRAFT_WEB_SCHEME}://`)) event.preventDefault()
+      webPreferences.preload = join(__dirname, '../preload/craft-web.js')
+      webPreferences.backgroundThrottling = false
+      delete params.allowpopups
+      return
+    }
     if (!partition.startsWith(PARTITION_PREFIX) || !isHttpUrl(params.src ?? '')) {
       event.preventDefault()
       return

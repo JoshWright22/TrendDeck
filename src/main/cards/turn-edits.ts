@@ -1,4 +1,5 @@
 import { TurnGroups } from '@shared/craft-embed'
+import { webSpec } from '@shared/craft-web'
 import { openApp } from '../craft'
 import { waitForBridge } from '../craft/agent'
 import { spec } from '../craft/catalog'
@@ -22,9 +23,10 @@ const groups = new TurnGroups<Group>()
 
 async function start(c: CraftEditCall): Promise<Group> {
   const { turn, appId, projectId } = c
-  // so the user watches the edits land: the app's window opens on the project when it isn't open
-  // anywhere. one open on another project is left alone, the edits run headless then
-  if (spec(appId).bridgeArgs && !runningApp(appId) && (await installed(appId))) {
+  // so the user watches the edits land: an app without an editor in the chat opens its window on
+  // the project when it isn't open anywhere. one open on another project is left alone, the edits
+  // run headless then. apps with a web build show in this reply's card instead (upsertEmbed below)
+  if (!webSpec(appId) && spec(appId).bridgeArgs && !runningApp(appId) && (await installed(appId))) {
     try {
       await openApp({ appId, brandId: turn.brandId, projectId })
       await waitForBridge(appId)
@@ -71,7 +73,8 @@ export function setupTurnEdits(): void {
       void g.value
         .then(async (grp) => {
           // the open window's project on disk gets the reply's edits, like the headless engine's
-          if (g.edits > 0 && appId === 'filmcraft' && liveOn(appId, grp.brandId, projectId) === 'window') {
+          const live = liveOn(appId, grp.brandId, projectId)
+          if (g.edits > 0 && appId === 'filmcraft' && (live === 'window' || live === 'web')) {
             await appCall(grp.brandId, projectId, appId, 'command_run', { id: 'file.save', params: {} }).catch(() => {})
           }
           await changeCard(grp.brandId, grp.cardId, (e) => {

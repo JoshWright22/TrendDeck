@@ -5,6 +5,7 @@
 // the parts here are pure and unit tested, main and the window share them
 
 import type { CraftAppStatus } from './craft'
+import type { WebEmbedState } from './craft-web'
 import type { ProjectFileRef, ReviewBox } from './cards'
 
 export type EmbedSize = 'inline' | 'large' | 'fill'
@@ -103,6 +104,15 @@ export interface EmbedApi {
   // the newest video in the project folder, for the preview when the app can't run
   latestRender(brandId: string, cardId: string): Promise<ProjectFileRef | null>
   pathForFile(file: File): string
+  // the app's web build in the card: the page to load, then the guest's id once it's attached
+  webOpen(brandId: string, cardId: string): Promise<{ src: string; partition: string }>
+  webAttach(brandId: string, cardId: string, guestId: number): Promise<WebEmbedState | null>
+  // saves, then lets go of the editor (the card shows a still again)
+  webRelease(brandId: string, cardId: string): Promise<void>
+  webState(cardId: string): Promise<WebEmbedState | null>
+  onWebState(fn: (s: WebEmbedState) => void): () => void
+  // the desktop app in its own window, the editor in the chat saves and lets go first
+  openFull(brandId: string, cardId: string): Promise<CraftAppStatus>
 }
 
 declare global {

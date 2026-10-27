@@ -1,16 +1,15 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { CraftAppStatus } from '@shared/craft'
 import { craftBelongsTo } from '@shared/craft'
 import type { WorkspaceProps } from '../registry'
 import Placeholder from '../Placeholder'
-import { usePane } from '../pane'
 import { craftName } from './apps'
 import { craftApi, errorText, putCraft, useCraftApp } from './store'
-import { useDock } from './useDock'
 import './craft.css'
 
 // a Craft app in the workspace pane. not installed: what it is and Install. installed: the
-// project's files for it. open: a box the app's own window is docked over, with a thin bar
+// project's files for it. open in the full app: its own window, with a thin bar here to close it.
+// editing in the chat happens in the chat's cards (chat/cards/CraftEmbed.tsx)
 
 const AGENT_TEXT: Record<CraftAppStatus['agent'], string> = {
   off: 'Agent not connected',
@@ -106,7 +105,7 @@ function Files({ status, brandId, projectId, projectName }: { status: CraftAppSt
     setError('')
     setOpening(file ?? '')
     void craftApi()
-      ?.open({ appId, brandId, projectId, file })
+      ?.open({ appId, brandId, projectId, file, full: true })
       .then(putCraft, (err: unknown) => setError(errorText(err)))
       .finally(() => setOpening(null))
   }
@@ -159,10 +158,7 @@ function Files({ status, brandId, projectId, projectName }: { status: CraftAppSt
 }
 
 function Docked({ status }: { status: CraftAppStatus }): ReactNode {
-  const { collapsed, dockPriority } = usePane()
-  const box = useRef<HTMLDivElement>(null)
   const [error, setError] = useState('')
-  useDock(status.app.id, box, !collapsed, dockPriority)
   return (
     <div className="page craft craft-docked">
       <div className="craft-bar">
@@ -196,9 +192,8 @@ function Docked({ status }: { status: CraftAppStatus }): ReactNode {
           Close
         </button>
       </div>
-      {/* the app's window sits exactly over this box. what's here only shows while it's hidden */}
-      <div className="craft-dock" ref={box}>
-        <p>{status.app.name} is open in its own window here</p>
+      <div className="craft-dock">
+        <p>{status.app.name} is open in its own window.</p>
       </div>
     </div>
   )

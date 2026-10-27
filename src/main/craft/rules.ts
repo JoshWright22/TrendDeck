@@ -231,3 +231,6 @@ export function gatewaySchema(schema: unknown, top = true): Record<string, unkno
   if (top) s.type = 'object'
   return s
 }
+
+// the web build in a release: <id>-web-<version>.zip
+export const webAssetName = (id: string, version: string): string => `${id}-web-${version}.zip`

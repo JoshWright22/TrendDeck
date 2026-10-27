@@ -1,23 +1,24 @@
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
+import type { WebviewTag } from 'electron'
 import type { CraftEmbedCard, ProjectFileRef } from '@shared/cards'
-import type { CraftDockState } from '@shared/craft'
 import { stageHeight, type EmbedSize } from '@shared/craft-embed'
+import { webSpec, type WebEmbedState } from '@shared/craft-web'
 import { craftApi, putCraft, useCraftApp } from '../../workspace/craft/store'
-import { useDock } from '../../workspace/craft/useDock'
 import VideoReview from '../VideoReview'
 import CraftTimelineReview from './CraftTimelineReview'
 import CraftVisualReview from './CraftVisualReview'
-import { pinEmbed, registerEmbed, setEmbedVisible, useEmbedOwner } from './embed-owner'
+import { pinEmbed, registerEmbed, setEmbedVisible, useLiveEmbeds } from './embed-owner'
 import { cleanError, type CardActions } from './useCards'
 import { sendReview } from './VideoCard'
 import './craft-embed.css'
 
-// a live Craft editor in the chat. the newest one you can see has the real app docked over its
-// stage, the others show a still with Open here. the agent's edits of the reply show as a count
-// with Undo this turn and Keep, its versions of a cut as a switch, and FilmCraft gets timeline
-// comments that become markers
+// a Craft editor in the chat. FilmCraft and PhotoCraft run here as their web builds, a real part
+// of the page: it scrolls with the chat, menus draw over it, and two can run at once. the others
+// show a still and open in their own window. the agent's edits of the reply show as a count with
+// Undo this turn and Keep, its versions of a cut as a switch, and FilmCraft gets timeline comments
+// that become markers
 
-// the last still of each embed, kept while the window is open
+// the last still of each embed, for when its editor isn't running here
 const stills = new Map<string, string>()
 
 const fileName = (p: string | null): string | null => (p ? (p.split(/[\\/]/).pop() ?? p) : null)
@@ -35,13 +36,21 @@ function scroller(el: HTMLElement | null): HTMLElement | null {
   return null
 }
 
+const savedText = (s: WebEmbedState | null): string => {
+  if (!s) return ''
+  if (s.state === 'loading') return 'Opening the project...'
+  if (s.state === 'failed') return s.note
+  const at = s.savedAt ? `Saved to the project folder at ${new Date(s.savedAt).toLocaleTimeString()}. ` : ''
+  return s.note || `${at}Changes save a few seconds after you make them, with recovery copies.`
+}
+
 export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardActions }): ReactNode {
   const api = window.trenddeckEmbed
   const status = useCraftApp(card.appId)
-  const owner = useEmbedOwner()
+  const liveSet = useLiveEmbeds()
   const rootRef = useRef<HTMLElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const nativeRef = useRef<HTMLDivElement>(null)
+  const viewRef = useRef<WebviewTag | null>(null)
   const [size, setSize] = useState<EmbedSize>('fill')
   const [height, setHeight] = useState(0)
   const [still, setStill] = useState<string | null>(stills.get(card.id) ?? null)
@@ -49,38 +58,32 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   const [error, setError] = useState('')
   const [note, setNote] = useState('')
   const [commenting, setCommenting] = useState(false)
-  const [browsing, setBrowsing] = useState(false)
   const [reviewFrame, setReviewFrame] = useState<string | null>(null)
-  const [dock, setDock] = useState<CraftDockState>('waiting')
   const [dropping, setDropping] = useState(false)
   const [preview, setPreview] = useState<ProjectFileRef | null | undefined>(undefined)
+  const [page, setPage] = useState<{ src: string; partition: string } | null>(null)
+  const [web, setWeb] = useState<WebEmbedState | null>(null)
   const project = a.brand.projects.find((p) => p.id === card.projectId)
 
-  const runningHere =
+  const inChat = !!webSpec(card.appId)
+  // the desktop app has this project open in its own window
+  const fullHere =
     !!status?.running &&
     status.brandId === a.brand.id &&
     status.projectId === card.projectId &&
     (!card.file || !status.file || fileName(status.file)?.toLowerCase() === fileName(card.file)?.toLowerCase())
-  const isOwner = owner === card.id
-  const live = isOwner && runningHere
-  const suspended = browsing || reviewFrame !== null
   const installKind = status?.install.kind
   const cantRun = installKind === 'not-installed' || installKind === 'failed'
+  const wanted = inChat && liveSet.has(card.id) && !fullHere && !cantRun && status !== undefined && reviewFrame === null
+  const live = !!page && web?.state === 'ready'
 
   useEffect(() => registerEmbed(card.id, card.appId, card.appName, card.projectId, card.at), [card.id, card.appId, card.appName, card.projectId, card.at])
 
-  // the newest embed you can see owns the app's window
+  // any of it in view counts as visible
   useEffect(() => {
     const el = rootRef.current
     if (!el) return
-    // mostly in view, or a good piece of a tall one. a short chat (big display scaling, a small
-    // window) counts most of what it shows as a good piece
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        setEmbedVisible(card.id, entry.isIntersecting && entry.intersectionRect.height > 0)
-      },
-      { threshold: [0, 0.01] }
-    )
+    const io = new IntersectionObserver(([entry]) => setEmbedVisible(card.id, entry.isIntersecting && entry.intersectionRect.height > 0), { threshold: [0, 0.01] })
     io.observe(el)
     return () => {
       io.disconnect()
@@ -88,36 +91,93 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     }
   }, [card.id])
 
-  useDock(card.appId, nativeRef, live, 2, suspended)
-
+  // the editor's state from main: loading, ready, saved, failed
   useEffect(() => {
-    if (!live || suspended) return
-    const api = craftApi()
-    if (!api?.dockState) return
+    if (!api) return
+    const off = api.onWebState((s) => {
+      if (s.cardId === card.id) setWeb(s)
+    })
+    void api.webState(card.id).then((s) => s && setWeb(s), () => {})
+    return off
+  }, [api, card.id])
+
+  // the editor runs while this card is one of the live ones. letting go saves first, the webview
+  // goes only after that (a still of it stays)
+  const pageRef = useRef(page)
+  pageRef.current = page
+  useEffect(() => {
+    if (!api) return
     let alive = true
-    const check = (): void => {
-      void api.dockState!(card.appId).then((value) => { if (alive) setDock(value) }, () => { if (alive) setDock('failed') })
+    if (wanted && !pageRef.current) {
+      setError('')
+      void api.webOpen(a.brand.id, card.id).then(
+        (p) => alive && setPage(p),
+        (err: unknown) => alive && setError(cleanError(err))
+      )
+    } else if (!wanted && pageRef.current) {
+      void (async () => {
+        const shot = await api.still(a.brand.id, card.id, null).catch(() => null)
+        if (shot) {
+          stills.set(card.id, shot)
+          setStill(shot)
+        }
+        try {
+          await api.webRelease(a.brand.id, card.id)
+          if (alive) setPage(null)
+        } catch (err) {
+          // it couldn't save: it stays open here so nothing is lost
+          if (alive) setError(cleanError(err))
+        }
+      })()
     }
-    check()
-    const timer = window.setInterval(check, 1000)
-    return () => { alive = false; clearInterval(timer) }
-  }, [live, suspended, card.appId])
+    return () => {
+      alive = false
+    }
+  }, [api, wanted, a.brand.id, card.id])
+
+  // the card going away (another chat) lets go too. autosave has kept the project current
+  useEffect(() => () => {
+    if (pageRef.current) void api?.webRelease(a.brand.id, card.id).catch(() => {})
+  }, [api, a.brand.id, card.id])
+
+  // the webview on the page: main finds its guest and loads the project into it
+  useEffect(() => {
+    const view = viewRef.current
+    if (!page || !view || !api) return
+    // it may have attached before this ran: try now, and again on the events (main ignores repeats)
+    const attach = (): void => {
+      let id: number
+      try {
+        id = view.getWebContentsId()
+      } catch {
+        return
+      }
+      void api.webAttach(a.brand.id, card.id, id).then((s) => s && setWeb(s), (err: unknown) => setError(cleanError(err)))
+    }
+    attach()
+    view.addEventListener('did-attach', attach)
+    view.addEventListener('dom-ready', attach)
+    return () => {
+      view.removeEventListener('did-attach', attach)
+      view.removeEventListener('dom-ready', attach)
+    }
+  }, [page, api, a.brand.id, card.id])
 
   // filling the chat, the plan bar above the messages folds away to give the editor the room
   useEffect(() => {
-    if (size !== 'fill' || !isOwner) return
+    if (size !== 'fill' || !page) return
     const root = document.documentElement
     root.dataset.embedFill = card.id
     return () => {
       if (root.dataset.embedFill === card.id) delete root.dataset.embedFill
     }
-  }, [size, isOwner, card.id])
+  }, [size, page, card.id])
 
-  // a still for when the window isn't here (and under it, for when it hides while scrolling)
+  // a still for when the editor isn't running here
   const lastAsk = useRef(0)
   useEffect(() => {
-    if (!api || cantRun || installKind === undefined || live) return
-    if (!runningHere && !isOwner && stills.has(card.id)) return
+    if (!api || cantRun || installKind === undefined || page) return
+    if (stills.has(card.id) && !card.updatedAt) return
     const wait = Math.max(0, 2500 - (Date.now() - lastAsk.current))
     const t = window.setTimeout(() => {
       lastAsk.current = Date.now()
@@ -132,7 +192,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     }, wait)
     return () => clearTimeout(t)
     // the card changes on every edit the agent makes
-  }, [api, card.id, card.updatedAt, isOwner, runningHere, cantRun, installKind, a.brand.id, live])
+  }, [api, card.id, card.updatedAt, cantRun, installKind, a.brand.id, page])
 
   // FilmCraft that can't run: the newest render plays here instead, as a preview
   useEffect(() => {
@@ -148,7 +208,6 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     const measure = (): void => {
       const stage = stageRef.current
       if (!stage) return
-      // the card's own rows above and below the stage, and a little air
       const chrome = size === 'fill'
         ? Math.max(40, stage.getBoundingClientRect().top - root.getBoundingClientRect().top)
         : root.getBoundingClientRect().height - stage.getBoundingClientRect().height
@@ -160,7 +219,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     ro.observe(root)
     if (sc) ro.observe(sc)
     return () => ro.disconnect()
-  }, [size, isOwner])
+  }, [size, page])
 
   const run = async (fn: () => Promise<{ ok: boolean; note: string } | void>): Promise<void> => {
     if (busy) return
@@ -178,37 +237,43 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     }
   }
 
+  // Open here: this card's editor runs (the oldest live one lets go if two are running)
   const openHere = (): Promise<void> =>
     run(async () => {
-      pinEmbed(card.id)
-      setBrowsing(false)
       setReviewFrame(null)
-      rootRef.current?.scrollIntoView({ block: 'start' })
-      if (runningHere) return
       if (cantRun) putCraft(await craftApi()!.install(card.appId))
+      if (inChat) {
+        pinEmbed(card.id)
+        return
+      }
       putCraft(await api!.open(a.brand.id, card.id))
     })
 
-  const pauseEditor = (annotate: boolean): Promise<void> => run(async () => {
-    if (!annotate) {
-      setBrowsing(true)
-      return
-    }
-    const frame = live ? await api!.still(a.brand.id, card.id, null) : still
-    if (frame) {
-      stills.set(card.id, frame)
-      setStill(frame)
-    }
-    if (annotate) {
-      if (!frame) throw new Error('The editor did not provide a frame. Wait for it to finish opening, then try again.')
-      setReviewFrame(frame)
-    }
-  })
+  const openFull = (): Promise<void> =>
+    run(async () => {
+      if (page) {
+        const shot = await api!.still(a.brand.id, card.id, null).catch(() => null)
+        if (shot) {
+          stills.set(card.id, shot)
+          setStill(shot)
+        }
+      }
+      putCraft(await api!.openFull(a.brand.id, card.id))
+      return { ok: true, note: `${card.appName} opened in its own window. Close it there to edit here again.` }
+    })
 
-  const scrollChat = (direction: number): void => {
-    const chat = scroller(rootRef.current)
-    chat?.scrollBy({ top: direction * chat.clientHeight * 0.75, behavior: 'smooth' })
-  }
+  const closeFull = (): Promise<void> =>
+    run(async () => {
+      await craftApi()!.close(card.appId)
+    })
+
+  const circle = (): Promise<void> => run(async () => {
+    const frame = page ? await api!.still(a.brand.id, card.id, null) : still
+    if (!frame) throw new Error('The editor did not provide a frame. Wait for it to finish opening, then try again.')
+    stills.set(card.id, frame)
+    setStill(frame)
+    setReviewFrame(frame)
+  })
 
   const onDrop = (e: DragEvent): void => {
     e.preventDefault()
@@ -232,10 +297,19 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   }
 
   const turn = card.turn
-  const canComment = card.appId === 'filmcraft' && runningHere
+  const canComment = card.appId === 'filmcraft' && (live || fullHere)
   const alts = card.alternatives
-  const autosave = runningHere ? status?.autosave : undefined
   const stageStyle = height ? { height } : undefined
+  const cover = !live || !page
+  const coverText = cantRun
+    ? installKind === 'failed' ? `${card.appName} couldn't be installed.` : `${card.appName} isn't installed.`
+    : fullHere
+      ? `${card.appName} is open in its own window. Close it there to edit here.`
+      : !inChat
+        ? `${card.appName} opens in its own window.`
+        : page
+          ? web?.state === 'failed' ? web.note : 'Opening the project...'
+          : still ? '' : `${card.appName} isn't running here. Two editors can run at once.`
 
   return (
     <article
@@ -263,19 +337,14 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
         </div>
       </header>
       <div className="cx-embed-controls">
-        {suspended ? (
-          <button type="button" onClick={() => void openHere()} disabled={busy}>Return to editor</button>
+        <button type="button" onClick={() => void circle()} disabled={busy || (!live && !still)}>Circle and comment</button>
+        {fullHere ? (
+          <button type="button" onClick={() => void closeFull()} disabled={busy}>Close the full app</button>
         ) : (
-          <button type="button" onClick={() => void pauseEditor(false)} disabled={busy || !live}>Browse chat</button>
+          <button type="button" onClick={() => void openFull()} disabled={busy || cantRun || status === undefined}>Open in the full app</button>
         )}
-        <button type="button" onClick={() => void pauseEditor(true)} disabled={busy || (!live && !still)}>Circle and comment</button>
-        <span className="muted">{suspended ? 'Editor paused in this view; your project stays open.' : 'Wheel inside the editor edits its view. Use the chat rail to scroll the conversation.'}</span>
+        <span className="muted" role="status">{page ? savedText(web) : ''}</span>
       </div>
-      {runningHere && (
-        <p className={`cx-card2-note${autosave?.state === 'error' ? ' cx-card2-error' : ''}`} role={autosave?.state === 'error' ? 'alert' : 'status'}>
-          {autosave?.state === 'saved' ? `Last recovery copy: ${new Date(autosave.savedAt!).toLocaleTimeString()}. New edits save every 30 seconds; up to 30 distinct snapshots are kept.` : autosave?.state === 'saving' ? 'Saving editor changes and a recovery copy...' : autosave?.state === 'ready' ? 'Autosave every 30 seconds, with copies before agent edits.' : autosave?.note || 'Autosave is not confirmed. Save in the editor until its bridge connects.'}
-        </p>
-      )}
       {card.note && <p className="cx-card2-body">{card.note}</p>}
 
       {reviewFrame ? (
@@ -292,40 +361,30 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
           />
         </div>
       ) : (
-        <div
-          ref={stageRef}
-          className={`cx-embed-stage${live ? ' is-live' : ''}`}
-          style={stageStyle}
-          aria-label={live ? `${card.appName}, live` : `${card.appName}, still`}
-        >
-          <div ref={nativeRef} className="cx-embed-native">
-          {still && <img className="cx-embed-still" src={still} alt="" />}
-          {(!live || suspended) && (
+        <div ref={stageRef} className={`cx-embed-stage${live ? ' is-live' : ''}`} style={stageStyle} aria-label={live ? `${card.appName}, live` : `${card.appName}, still`}>
+          {page && (
+            <webview
+              ref={viewRef as never}
+              className="cx-embed-web"
+              src={page.src}
+              partition={page.partition}
+              webpreferences="backgroundThrottling=no"
+              title={`${card.appName} editor`}
+            />
+          )}
+          {cover && still && <img className="cx-embed-still" src={still} alt="" />}
+          {cover && (
             <div className="cx-embed-cover">
-              {cantRun ? (
-                <span>{installKind === 'failed' ? `${card.appName} couldn't be installed.` : `${card.appName} isn't installed.`}</span>
-              ) : !still ? (
-                <span>{suspended ? 'Browsing the conversation. Your editor remains open.' : runningHere ? `${card.appName} is active elsewhere in this conversation. Use it here without reopening the project.` : `${card.appName} is not running for this project.`}</span>
-              ) : null}
-              <button type="button" className="primary" disabled={busy || installKind === 'installing' || status === undefined} onClick={() => void openHere()}>
-                {status === undefined ? 'Loading editor status' : installKind === 'installing' ? 'Installing' : cantRun ? `Install ${card.appName}` : runningHere ? 'Use editor here' : `Open ${card.appName}`}
-              </button>
+              {coverText && <span>{coverText}</span>}
+              {!page && !fullHere && (
+                <button type="button" className="primary" disabled={busy || installKind === 'installing' || status === undefined} onClick={() => void openHere()}>
+                  {status === undefined ? 'Loading editor status' : installKind === 'installing' ? 'Installing' : cantRun ? `Install ${card.appName}` : inChat ? 'Open here' : `Open ${card.appName}`}
+                </button>
+              )}
             </div>
           )}
-          {live && !suspended && dock !== 'docked' && (
-            <div className="cx-embed-cover" role="status">
-              <span>{dock === 'failed' ? 'This editor could not attach to the chat. Your editor remains open; do not close unsaved work.' : dock === 'unsupported' ? 'Native Craft hosting is supported on Windows only.' : dock === 'hidden' ? 'Editor is temporarily hidden while chat controls overlap it.' : 'Attaching the live editor...'}</span>
-            </div>
-          )}
-          </div>
-          <nav className="cx-embed-scroll-rail" aria-label="Scroll the chat beside the editor">
-            <button type="button" title="Scroll chat up" aria-label="Scroll chat up" onClick={() => scrollChat(-1)}>{'\u2191'}</button>
-            <span>Chat</span>
-            <button type="button" title="Scroll chat down" aria-label="Scroll chat down" onClick={() => scrollChat(1)}>{'\u2193'}</button>
-          </nav>
         </div>
       )}
-
 
       {alts && alts.items.length > 1 && (
         <div className="cx-embed-alts">

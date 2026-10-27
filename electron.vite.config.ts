@@ -76,7 +76,9 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/preload/index.ts'),
-          adblock: resolve('src/preload/adblock.ts')
+          adblock: resolve('src/preload/adblock.ts'),
+          // the Craft editors in the chat, see src/main/craft/web.ts
+          'craft-web': resolve('src/preload/craft-web.ts')
         }
       }
     }

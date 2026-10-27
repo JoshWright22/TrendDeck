@@ -2,16 +2,22 @@ import { protocol } from 'electron'
 import { createReadStream, promises as fs } from 'node:fs'
 import { Readable } from 'node:stream'
 import { MEDIA_SCHEME } from '@shared/media'
+import { CRAFT_WEB_SCHEME } from '@shared/craft-web'
 import { getLib, thumbPath, validId } from './library'
 import { servedPath } from '../cards/files'
 import { servedModelFile } from '../dictation/models'
 
-// has to run before the app is ready
+// has to run before the app is ready, and only once for every scheme: the Craft web builds'
+// craft-web: (main/craft/web.ts) is a secure origin so WebGPU, OPFS and cross-origin isolation work
 export function registerMediaScheme(): void {
   protocol.registerSchemesAsPrivileged([
     {
       scheme: MEDIA_SCHEME,
       privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true }
+    },
+    {
+      scheme: CRAFT_WEB_SCHEME,
+      privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true, codeCache: true }
     }
   ])
 }

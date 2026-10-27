@@ -72,6 +72,8 @@ export interface CraftOpenRequest {
   // a file in the project folder to open, or null for the project's main file of this app,
   // made empty on first open
   file?: string | null
+  // the desktop app in its own window instead of the editor in the chat
+  full?: boolean
 }
 
 // main -> renderer on 'craft:changed'

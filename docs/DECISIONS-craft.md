@@ -82,6 +82,10 @@ of it lives in `src/main/craft/`.
 
 ## Docking
 
+Replaced: the editors in the chat are the apps' web builds now (`DECISIONS-craft-web.md`), and the desktop
+app opens as a normal window of its own ("Open in the full app"). `dock.ts` is kept for closing windows and
+`npm run test:craft-native`; nothing docks by default. What follows is how docking worked.
+
 - The app stays its own process and its own top level window. Reparenting it as a child (`SetParent`)
   would tie the two message queues together, so a hung app would hang TrendDeck, and egui/winit apps
   don't expect to be children. Instead TrendDeck becomes its owner (`SetWindowLongPtrW(GWLP_HWNDPARENT)`):

@@ -1,7 +1,9 @@
 import { useSyncExternalStore } from 'react'
+import { MAX_LIVE, pickLive, webSpec } from '@shared/craft-web'
 
-// one live Craft app in the chat at a time: of the embeds you can see, the newest owns the docked
-// window and the others show a still. "Open here" on an older one makes it the newest for now
+// which Craft embeds in the chat run their editor: of the ones you can see, the newest (or the
+// one you asked for with Open here), at most MAX_LIVE and one per document. the others show a
+// still. one that runs keeps running while you can see any of it, so scrolling never reloads it
 
 interface Entry {
   id: string
@@ -16,18 +18,16 @@ interface Entry {
 const entries = new Map<string, Entry>()
 const requested = new Map<string, number>()
 const subs = new Set<() => void>()
-let owner: string | null = null
+let live: Set<string> = new Set()
 let version = 0
 
 function recompute(): void {
-  let best: Entry | null = null
-  for (const e of entries.values()) {
-    if (!e.visible) continue
-    if (!best || Math.max(e.at, e.pinned) > Math.max(best.at, best.pinned)) best = e
-  }
-  const next = best?.id ?? null
+  const cands = [...entries.values()]
+    .filter((e) => webSpec(e.appId))
+    .map((e) => ({ id: e.id, key: `${e.appId}|${e.projectId}`, visible: e.visible, rank: Math.max(e.at, e.pinned) }))
+  const next = pickLive(cands, live, MAX_LIVE)
   version += 1
-  owner = next
+  live = next
   for (const fn of subs) fn()
 }
 
@@ -64,8 +64,9 @@ const subscribe = (fn: () => void): (() => void) => {
   return () => subs.delete(fn)
 }
 
-export function useEmbedOwner(): string | null {
-  return useSyncExternalStore(subscribe, () => owner)
+// the embeds that run their editor now
+export function useLiveEmbeds(): ReadonlySet<string> {
+  return useSyncExternalStore(subscribe, () => live)
 }
 
 // re-renders on any change, for readers of embedFor

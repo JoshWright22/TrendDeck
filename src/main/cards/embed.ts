@@ -16,10 +16,11 @@ import {
 } from '@shared/craft-embed'
 import { ID_PATTERN } from '@shared/types'
 import { openApp } from '../craft'
-import { cachedTools, sessionOf, stopSession, waitForBridge } from '../craft/agent'
+import { webSpec } from '@shared/craft-web'
+import { cachedTools, pickFile, sessionOf, stopSession, waitForBridge } from '../craft/agent'
 import { APPS, fill, isAppId, spec } from '../craft/catalog'
-import { isShown } from '../craft/dock'
 import { runningApp } from '../craft/launch'
+import { attachWeb, cardForGuest, prepareWeb, releaseWeb, reloadWeb, webLiveOn, webReady, webState, webStill } from '../craft/web'
 import { appFiles, findProject, knownFolder, projectFolder } from '../craft/paths'
 import { isInside, PathError, resolveInProject, safeName, uniqueName } from '../craft/rules'
 import { liveOf, status } from '../craft/state'
@@ -34,8 +35,8 @@ import { addCard, changeCard, getCard, listCards, newCardId } from './store'
 import { projectOf } from './tools'
 
 // a live Craft editor in the chat: the agent posts one with craft_embed (or its edits in a reply
-// make one), the window docks the real app over it. see @shared/craft-embed and
-// docs/DECISIONS-craft-embed.md
+// make one), the card hosts the app's web build (craft/web.ts). see @shared/craft-embed,
+// @shared/craft-web and docs/DECISIONS-craft-web.md
 
 export interface Where {
   brandId: string
@@ -58,8 +59,9 @@ export async function currentFile(appId: string, brandId: string, projectId: str
   return files.length ? join(folder, files[0].name) : null
 }
 
-// the app has this project open, in its window or headless
-export function liveOn(appId: string, brandId: string, projectId: string): 'window' | 'headless' | null {
+// the app has this project open: in the chat (its web build), its own window, or headless
+export function liveOn(appId: string, brandId: string, projectId: string): 'web' | 'window' | 'headless' | null {
+  if (webLiveOn(appId, brandId, projectId)) return 'web'
   const run = runningApp(appId)
   if (run && run.brandId === brandId && run.projectId === projectId) return 'window'
   const s = sessionOf(appId)
@@ -169,6 +171,16 @@ export async function restoreFile(brandId: string, projectId: string, appId: str
   const name = spec(appId).name
   const live = liveOn(appId, brandId, projectId)
   const run = runningApp(appId)
+  if (live === 'web') {
+    await fs.copyFile(target, `${copy}.before-undo`).catch(() => {})
+    await fs.copyFile(copy, target)
+    try {
+      await reloadWeb(appId, brandId, projectId)
+    } catch {
+      return { ok: false, note: `The file is back on disk, but ${name} in the chat didn't show it. Open it here again.` }
+    }
+    return { ok: true, note: '' }
+  }
   if (live === 'window' && run?.file && run.file.toLowerCase() !== target.toLowerCase()) return { ok: false, note: `${name} has another file of this project open.` }
   if (live === 'window' && appId !== 'filmcraft') return { ok: false, note: `Close ${name}, then undo again. It can't reload the file while it's open.` }
   // what's there now goes aside, so an undo can be taken back by hand
@@ -218,10 +230,14 @@ async function still(card: CraftEmbedCard, seconds: number | null): Promise<stri
   const run = runningApp(card.appId)
   // the app is busy with another project, nothing to show without taking it away
   if (run && (run.brandId !== card.brandId || run.projectId !== card.projectId)) return null
+  // the editor in this card as it looks now
+  if (seconds === null) {
+    const shot = await webStill(card.id).catch(() => null)
+    if (shot) return shot
+  }
   const window = liveOn(card.appId, card.brandId, card.projectId) === 'window'
-  // the whole window as it was docked, so a hidden window leaves the same picture behind. only while
-  // it's on screen, a hidden one has no frame to take
-  if (seconds === null && window && isShown(card.appId) && hasTool(card.appId, 'ui_screenshot')) {
+  // the full app's window as it looks now
+  if (seconds === null && window && hasTool(card.appId, 'ui_screenshot')) {
     const shot = await appCall(card.brandId, card.projectId, card.appId, 'ui_screenshot', { max_side: 1600 }, { needsWindow: true, timeoutMs: 15_000 })
       .then(imageOf)
       .catch(() => null)
@@ -337,8 +353,9 @@ export function embedTools(): GatewayTool[] {
         } catch (err) {
           throw new ToolError(err instanceof Error ? err.message : String(err))
         }
-        if (spec(appId).agent && spec(appId).bridgeArgs) await waitForBridge(appId)
-        const notes = await applyFocus(turn.brandId, project.id, appId, focus)
+        if (spec(appId).agent && spec(appId).bridgeArgs && !webSpec(appId)) await waitForBridge(appId)
+        // an editor in the chat takes the focus when it has loaded, see embed:web-attach
+        const notes = liveOn(appId, turn.brandId, project.id) ? await applyFocus(turn.brandId, project.id, appId, focus) : []
         let alternatives: CraftEmbedCard['alternatives'] = null
         const alts = (args.alternatives as EmbedAlternative[] | undefined) ?? []
         if (alts.length) {
@@ -444,10 +461,50 @@ export function setupEmbeds(deps: { addToProject: (brandId: string, projectId: s
     if (!fromApp(e) || !isId(brandId) || !isCardId(cardId)) bad()
     const card = await embedCard(brandId, cardId)
     const s = await openApp({ appId: card.appId, brandId, projectId: card.projectId, file: card.file })
-    if (spec(card.appId).agent && spec(card.appId).bridgeArgs) {
+    if (!webSpec(card.appId) && spec(card.appId).agent && spec(card.appId).bridgeArgs) {
       void waitForBridge(card.appId).then((ok) => (ok ? applyFocus(brandId, card.projectId, card.appId, card.focus) : null)).catch(() => {})
     }
     return s
+  })
+  // the card shows the app's web build: the page and session to load, then the guest it made
+  ipcMain.handle('embed:web-open', async (e, brandId: unknown, cardId: unknown) => {
+    if (!fromApp(e) || !isId(brandId) || !isCardId(cardId)) bad()
+    const card = await embedCard(brandId, cardId)
+    if (!webSpec(card.appId)) throw new Error(`${card.appName} opens in the full app`)
+    await openApp({ appId: card.appId, brandId, projectId: card.projectId, file: card.file })
+    const folder = await projectFolder(brandId, card.projectId)
+    const { project } = findProject(brandId, card.projectId)
+    const file = await pickFile(card.appId, folder, project.name, card.file)
+    if (file && !card.file) await changeCard(brandId, card.id, (c) => { if (c.type === 'craft') c.file = basename(file) })
+    return prepareWeb({ cardId, appId: card.appId, brandId, projectId: card.projectId, folder, file, where: { brandId, threadId: card.threadId, messageId: card.messageId } })
+  })
+  ipcMain.handle('embed:web-attach', async (e, brandId: unknown, cardId: unknown, guestId: unknown) => {
+    if (!fromApp(e) || !isId(brandId) || !isCardId(cardId) || typeof guestId !== 'number') bad()
+    const card = await embedCard(brandId, cardId)
+    attachWeb(cardId, guestId, e.sender)
+    void webReady(cardId).then(() => applyFocus(brandId, card.projectId, card.appId, card.focus)).catch(() => {})
+    return webState(cardId)
+  })
+  ipcMain.handle('embed:web-release', async (e, brandId: unknown, cardId: unknown) => {
+    if (!fromApp(e) || !isId(brandId) || !isCardId(cardId)) bad()
+    await releaseWeb(cardId)
+  })
+  ipcMain.handle('embed:web-state', (e, cardId: unknown) => {
+    if (!fromApp(e) || !isCardId(cardId)) bad()
+    return webState(cardId)
+  })
+  ipcMain.handle('embed:open-full', async (e, brandId: unknown, cardId: unknown) => {
+    if (!fromApp(e) || !isId(brandId) || !isCardId(cardId)) bad()
+    const card = await embedCard(brandId, cardId)
+    return openApp({ appId: card.appId, brandId, projectId: card.projectId, file: card.file, full: true })
+  })
+  // files dropped on FilmCraft in a card (its preload sends them) go into the project like a drop on the card
+  ipcMain.on('craft-web:drop', (e, paths: unknown) => {
+    const at = cardForGuest(e.sender.id)
+    if (!at || !Array.isArray(paths)) return
+    void getCard(at.brandId, at.cardId)
+      .then((c) => (c && c.type === 'craft' ? importPaths(c, paths.filter((p): p is string => typeof p === 'string')) : null))
+      .catch((err) => console.error('craft: dropped files were not added', err))
   })
   ipcMain.handle('embed:still', async (e, brandId: unknown, cardId: unknown, seconds: unknown) => {
     if (!fromApp(e) || !isId(brandId) || !isCardId(cardId)) bad()
@@ -534,7 +591,8 @@ export function setupEmbeds(deps: { addToProject: (brandId: string, projectId: s
     try {
       await command(brandId, card.projectId, 'filmcraft', 'sequence.open', { item: sequence })
       await command(brandId, card.projectId, 'filmcraft', 'project.delete', { items: others }, true)
-      if (liveOn(card.appId, brandId, card.projectId) === 'window') await command(brandId, card.projectId, 'filmcraft', 'file.save').catch(() => {})
+      const live = liveOn(card.appId, brandId, card.projectId)
+      if (live === 'window' || live === 'web') await command(brandId, card.projectId, 'filmcraft', 'file.save').catch(() => {})
     } catch (err) {
       return { ok: false, note: `FilmCraft didn't remove the other versions: ${message(err)}` }
     }

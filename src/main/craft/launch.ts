@@ -2,14 +2,15 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { createServer } from 'node:net'
 import { spec } from './catalog'
-import { askClose, attach, forget, release } from './dock'
+import { askClose, forget, release } from './dock'
 import { applyStaged, installed } from './install'
 import { setLive } from './state'
 import { projectOperation, snapshotFile } from './recovery'
 
-// one window per app. it's started with a loopback control port and a fresh token in its
-// environment: the token lives in main only, the renderer and the agent never see it.
-// the agent's bridge (mcp.ts) inherits it the same way
+// one window per app, "Open in the full app": a normal window of its own next to TrendDeck (the
+// editors in the chat are the apps' web builds, see web.ts). it's started with a loopback control
+// port and a fresh token in its environment: the token lives in main only, the renderer and the
+// agent never see it. the agent's bridge (mcp.ts) inherits it the same way
 
 export interface Running {
   appId: string
@@ -103,7 +104,6 @@ export async function launch(opts: { appId: string; brandId: string; projectId: 
     void applyStaged(opts.appId)
     done()
   })
-  attach(opts.appId, pid)
   setLive(opts.appId, {
     running: true, brandId: opts.brandId, projectId: opts.projectId, file: opts.file,
     autosave: { state: 'unavailable', savedAt: null, note: s.bridgeArgs && s.save && opts.file

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { ChatCard } from '@shared/cards'
 import { ContentMapCard, PostMortemCard } from './ContentMapCards'
 import CraftEmbed from './CraftEmbed'
+import CraftJobCard from './CraftJobCard'
 import { BrandFileCard, RuleCard } from './MemoryCards'
 import ObsCard from './ObsCard'
 import ScriptCard from './ScriptCard'
@@ -39,6 +40,8 @@ function Card({ c, a }: { c: ChatCard; a: CardActions }): ReactNode {
       return <ContentMapCard card={c} a={a} />
     case 'post-mortem':
       return <PostMortemCard card={c} a={a} />
+    case 'craft-job':
+      return <CraftJobCard card={c} a={a} />
   }
 }
 

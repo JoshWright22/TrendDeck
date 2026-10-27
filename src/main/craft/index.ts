@@ -1,28 +1,40 @@
 import { app, dialog, ipcMain, type BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron'
 import type { CraftAppStatus, CraftDock, CraftOpenRequest } from '@shared/craft'
+import { webSpec } from '@shared/craft-web'
 import { registerToolSource } from '../gateway/call'
 import { registerSecretSource } from '../gateway/secrets'
 import { loadAllToolCaches, loadToolCache, pickFile, setupAgentSessions, stopAllSessions, stopSession } from './agent'
 import { isAppId, spec } from './catalog'
 import { dockState, setDock, setHost } from './dock'
-import { checkUpdates, installLatest, loadInstalled, setRunningCheck, startUpdateChecks, uninstall } from './install'
+import { checkUpdates, ensureWeb, installLatest, loadInstalled, setRunningCheck, startUpdateChecks, uninstall } from './install'
 import { close, closeAllForQuit, controlTokens, isRunning, launch, runningApp } from './launch'
 import { appFiles, findProject, knownFolder, projectFolder } from './paths'
 import { resolveInProject } from './rules'
 import { allStatus, liveOf, onChanged, status } from './state'
 import { craftAppTools, craftTools, setupCraftTurns } from './tools'
+import { hasWebEmbeds, releaseAllWeb, releaseWeb, setupWebSession, webEmbedOn } from './web'
 
-// the Craft App Suite: install, open docked over the workspace, and the agent's tools.
-// see docs/DECISIONS-craft.md
+// the Craft App Suite: install, open in the chat (the apps' web builds, web.ts) or as the full app
+// in its own window, and the agent's tools. see docs/DECISIONS-craft.md and DECISIONS-craft-web.md
 
-// installs if needed, then opens the app on the project's file. an app open on something else
-// is asked to close first (it can ask to save), a headless engine on it saves and stops
+// installs if needed, then makes the app ready on the project's file. an app with a web build opens
+// in the chat: the card that shows it loads the project, so here it's only installed and the file
+// made. full (or an app without one) opens the desktop app in its own window: an editor in the chat
+// on that project saves and lets go first, an app open on something else is asked to close (it can
+// ask to save), a headless engine on it saves and stops
 export async function openApp(req: CraftOpenRequest): Promise<CraftAppStatus> {
   const { appId, brandId, projectId } = req
   if (!isAppId(appId)) throw new Error('no craft app with that id')
   const { project } = findProject(brandId, projectId)
   if (liveOf(appId).install.kind !== 'installed') await installLatest(appId)
   const folder = await projectFolder(brandId, projectId)
+  if (webSpec(appId) && !req.full) {
+    await ensureWeb(appId)
+    await pickFile(appId, folder, project.name, req.file ?? null)
+    return status(appId)
+  }
+  const inChat = webEmbedOn(appId, brandId, projectId)
+  if (inChat) await releaseWeb(inChat)
   const asked = req.file ? resolveInProject(folder, req.file) : null
   const run = runningApp(appId)
   if (run && run.brandId === brandId && run.projectId === projectId && (!asked || asked.toLowerCase() === run.file?.toLowerCase())) {
@@ -100,7 +112,7 @@ export function setupCraft(): void {
     if (!fromApp(e) || !req || typeof req !== 'object') throw new Error('bad craft call')
     const r = req as Partial<CraftOpenRequest>
     if (typeof r.brandId !== 'string' || typeof r.projectId !== 'string') throw new Error('bad craft call')
-    return openApp({ appId: appIdOf(r.appId), brandId: r.brandId, projectId: r.projectId, file: typeof r.file === 'string' ? r.file : null })
+    return openApp({ appId: appIdOf(r.appId), brandId: r.brandId, projectId: r.projectId, file: typeof r.file === 'string' ? r.file : null, full: r.full === true })
   })
   ipcMain.handle('craft:close', async (e, appId: unknown) => {
     if (!fromApp(e)) throw new Error('bad craft call')
@@ -130,6 +142,7 @@ export function setupCraft(): void {
   })
 
   void app.whenReady().then(async () => {
+    setupWebSession()
     await loadInstalled().catch((err) => console.error('craft: loading installs failed', err))
     void loadAllToolCaches()
     startUpdateChecks()
@@ -139,11 +152,11 @@ export function setupCraft(): void {
   // engines. one that stays open (its save prompt is up) is left running on its own
   app.on('before-quit', (e) => {
     if (quitting) return
-    const anyOpen = allStatus().some((s) => s.running || s.agent !== 'off')
+    const anyOpen = allStatus().some((s) => s.running || s.agent !== 'off') || hasWebEmbeds()
     if (!anyOpen) return
     e.preventDefault()
     quitting = true
-    void closeAllForQuit().then(async () => {
+    void releaseAllWeb().then(() => closeAllForQuit()).then(async () => {
       await stopAllSessions()
       app.quit()
     }).catch((error) => {

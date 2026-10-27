@@ -11,6 +11,9 @@ Calls made while moving review, suggestions, progress, storage and context into 
 
 ## Native editor containment and sizing
 
+Replaced by `DECISIONS-craft-web.md`: the cards host the apps' web builds as part of the page. What follows is
+the native hosting it replaced.
+
 - On Windows the Craft editor is now reparented with `SetParent` and `WS_CHILD`, rather than kept as a floating owned top-level window. It remains a separate native application, not an HTML/iframe editor. Unsupported native hosting must not be described as a web embed.
 - The active editor defaults to **Whole chat**: the message column's width cap is removed, the stage uses the chat viewport's available height, and the composer remains below it. Inline/Large remain optional. Editor windows are resized, not stretched from a video-shaped screenshot.
 - Inactive cards do not install dock observers. Native stray-window enumeration is throttled, live editing does not trigger still captures, and message entrance transforms are disabled around native editor surfaces.
