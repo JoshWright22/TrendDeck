@@ -68,10 +68,16 @@ export const OBS_TOOLS: GatewayTool[] = [
   },
   {
     name: 'obs_show', title: 'Show OBS in the chat', risk: 'read',
-    description: 'Puts the OBS card in the chat before or after recording: connection, a live preview, scene picker, Record and Stop, and recent takes. Works even when disconnected so the user can see setup guidance. Does not start recording or streaming; the user can record from the card themselves.',
+    description: "Puts the OBS card in the chat when the user is about to record or wants to see takes: a live preview, scene picker, Record and Stop, and recent takes. Only once OBS is connected, it refuses otherwise. Does not start recording or streaming; the user can record from the card themselves.",
     inputSchema: projectSchema,
     run: async (turn, args) => {
       const project = projectOf(turn, args.projectId)
+      // a card that can only say "not connected" is noise in the chat, setup comes first
+      try {
+        await obsScenes(turn.brandId)
+      } catch {
+        throw new ToolError("OBS isn't connected, so there's nothing to show yet. Help the user set it up first (OBS running, its WebSocket server on, the password imported in Settings, OBS), then show it once obs_status says it's connected")
+      }
       const now = Date.now()
       const card: ObsCard = { id: newCardId(), brandId: turn.brandId, threadId: turn.threadId, messageId: turn.messageId ?? null, at: now, updatedAt: now, type: 'obs', projectId: project.id }
       await addCard(card)

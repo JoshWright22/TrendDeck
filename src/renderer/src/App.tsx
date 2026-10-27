@@ -430,7 +430,6 @@ export default function App(): ReactNode {
                 headerRight={wsToggle}
                 project={project ?? undefined}
                 linkedProjects={linked}
-                onInlineCraft={() => setPane((current) => current.collapsed ? current : { ...current, collapsed: true })}
               />
             </Suspense>
           )}

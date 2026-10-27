@@ -27,7 +27,6 @@ import Markdown from './Markdown'
 import { EmbedCard, type EmbedActions } from './Embeds'
 import MediaReview from './MediaReview'
 import CardList from './cards/CardList'
-import EmbedPicker from './cards/EmbedPicker'
 import { useCards, type CardActions } from './cards/useCards'
 import ComposerMic from './ComposerMic'
 import TakeRecorder from './TakeRecorder'
@@ -75,7 +74,6 @@ interface Props {
   project?: Project
   // every video the chat is linked to, each gets a progress row
   linkedProjects?: Project[]
-  onInlineCraft?: () => void
 }
 
 // talking modes for the composer: what you say goes to the agent with this ask in front
@@ -202,8 +200,7 @@ export default function ChatView({
   context,
   headerRight,
   project,
-  linkedProjects = [],
-  onInlineCraft
+  linkedProjects = []
 }: Props): ReactNode {
   const [agents, setAgents] = useState<AgentInfo[] | null>(null)
   const [config, setConfig] = useState<AgentConfig>({ defaultAgentId: null, custom: [], accounts: [], rank: [], autoOff: [] })
@@ -1091,7 +1088,6 @@ export default function ChatView({
             {context && <span className="cx-head-context" title={`Linked to ${context}`}>{context}</span>}
           </h2>
           <span className="spacer" />
-          {project && <EmbedPicker brandId={brand.id} threadId={thread?.id ?? null} project={project} onOpened={onInlineCraft} />}
           {headerRight}
         </header>
 
@@ -1347,7 +1343,6 @@ export default function ChatView({
                     disabled: takeBusy || dictation.state !== 'idle',
                     divider: true
                   },
-                  ...(project ? [{ label: 'Show OBS in the chat', onSelect: () => openId && void window.trenddeckObs.showCard(brandId, openId, project.id).catch((err: unknown) => setError(cleanError(err))), disabled: !openId }] : [])
                 ]}
               />
               <Dropdown

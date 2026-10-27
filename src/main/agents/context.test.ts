@@ -14,7 +14,7 @@ describe('recording workflow context', () => {
     const context = await brandContext(brand)
     for (const instruction of [
       'Ordinary dictation updates the draft', 'enabled hands-free mode sends it', 'Dictation does not create a take',
-      'rather than assuming a dump exists', 'Settings, Dictation', 'obs_show', 'even before a take exists',
+      'rather than assuming a dump exists', 'Settings, Dictation', 'obs_show', 'only when it helps the step',
       'take_list', 'take_get', 'take_show creates a new take card for analysis, not a new recording',
       'never bypass it', 'Never start capture or send audio to a remote service without permission',
       'only use it when the creator permits sharing that view', 'never ask for OBS passwords or stream keys in chat',
