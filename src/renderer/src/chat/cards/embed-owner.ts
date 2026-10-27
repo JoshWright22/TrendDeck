@@ -14,6 +14,7 @@ interface Entry {
 }
 
 const entries = new Map<string, Entry>()
+const requested = new Map<string, number>()
 const subs = new Set<() => void>()
 let owner: string | null = null
 let version = 0
@@ -31,7 +32,8 @@ function recompute(): void {
 }
 
 export function registerEmbed(id: string, appId: string, appName: string, projectId: string, at: number): () => void {
-  entries.set(id, { id, appId, appName, projectId, at, pinned: entries.get(id)?.pinned ?? 0, visible: false })
+  entries.set(id, { id, appId, appName, projectId, at, pinned: requested.get(id) ?? entries.get(id)?.pinned ?? 0, visible: false })
+  requested.delete(id)
   recompute()
   return () => {
     entries.delete(id)
@@ -48,7 +50,11 @@ export function setEmbedVisible(id: string, visible: boolean): void {
 
 export function pinEmbed(id: string): void {
   const e = entries.get(id)
-  if (!e) return
+  if (!e) {
+    requested.set(id, Date.now())
+    if (requested.size > 50) requested.delete(requested.keys().next().value!)
+    return
+  }
   e.pinned = Date.now()
   recompute()
 }

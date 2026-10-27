@@ -34,6 +34,11 @@ export interface CraftAppStatus {
   file: string | null
   // the agent's MCP connection to it
   agent: 'off' | 'headless' | 'bridge' | 'error'
+  autosave?: {
+    state: 'ready' | 'saving' | 'saved' | 'unavailable' | 'error'
+    savedAt: number | null
+    note: string
+  }
 }
 
 // where the renderer wants an app's window: the workspace pane, in css pixels of the TrendDeck
@@ -47,6 +52,8 @@ export interface CraftDock {
   // view. the app's window keeps its full size and is cut to this. null or left out: all of it
   clip?: { x: number; y: number; width: number; height: number } | null
 }
+
+export type CraftDockState = 'waiting' | 'docked' | 'hidden' | 'failed' | 'unsupported'
 
 export function craftBelongsTo(
   status: Pick<CraftAppStatus, 'running' | 'brandId' | 'projectId'>,
@@ -81,6 +88,7 @@ export interface CraftApi {
   close(appId: string): Promise<void>
   // sent whenever the workspace pane moves, resizes, shows or hides
   dock(d: CraftDock): void
+  dockState?(appId: string): Promise<CraftDockState>
   // the project folder's files for this app, newest first, names only
   files(brandId: string, projectId: string, appId: string): Promise<{ name: string; modified: number }[]>
   checkUpdates(): Promise<CraftAppStatus[]>

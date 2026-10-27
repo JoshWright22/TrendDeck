@@ -43,7 +43,7 @@ function activeLocal(config: DictationConfig, state: LocalModelsState): ActiveLo
     const d = status.downloading.find((x) => x.dtype === prefs.dtype)!
     return `${info.label} is downloading (${d.total ? Math.floor((d.received / d.total) * 100) : 0}%).`
   }
-  if (!status?.installed.includes(prefs.dtype)) return `Download ${info.label} in Settings, Dictation.`
+  if (!status?.installed.includes(prefs.dtype)) return `Set up dictation in Settings, Dictation: download ${info.label} or choose another configured source.`
   const v = info.variants[prefs.dtype]!
   return {
     info,

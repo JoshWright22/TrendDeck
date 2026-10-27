@@ -260,6 +260,7 @@ export default function ChatView({
   const dictated = useRef<{ t: Transcription; offset: number }[]>([])
   const [talkMode, setTalkMode] = useState<TalkMode | null>(null)
   const [recording, setRecording] = useState(false)
+  const [takeBusy, setTakeBusy] = useState(false)
   const [memory, setMemory] = useState<BrandMemoryState | null>(null)
 
   const loadAgents = useCallback(async (rescan = false) => {
@@ -436,6 +437,10 @@ export default function ChatView({
     listEnd.current?.scrollIntoView({ block: 'end' })
   }
   useEffect(() => {
+    if (document.documentElement.dataset.embedFill) {
+      setFollowing(false)
+      return
+    }
     if (following) listEnd.current?.scrollIntoView({ block: 'end' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread?.messages.length, lastSize])
@@ -1179,6 +1184,7 @@ export default function ChatView({
                     setRecording(false)
                   }}
                   onSaved={() => setRecording(false)}
+                  onBusyChange={setTakeBusy}
                 />
               </div>
             )}
@@ -1286,16 +1292,18 @@ export default function ChatView({
               >
                 <ClipIcon />
               </button>
-              <ComposerMic d={dictation} disabled={!agentId || !!approval} />
+              <ComposerMic d={dictation} disabled={!agentId || !!approval || recording} />
               <button
                 type="button"
                 className={`ui-menu-btn${recording ? ' on' : ''}`}
-                title={project ? 'Record a take for this project' : 'Record a take'}
+                title={takeBusy ? 'Stop and save or discard this take before closing' : dictation.state !== 'idle' ? 'Finish dictating before recording footage' : project ? 'Record footage for this project, preview, then save for the agent' : 'Record footage, preview, then attach it to your message'}
                 aria-label="Record a take"
                 aria-expanded={recording}
+                disabled={takeBusy || dictation.state !== 'idle'}
                 onClick={() => setRecording(!recording)}
               >
                 <RecordIcon />
+                <span>Take</span>
               </button>
               {project && (
                 <button
@@ -1307,6 +1315,7 @@ export default function ChatView({
                   onClick={() => openId && void window.trenddeckObs.showCard(brandId, openId, project.id).catch((err: unknown) => setError(cleanError(err)))}
                 >
                   <ObsIcon />
+                  <span>OBS</span>
                 </button>
               )}
               <span className="spacer" />

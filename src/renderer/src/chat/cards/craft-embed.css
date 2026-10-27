@@ -223,6 +223,67 @@ html[data-embed-fill] .cx-column {
   padding: 0 0 12px;
 }
 
+.cx-column > :has(.cx-embed) {
+  content-visibility: visible;
+  contain: none;
+}
+
+.cx-messages:has(.cx-embed) {
+  scrollbar-gutter: stable;
+  overflow-anchor: none;
+}
+
+html[data-embed-fill] .cx-jump {
+  position: static;
+  flex: none;
+  align-self: center;
+  margin: 4px auto;
+  transform: none;
+  animation: none;
+}
+
+.cx-embed-native {
+  position: absolute;
+  inset: 0 34px 0 0;
+  overflow: hidden;
+}
+
+.cx-embed-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.cx-embed-controls .muted {
+  flex: 1 1 220px;
+  font-size: 12px;
+}
+
+.cx-embed-scroll-rail {
+  position: absolute;
+  inset: 0 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  width: 34px;
+  padding: 6px 0;
+  background: var(--panel);
+  color: var(--smoke);
+}
+
+.cx-embed-scroll-rail span {
+  writing-mode: vertical-rl;
+  font-size: 11px;
+}
+
+.cx-card2 .cx-embed-scroll-rail button {
+  min-width: 28px;
+  padding: 6px;
+}
+
 .cx-msg:has(.cx-embed),
 .cx-msg-agent-wrap:has(.cx-embed) {
   animation: none;

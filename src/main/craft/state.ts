@@ -13,6 +13,7 @@ interface Live {
   projectId: string | null
   file: string | null
   agent: CraftAppStatus['agent']
+  autosave: CraftAppStatus['autosave']
 }
 
 const live = new Map<string, Live>()
@@ -20,7 +21,7 @@ const live = new Map<string, Live>()
 function get(id: string): Live {
   let l = live.get(id)
   if (!l) {
-    l = { install: { kind: 'not-installed' }, latest: null, updateReady: null, running: false, brandId: null, projectId: null, file: null, agent: 'off' }
+    l = { install: { kind: 'not-installed' }, latest: null, updateReady: null, running: false, brandId: null, projectId: null, file: null, agent: 'off', autosave: undefined }
     live.set(id, l)
   }
   return l
@@ -47,7 +48,8 @@ export function status(id: string): CraftAppStatus {
     brandId: l.brandId,
     projectId: l.projectId,
     file: l.file,
-    agent: l.agent
+    agent: l.agent,
+    autosave: l.running && l.agent !== 'headless' ? l.autosave : undefined
   }
 }
 

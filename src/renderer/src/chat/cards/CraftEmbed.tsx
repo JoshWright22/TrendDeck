@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react'
 import type { CraftEmbedCard, ProjectFileRef } from '@shared/cards'
+import type { CraftDockState } from '@shared/craft'
 import { stageHeight, type EmbedSize } from '@shared/craft-embed'
 import { craftApi, putCraft, useCraftApp } from '../../workspace/craft/store'
 import { useDock } from '../../workspace/craft/useDock'
 import VideoReview from '../VideoReview'
 import CraftTimelineReview from './CraftTimelineReview'
+import CraftVisualReview from './CraftVisualReview'
 import { pinEmbed, registerEmbed, setEmbedVisible, useEmbedOwner } from './embed-owner'
 import { cleanError, type CardActions } from './useCards'
 import { sendReview } from './VideoCard'
@@ -39,6 +41,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   const owner = useEmbedOwner()
   const rootRef = useRef<HTMLElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
+  const nativeRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState<EmbedSize>('fill')
   const [height, setHeight] = useState(0)
   const [still, setStill] = useState<string | null>(stills.get(card.id) ?? null)
@@ -46,6 +49,9 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   const [error, setError] = useState('')
   const [note, setNote] = useState('')
   const [commenting, setCommenting] = useState(false)
+  const [browsing, setBrowsing] = useState(false)
+  const [reviewFrame, setReviewFrame] = useState<string | null>(null)
+  const [dock, setDock] = useState<CraftDockState>('waiting')
   const [dropping, setDropping] = useState(false)
   const [preview, setPreview] = useState<ProjectFileRef | null | undefined>(undefined)
   const project = a.brand.projects.find((p) => p.id === card.projectId)
@@ -54,9 +60,10 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     !!status?.running &&
     status.brandId === a.brand.id &&
     status.projectId === card.projectId &&
-    (!card.file || !status.file || fileName(status.file)?.toLowerCase() === card.file.toLowerCase())
+    (!card.file || !status.file || fileName(status.file)?.toLowerCase() === fileName(card.file)?.toLowerCase())
   const isOwner = owner === card.id
   const live = isOwner && runningHere
+  const suspended = browsing || reviewFrame !== null
   const installKind = status?.install.kind
   const cantRun = installKind === 'not-installed' || installKind === 'failed'
 
@@ -68,13 +75,11 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     if (!el) return
     // mostly in view, or a good piece of a tall one. a short chat (big display scaling, a small
     // window) counts most of what it shows as a good piece
-    const sc = scroller(el)
     const io = new IntersectionObserver(
       ([entry]) => {
-        const piece = Math.min(320, (sc?.clientHeight ?? window.innerHeight) * 0.6)
-        setEmbedVisible(card.id, entry.isIntersecting && (entry.intersectionRatio >= 0.4 || entry.intersectionRect.height >= piece))
+        setEmbedVisible(card.id, entry.isIntersecting && entry.intersectionRect.height > 0)
       },
-      { threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.6, 0.8, 1] }
+      { threshold: [0, 0.01] }
     )
     io.observe(el)
     return () => {
@@ -83,7 +88,20 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     }
   }, [card.id])
 
-  useDock(card.appId, stageRef, live, 2)
+  useDock(card.appId, nativeRef, live, 2, suspended)
+
+  useEffect(() => {
+    if (!live || suspended) return
+    const api = craftApi()
+    if (!api?.dockState) return
+    let alive = true
+    const check = (): void => {
+      void api.dockState!(card.appId).then((value) => { if (alive) setDock(value) }, () => { if (alive) setDock('failed') })
+    }
+    check()
+    const timer = window.setInterval(check, 1000)
+    return () => { alive = false; clearInterval(timer) }
+  }, [live, suspended, card.appId])
 
   // filling the chat, the plan bar above the messages folds away to give the editor the room
   useEffect(() => {
@@ -132,13 +150,12 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
       if (!stage) return
       // the card's own rows above and below the stage, and a little air
       const chrome = size === 'fill'
-        ? (root.querySelector('.cx-embed-head-row')?.getBoundingClientRect().height ?? 40)
+        ? Math.max(40, stage.getBoundingClientRect().top - root.getBoundingClientRect().top)
         : root.getBoundingClientRect().height - stage.getBoundingClientRect().height
       const room = Math.max(1, (sc?.clientHeight ?? window.innerHeight) - chrome - 24)
       setHeight(stageHeight(size, stage.getBoundingClientRect().width, room))
     }
     measure()
-    if (size !== 'inline' && isOwner) root.scrollIntoView({ block: 'start' })
     const ro = new ResizeObserver(measure)
     ro.observe(root)
     if (sc) ro.observe(sc)
@@ -164,10 +181,34 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   const openHere = (): Promise<void> =>
     run(async () => {
       pinEmbed(card.id)
+      setBrowsing(false)
+      setReviewFrame(null)
+      rootRef.current?.scrollIntoView({ block: 'start' })
       if (runningHere) return
       if (cantRun) putCraft(await craftApi()!.install(card.appId))
       putCraft(await api!.open(a.brand.id, card.id))
     })
+
+  const pauseEditor = (annotate: boolean): Promise<void> => run(async () => {
+    if (!annotate) {
+      setBrowsing(true)
+      return
+    }
+    const frame = live ? await api!.still(a.brand.id, card.id, null) : still
+    if (frame) {
+      stills.set(card.id, frame)
+      setStill(frame)
+    }
+    if (annotate) {
+      if (!frame) throw new Error('The editor did not provide a frame. Wait for it to finish opening, then try again.')
+      setReviewFrame(frame)
+    }
+  })
+
+  const scrollChat = (direction: number): void => {
+    const chat = scroller(rootRef.current)
+    chat?.scrollBy({ top: direction * chat.clientHeight * 0.75, behavior: 'smooth' })
+  }
 
   const onDrop = (e: DragEvent): void => {
     e.preventDefault()
@@ -193,6 +234,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   const turn = card.turn
   const canComment = card.appId === 'filmcraft' && runningHere
   const alts = card.alternatives
+  const autosave = runningHere ? status?.autosave : undefined
   const stageStyle = height ? { height } : undefined
 
   return (
@@ -220,9 +262,25 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
           ))}
         </div>
       </header>
+      <div className="cx-embed-controls">
+        {suspended ? (
+          <button type="button" onClick={() => void openHere()} disabled={busy}>Return to editor</button>
+        ) : (
+          <button type="button" onClick={() => void pauseEditor(false)} disabled={busy || !live}>Browse chat</button>
+        )}
+        <button type="button" onClick={() => void pauseEditor(true)} disabled={busy || (!live && !still)}>Circle and comment</button>
+        <span className="muted">{suspended ? 'Editor paused in this view; your project stays open.' : 'Wheel inside the editor edits its view. Use the chat rail to scroll the conversation.'}</span>
+      </div>
+      {runningHere && (
+        <p className={`cx-card2-note${autosave?.state === 'error' ? ' cx-card2-error' : ''}`} role={autosave?.state === 'error' ? 'alert' : 'status'}>
+          {autosave?.state === 'saved' ? `Last recovery copy: ${new Date(autosave.savedAt!).toLocaleTimeString()}. New edits save every 30 seconds; up to 30 distinct snapshots are kept.` : autosave?.state === 'saving' ? 'Saving editor changes and a recovery copy...' : autosave?.state === 'ready' ? 'Autosave every 30 seconds, with copies before agent edits.' : autosave?.note || 'Autosave is not confirmed. Save in the editor until its bridge connects.'}
+        </p>
+      )}
       {card.note && <p className="cx-card2-body">{card.note}</p>}
 
-      {cantRun && card.appId === 'filmcraft' && preview ? (
+      {reviewFrame ? (
+        <CraftVisualReview card={card} a={a} initialFrame={reviewFrame} onClose={() => setReviewFrame(null)} />
+      ) : cantRun && card.appId === 'filmcraft' && preview ? (
         <div className="cx-embed-fallback">
           <p className="cx-card2-note">
             Preview of the newest video in this project, {preview.file}. It isn't the editable project: FilmCraft {installKind === 'failed' ? "couldn't be installed" : "isn't installed"}, so comments here go to your agent without markers.
@@ -240,19 +298,31 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
           style={stageStyle}
           aria-label={live ? `${card.appName}, live` : `${card.appName}, still`}
         >
+          <div ref={nativeRef} className="cx-embed-native">
           {still && <img className="cx-embed-still" src={still} alt="" />}
-          {!live && (
+          {(!live || suspended) && (
             <div className="cx-embed-cover">
               {cantRun ? (
                 <span>{installKind === 'failed' ? `${card.appName} couldn't be installed.` : `${card.appName} isn't installed.`}</span>
               ) : !still ? (
-                <span>{runningHere ? `${card.appName} is open in a newer spot in this chat.` : `${card.appName} isn't open here.`}</span>
+                <span>{suspended ? 'Browsing the conversation. Your editor remains open.' : runningHere ? `${card.appName} is active elsewhere in this conversation. Use it here without reopening the project.` : `${card.appName} is not running for this project.`}</span>
               ) : null}
-              <button type="button" className="primary" disabled={busy || installKind === 'installing'} onClick={() => void openHere()}>
-                {installKind === 'installing' ? 'Installing' : cantRun ? `Install ${card.appName}` : 'Open here'}
+              <button type="button" className="primary" disabled={busy || installKind === 'installing' || status === undefined} onClick={() => void openHere()}>
+                {status === undefined ? 'Loading editor status' : installKind === 'installing' ? 'Installing' : cantRun ? `Install ${card.appName}` : runningHere ? 'Use editor here' : `Open ${card.appName}`}
               </button>
             </div>
           )}
+          {live && !suspended && dock !== 'docked' && (
+            <div className="cx-embed-cover" role="status">
+              <span>{dock === 'failed' ? 'This editor could not attach to the chat. Your editor remains open; do not close unsaved work.' : dock === 'unsupported' ? 'Native Craft hosting is supported on Windows only.' : dock === 'hidden' ? 'Editor is temporarily hidden while chat controls overlap it.' : 'Attaching the live editor...'}</span>
+            </div>
+          )}
+          </div>
+          <nav className="cx-embed-scroll-rail" aria-label="Scroll the chat beside the editor">
+            <button type="button" title="Scroll chat up" aria-label="Scroll chat up" onClick={() => scrollChat(-1)}>{'\u2191'}</button>
+            <span>Chat</span>
+            <button type="button" title="Scroll chat down" aria-label="Scroll chat down" onClick={() => scrollChat(1)}>{'\u2193'}</button>
+          </nav>
         </div>
       )}
 

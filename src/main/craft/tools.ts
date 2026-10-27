@@ -6,7 +6,7 @@ import { brandOf } from '../gateway/tools/common'
 import { ContentResult, ToolError, type GatewayTool, type Turn } from '../gateway/types'
 import { obj, oneOf, str } from '../gateway/validate'
 import type { JsonSchema } from '../gateway/validate'
-import { cachedTools, markDirty, pickFile, saveSession, sessionFor } from './agent'
+import { cachedTools, pickFile, saveSession, sessionCall, sessionFor } from './agent'
 import { countsAsEdit } from '@shared/craft-embed'
 import { APPS, spec } from './catalog'
 import type { McpCallResult, McpContent } from './mcp'
@@ -101,8 +101,7 @@ export async function appCall(
   const { project } = findProject(brandId, projectId)
   const folder = await projectFolder(brandId, projectId)
   const session = await sessionFor(appId, brandId, projectId, folder, () => pickFile(appId, folder, project.name, null), !!opts.needsWindow)
-  const r = await session.client.callTool(tool, args, { timeoutMs: opts.timeoutMs ?? 60_000 })
-  if (opts.edits) markDirty(appId)
+  const r = await sessionCall(session, !!opts.edits, () => session.client.callTool(tool, args, { timeoutMs: opts.timeoutMs ?? 60_000 }), { tool, args })
   return r
 }
 
@@ -172,8 +171,7 @@ function appTool(appId: string, t: McpToolDef, bridgeOnly: boolean): GatewayTool
       const ac = forTurn(turn.id)
       try {
         // progress keeps a long export from timing out, it isn't shown anywhere yet
-        const r = await session.client.callTool(t.name, callArgs, { signal: ac.signal, timeoutMs: 10 * 60_000, onProgress: () => {} })
-        if (risk !== 'read') markDirty(appId)
+        const r = await sessionCall(session, risk !== 'read', () => session.client.callTool(t.name, callArgs, { signal: ac.signal, timeoutMs: 10 * 60_000, onProgress: () => {} }), { tool: t.name, args: callArgs })
         if (edit) for (const fn of afterEdits) fn(edit, r.isError !== true)
         return new ContentResult(content(r.content, folder), r.isError === true)
       } catch (err) {

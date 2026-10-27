@@ -10,6 +10,7 @@ export const craftApi: CraftApi = {
   open: (req) => ipcRenderer.invoke('craft:open', req),
   close: (appId) => ipcRenderer.invoke('craft:close', appId),
   dock: (d) => ipcRenderer.send('craft:dock', d),
+  dockState: (appId) => ipcRenderer.invoke('craft:dock-state', appId),
   files: (brandId, projectId, appId) => ipcRenderer.invoke('craft:files', brandId, projectId, appId),
   checkUpdates: () => ipcRenderer.invoke('craft:check-updates'),
   onChanged: (fn) => {

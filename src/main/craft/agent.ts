@@ -1,12 +1,15 @@
 import { promises as fs } from 'node:fs'
 import { basename, extname, join } from 'node:path'
+import type { CraftAppStatus } from '@shared/craft'
 import { APPS, fill, spec } from './catalog'
 import { craftRoot, installed } from './install'
-import { cleanEnv, onAppExit, onAppStart, runningApp, type Running } from './launch'
+import { cleanEnv, onAppExit, onAppStart, onBeforeAppClose, runningApp, type Running } from './launch'
 import { McpClient, type McpCallResult } from './mcp'
 import { appFiles } from './paths'
 import { resolveInProject, safeName, uniqueName, type McpToolDef } from './rules'
 import { changed, setLive } from './state'
+import { periodicSave, projectOperation, snapshotFile } from './recovery'
+import { LiveIdentityError, liveSaveCall, liveSavePlan, switchesLiveDocument, verifyLiveFile, type LiveSavePlan } from './live-file'
 
 // the agent's connection to each app's own MCP server, <id>-cli mcp. bridge mode drives the
 // open window (same token as the window, from main's environment), headless mode runs the
@@ -25,9 +28,19 @@ export interface Session {
   // headless: something changed since the last save
   dirty: boolean
   idle: NodeJS.Timeout | null
+  cancelAutosave: () => void
 }
 
 const sessions = new Map<string, Session>()
+const sessionQueues = new Map<string, Promise<unknown>>()
+const savedAt = new WeakMap<Session, number>()
+const livePlans = new WeakMap<Session, LiveSavePlan>()
+
+// TrendDeck can save this session itself: the app has a save step and, for an open window, a
+// verified live save plan for its version. when it can't, the app's own save prompt handles it
+export function canAutosave(s: Session): boolean {
+  return !!spec(s.appId).save && !!s.file && (s.mode === 'headless' || livePlans.has(s))
+}
 // a headless engine nobody used for this long is saved and stopped
 const IDLE_MS = 10 * 60_000
 
@@ -108,10 +121,21 @@ export async function loadAllToolCaches(): Promise<void> {
 
 function agentState(appId: string): void {
   const s = sessions.get(appId)
-  setLive(appId, { agent: s ? s.mode : 'off' })
+  setLive(appId, {
+    agent: s ? s.mode : 'off',
+    ...(!s ? { autosave: runningApp(appId) ? { state: 'unavailable' as const, savedAt: null, note: 'Live autosave is disconnected. Save in the editor.' } : undefined } : {})
+  })
 }
 
-async function startSession(s: Omit<Session, 'client' | 'ready' | 'dirty' | 'idle'>, run: Running | null): Promise<Session> {
+function reportAutosave(s: Session, state: NonNullable<CraftAppStatus['autosave']>['state'], note: string): void {
+  const run = runningApp(s.appId)
+  if (s.mode !== 'bridge' || sessions.get(s.appId) !== s || !run || run.brandId !== s.brandId || run.projectId !== s.projectId) return
+  if (state === 'saved') savedAt.set(s, Date.now())
+  if (state === 'unavailable') savedAt.delete(s)
+  setLive(s.appId, { autosave: { state, savedAt: savedAt.get(s) ?? null, note } })
+}
+
+async function startSession(s: Omit<Session, 'client' | 'ready' | 'dirty' | 'idle' | 'cancelAutosave'>, run: Running | null): Promise<Session> {
   const have = await installed(s.appId)
   if (!have) throw new Error(`${spec(s.appId).name} isn't installed`)
   const sp = spec(s.appId)
@@ -121,21 +145,31 @@ async function startSession(s: Omit<Session, 'client' | 'ready' | 'dirty' | 'idl
   // the bridge needs the window's token, headless gets none
   const env: Record<string, string> = bridge && run && sp.tokenEnv ? { [sp.tokenEnv]: run.token } : {}
   const client = new McpClient({ command: have.cli, args, env: cleanEnv(env) as Record<string, string>, cwd: s.folder, timeoutMs: 10 * 60_000 })
-  const session: Session = { ...s, client, ready: Promise.resolve(), dirty: false, idle: null }
+  const session: Session = { ...s, client, ready: Promise.resolve(), dirty: false, idle: null, cancelAutosave: () => {} }
   session.ready = client.start().then(async () => {
-    storeTools(s.appId, have.version, s.mode, await client.listTools())
+    const tools = await client.listTools()
+    storeTools(s.appId, have.version, s.mode, tools)
+    if (s.mode === 'bridge') {
+      const plan = liveSavePlan(s.appId, have.version, tools)
+      if (plan) livePlans.set(session, plan)
+    }
     // apps without a file flag load it with a tool
     if (s.mode === 'headless' && s.file && sp.openTool) check(await client.callTool(...step(fill(sp.openTool, s.file))), `open ${basename(s.file)}`)
   })
   sessions.set(s.appId, session)
+  if (s.mode === 'headless' && !runningApp(s.appId)) setLive(s.appId, { autosave: undefined })
   agentState(s.appId)
   client.onExit((why) => {
     if (sessions.get(s.appId) !== session) return
     sessions.delete(s.appId)
+    session.cancelAutosave()
     if (session.idle) clearTimeout(session.idle)
     if (why !== 'closed') {
       console.error(`craft: ${s.appId} agent connection ${why}`)
-      setLive(s.appId, { agent: 'error' })
+      setLive(s.appId, {
+        agent: 'error',
+        autosave: s.mode === 'bridge' && runningApp(s.appId) ? { state: 'unavailable', savedAt: null, note: 'Live autosave is disconnected. Save in the editor while TrendDeck reconnects.' } : undefined
+      })
       if (s.mode === 'bridge') retryBridge(s.appId)
     } else agentState(s.appId)
   })
@@ -144,14 +178,32 @@ async function startSession(s: Omit<Session, 'client' | 'ready' | 'dirty' | 'idl
   } catch (err) {
     client.close()
     if (sessions.get(s.appId) === session) sessions.delete(s.appId)
-    setLive(s.appId, { agent: 'error' })
+    setLive(s.appId, {
+      agent: 'error',
+      autosave: s.mode === 'bridge' && runningApp(s.appId) ? { state: 'unavailable', savedAt: null, note: 'Live autosave could not connect. Save in the editor.' } : undefined
+    })
     throw err
+  }
+  if (s.mode === 'bridge') {
+    try {
+      await verifyBridgeFile(session)
+      reportAutosave(session, 'ready', 'Live autosave is ready. Changes are saved periodically.')
+    } catch {
+      reportAutosave(session, 'unavailable', 'The active document cannot be verified for autosave. Save in the editor; return to the original project document before trying again.')
+    }
+  }
+  if (canAutosave(session)) {
+    session.cancelAutosave = periodicSave(
+      () => saveSession(s.appId),
+      (error) => console.error(`craft: ${s.appId} autosave failed; editor remains open`, error)
+    )
   }
   return session
 }
 
 // a crashed bridge comes back while the window is open: 1s, 2s, 4s... up to 30s
 const backoff = new Map<string, number>()
+const bridgeStarts = new Map<string, Promise<Session>>()
 function retryBridge(appId: string): void {
   const run = runningApp(appId)
   if (!run) return
@@ -160,56 +212,151 @@ function retryBridge(appId: string): void {
   setTimeout(() => {
     const now = runningApp(appId)
     if (!now || now !== run || sessions.has(appId)) return
-    void startBridge(now).catch(() => {})
+    void startBridge(now).catch(() => retryBridge(appId))
   }, wait)
 }
 
-async function startBridge(run: Running): Promise<Session> {
-  const s = await startSession(
-    { appId: run.appId, mode: 'bridge', file: run.file, folder: run.folder, brandId: run.brandId, projectId: run.projectId },
-    run
-  )
-  backoff.delete(run.appId)
-  return s
+function startBridge(run: Running): Promise<Session> {
+  const pending = bridgeStarts.get(run.appId)
+  if (pending) return pending
+  const next = startSession(
+    { appId: run.appId, mode: 'bridge', file: run.file, folder: run.folder, brandId: run.brandId, projectId: run.projectId }, run
+  ).then((session) => {
+    backoff.delete(run.appId)
+    return session
+  }).finally(() => { if (bridgeStarts.get(run.appId) === next) bridgeStarts.delete(run.appId) })
+  bridgeStarts.set(run.appId, next)
+  return next
 }
 
-// writes a headless engine's changes back to its file
-async function saveHeadless(s: Session): Promise<void> {
+async function verifyBridgeFile(s: Session): Promise<void> {
+  const plan = livePlans.get(s)
+  if (!s.file || !plan) throw new LiveIdentityError()
+  await verifyLiveFile(s.file, () => s.client.callTool(plan.inspect, {}, { timeoutMs: 10_000 }))
+  if (sessions.get(s.appId) !== s || !runningApp(s.appId)) throw new LiveIdentityError()
+}
+
+async function saveCurrent(s: Session, reason: string, force = false): Promise<void> {
+  await s.ready
+  if (sessions.get(s.appId) !== s) throw new Error('Craft session changed before saving')
   const saveStep = spec(s.appId).save
-  if (s.mode !== 'headless' || !s.dirty || !s.file || !saveStep) return
+  if (!force && s.mode === 'headless' && !s.dirty) return
+  if (!s.file || !saveStep) {
+    reportAutosave(s, 'unavailable', 'Live autosave is unavailable for this document. Save in the editor.')
+    throw new Error(`${spec(s.appId).name} cannot safely autosave this session; save it in the editor first`)
+  }
+  reportAutosave(s, 'saving', 'Saving the live editor and a recoverable snapshot.')
   try {
-    check(await s.client.callTool(...step(fill(saveStep, s.file))), 'save')
+    if (s.mode === 'bridge') await verifyBridgeFile(s)
+    await snapshotFile(s.folder, s.file, s.appId, `before-${reason}`)
+    if (s.mode === 'bridge') await verifyBridgeFile(s)
+    const save = s.mode === 'bridge' ? livePlans.get(s)!.save : fill(saveStep, s.file)
+    check(await s.client.callTool(...step(save)), 'save the live editor')
+    if (s.mode === 'bridge') await verifyBridgeFile(s)
+    await snapshotFile(s.folder, s.file, s.appId, reason)
+    if (s.mode === 'bridge') await verifyBridgeFile(s)
     s.dirty = false
-  } catch (err) {
-    console.error(`craft: ${s.appId} couldn't save`, err)
+    reportAutosave(s, 'saved', 'Saved with a recoverable snapshot.')
+  } catch (error) {
+    reportAutosave(s, error instanceof LiveIdentityError ? 'unavailable' : 'error', error instanceof LiveIdentityError
+      ? 'The active document cannot be verified for autosave. Save in the editor; return to the original project document before trying again.'
+      : 'Autosave failed. Save in the editor and try again; TrendDeck has not closed it.')
+    throw error
   }
 }
 
 export async function saveSession(appId: string): Promise<void> {
   const s = sessions.get(appId)
-  if (s) await saveHeadless(s)
+  if (s) await projectOperation(s.folder, () => saveCurrent(s, 'autosave'))
+}
+
+export async function sessionCall<T>(s: Session, edits: boolean, call: () => Promise<T>, request?: { tool: string; args: Record<string, unknown> }): Promise<T> {
+  return projectOperation(s.folder, async () => {
+    if (sessions.get(s.appId) !== s) throw new Error('Craft session changed before the editor call')
+    if (request && switchesLiveDocument(s.appId, request.tool, request.args)) {
+      throw new Error('Changing documents through an existing Craft session is not safe. Open the document through craft_open, or use the editor manually; automatic saves will not retarget it.')
+    }
+    const saveTool = spec(s.appId).save
+    const liveSave = s.mode === 'bridge' && request && saveTool ? liveSaveCall(request.tool, request.args, saveTool.name) : null
+    if (liveSave?.targetsPath) {
+      reportAutosave(s, 'unavailable', 'Path-targeted saves are not safe through this live bridge. Use Save As in the editor; automatic saves will not retarget a document.')
+      throw new LiveIdentityError()
+    }
+    if (liveSave?.saves && !edits) {
+      try {
+        await verifyBridgeFile(s)
+      } catch (error) {
+        reportAutosave(s, 'unavailable', 'The active document cannot be verified. Save in the editor before trying again.')
+        throw error
+      }
+    }
+    if (edits && spec(s.appId).save) await saveCurrent(s, 'before-edit', true)
+    if (edits && livePlans.has(s)) reportAutosave(s, 'ready', 'Editor changes may be pending. Live autosave is ready.')
+    try {
+      const result = await call()
+      if ((edits || liveSave?.saves) && s.mode === 'bridge' && saveTool) {
+        try {
+          await verifyBridgeFile(s)
+        } catch (error) {
+          reportAutosave(s, 'unavailable', 'The active document changed or cannot be verified. Save in the editor; return to the original project document before further agent edits.')
+          throw error
+        }
+      }
+      return result
+    } finally {
+      if (edits) s.dirty = true
+    }
+  })
 }
 
 // stops the app's session. a headless engine with changes saves first, if the app says how
 export async function stopSession(appId: string, save = true): Promise<void> {
   const s = sessions.get(appId)
   if (!s) return
-  sessions.delete(appId)
-  if (s.idle) clearTimeout(s.idle)
-  if (save) await saveHeadless(s)
-  s.client.close()
-  agentState(appId)
+  await projectOperation(s.folder, async () => {
+    if (sessions.get(appId) !== s) return
+    if (save && canAutosave(s) && (s.dirty || s.mode === 'bridge')) await saveCurrent(s, 'close')
+    // nothing TrendDeck can save: a window keeps its own save prompt, a headless engine's
+    // unsaved changes are reported instead of blocking the stop forever
+    else if (save && s.dirty) console.warn(`craft: ${appId} has changes TrendDeck can't save; save them in the editor`)
+    sessions.delete(appId)
+    s.cancelAutosave()
+    if (s.idle) clearTimeout(s.idle)
+    s.client.close()
+    agentState(appId)
+  })
 }
 
 function touch(s: Session): void {
   if (s.mode !== 'headless') return
   if (s.idle) clearTimeout(s.idle)
-  s.idle = setTimeout(() => void stopSession(s.appId), IDLE_MS)
+  s.idle = setTimeout(() => void stopSession(s.appId).catch((error) => {
+    console.error(`craft: ${s.appId} kept open because saving failed`, error)
+    touch(s)
+  }), IDLE_MS)
 }
 
 // the connection for a call on this project: the open window when it's showing this project,
 // else a headless engine on the project's main file
-export async function sessionFor(
+export function sessionFor(
+  appId: string,
+  brandId: string,
+  projectId: string,
+  folder: string,
+  mainFile: () => Promise<string | null>,
+  needsWindow: boolean
+): Promise<Session> {
+  const previous = sessionQueues.get(appId) ?? Promise.resolve()
+  const open = (): Promise<Session> => getSession(appId, brandId, projectId, folder, mainFile, needsWindow)
+  const next = previous.then(open, open)
+  sessionQueues.set(appId, next)
+  void next.finally(() => {
+    if (sessionQueues.get(appId) === next) sessionQueues.delete(appId)
+  }).catch(() => {})
+  return next
+}
+
+async function getSession(
   appId: string,
   brandId: string,
   projectId: string,
@@ -307,7 +454,10 @@ export async function pickFile(appId: string, folder: string, projectName: strin
 
 export function markDirty(appId: string): void {
   const s = sessions.get(appId)
-  if (s) s.dirty = true
+  if (s) {
+    s.dirty = true
+    if (livePlans.has(s)) reportAutosave(s, 'ready', 'Editor changes may be pending. Live autosave is ready.')
+  }
 }
 
 export function sessionOf(appId: string): Session | null {
@@ -315,6 +465,16 @@ export function sessionOf(appId: string): Session | null {
 }
 
 export function setupAgentSessions(): void {
+  onBeforeAppClose(async (run) => {
+    if (!spec(run.appId).save || !spec(run.appId).bridgeArgs) return
+    const session = sessions.get(run.appId) ?? await startBridge(run)
+    if (session.mode !== 'bridge' || session.brandId !== run.brandId || session.projectId !== run.projectId) {
+      throw new Error('Craft live editor is not connected; save it before closing')
+    }
+    // no verified live save for this app or version: let the app close and ask about saving itself
+    if (!canAutosave(session)) return
+    await projectOperation(session.folder, () => saveCurrent(session, 'close', true))
+  })
   // open() stops a headless engine on the app (saving it) before the window starts
   onAppStart((run) => {
     if (!spec(run.appId).agent) return

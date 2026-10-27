@@ -68,7 +68,7 @@ export const OBS_TOOLS: GatewayTool[] = [
   },
   {
     name: 'obs_show', title: 'Show OBS in the chat', risk: 'read',
-    description: 'Puts the OBS card in the chat: connection, a live preview, scene picker, Record and Stop, and recent takes. The user can record from it themselves.',
+    description: 'Puts the OBS card in the chat before or after recording: connection, a live preview, scene picker, Record and Stop, and recent takes. Works even when disconnected so the user can see setup guidance. Does not start recording or streaming; the user can record from the card themselves.',
     inputSchema: projectSchema,
     run: async (turn, args) => {
       const project = projectOf(turn, args.projectId)
@@ -80,7 +80,7 @@ export const OBS_TOOLS: GatewayTool[] = [
   },
   {
     name: 'obs_takes', title: 'List OBS takes', risk: 'read',
-    description: "Recent recordings in the project's OBS folder, newest first, with size, time and the path relative to the project folder (use it with show_video).",
+    description: "Recent recordings in the project's OBS folder, newest first, with size, time and project-relative file paths. Use show_video for playback or take_show to create a take card for analysis. These are files, not take card ids; use take_list for saved cards and take_get for their analysis.",
     inputSchema: projectSchema,
     run: (turn, args) => plain(async () => {
       const project = projectOf(turn, args.projectId)
@@ -117,7 +117,7 @@ export const OBS_TOOLS: GatewayTool[] = [
     mustAsk: async () => 'Starting recording always requires explicit approval',
     description: "Records the project in OBS with the brand's recording settings: OBS's record folder points at the project's folder (footage by default) until it stops, then goes back. Always asks; refuses while OBS records or streams on its own. When it stops, the take comes into the chat.",
     inputSchema: projectSchema,
-    summarize: (turn, args) => `Start recording ${projectOf(turn, args.projectId).name} in OBS`,
+    summarize: (turn, args) => `Start recording ${projectOf(turn, args.projectId).name} in OBS. If auto-import is enabled, the saved take is transcribed using the configured dictation source, which may send audio to a remote transcription service`,
     run: (turn, args) => plain(() => startRecording(turn.brandId, projectOf(turn, args.projectId).id, turn.threadId))
   },
   {

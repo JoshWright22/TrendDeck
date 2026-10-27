@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Attachment } from '@shared/chat'
 import { fromMedia } from './attachments'
+import { openSettings } from '../settings-link'
 import './take-recorder.css'
 
 export interface TakeRecorderProps {
@@ -11,6 +12,7 @@ export interface TakeRecorderProps {
   projectId?: string | null
   threadId?: string | null
   onSaved?: () => void
+  onBusyChange?: (busy: boolean) => void
 }
 
 type Phase = 'idle' | 'requesting' | 'recording' | 'stopping' | 'preview' | 'saving'
@@ -27,7 +29,7 @@ export function TakeRecorder(props: TakeRecorderProps): ReactNode {
 
 export default TakeRecorder
 
-function Recorder({ brandId, onAttach, projectId, threadId, onSaved }: TakeRecorderProps): ReactNode {
+function Recorder({ brandId, onAttach, projectId, threadId, onSaved, onBusyChange }: TakeRecorderProps): ReactNode {
   const [mode, setMode] = useState<Mode>('mic')
   const [phase, setPhase] = useState<Phase>('idle')
   const [elapsed, setElapsed] = useState(0)
@@ -43,6 +45,11 @@ function Recorder({ brandId, onAttach, projectId, threadId, onSaved }: TakeRecor
   const previewUrl = useRef('')
   const savedId = useRef<string | null>(null)
   const startedAt = useRef(0)
+
+  useEffect(() => {
+    onBusyChange?.(phase !== 'idle')
+    return () => onBusyChange?.(false)
+  }, [phase, onBusyChange])
 
   const releaseTracks = (): void => {
     stream.current?.getTracks().forEach((track) => {
@@ -215,6 +222,9 @@ function Recorder({ brandId, onAttach, projectId, threadId, onSaved }: TakeRecor
   const time = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`
   return (
     <section className='take-recorder' aria-label='Record a take' data-over-craft>
+      <strong>Record footage, not a message</strong>
+      <p className='take-recorder-hint'>Record, stop, preview, then save. {projectId ? 'Saving adds a take to this project and chat for agent review and cadence feedback; it does not insert it into the edit.' : 'Saving attaches the take to your draft. Send it when you are ready for the agent to review it.'} Use Dictate to speak instructions instead.</p>
+      {projectId && <p className='take-recorder-hint'>Transcription uses your Dictation settings. An API source sends audio to that service; a local model stays on this computer. <button type='button' onClick={() => openSettings('Dictation')}>Transcription settings</button></p>}
       <div className='take-recorder-controls'>
         <div className='take-recorder-source' role='group' aria-label='Recording source'>
           <button type='button' aria-pressed={mode === 'mic'} disabled={phase !== 'idle'} onClick={() => setMode('mic')}>Microphone</button>

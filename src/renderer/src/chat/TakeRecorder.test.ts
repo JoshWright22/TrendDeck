@@ -71,11 +71,12 @@ const stream = { getTracks: () => [track] }
 const media = { saveRecording: vi.fn(), list: vi.fn() }
 const getUserMedia = vi.fn()
 const attach = vi.fn()
+const busyChanged = vi.fn()
 let tree: Element
 
 function render(): void {
   hooks.cursor = 0
-  const outer = TakeRecorder({ brandId: 'brand-a', onAttach: attach }) as ReactElement
+  const outer = TakeRecorder({ brandId: 'brand-a', onAttach: attach, onBusyChange: busyChanged }) as ReactElement
   tree = (outer.type as (props: unknown) => Element)(outer.props)
   hooks.effects.splice(0).forEach((effect) => effect())
 }
@@ -119,6 +120,16 @@ beforeEach(() => {
 afterEach(() => { unmount(); vi.restoreAllMocks(); vi.unstubAllGlobals() })
 
 describe('take recorder lifecycle', () => {
+  it('keeps the panel protected through recording and unsaved preview', async () => {
+    expect(busyChanged).toHaveBeenLastCalledWith(false)
+    click('Record take'); await settle()
+    expect(busyChanged).toHaveBeenLastCalledWith(true)
+    click('Stop'); render()
+    expect(busyChanged).toHaveBeenLastCalledWith(true)
+    click('Discard'); render()
+    expect(busyChanged).toHaveBeenLastCalledWith(false)
+  })
+
   it('requests devices only on explicit start, then stops, previews, saves and attaches library media', async () => {
     expect(getUserMedia).not.toHaveBeenCalled()
     click('Record take')
@@ -180,6 +191,7 @@ describe('take recorder lifecycle', () => {
     expect(current.state).toBe('inactive')
     expect(track.stop).toHaveBeenCalledOnce()
     expect(URL.createObjectURL).not.toHaveBeenCalled()
+    expect(busyChanged).toHaveBeenLastCalledWith(false)
   })
 
   it('ignores permission completion after unmount', async () => {

@@ -1,5 +1,5 @@
 import { screen, type BrowserWindow } from 'electron'
-import type { CraftDock } from '@shared/craft'
+import type { CraftDock, CraftDockState } from '@shared/craft'
 
 type Fn = (...args: unknown[]) => unknown
 
@@ -181,6 +181,7 @@ interface Docked {
 }
 
 const docked = new Map<string, Docked>()
+const failed = new Set<string>()
 let host: BrowserWindow | null = null
 let timer: NodeJS.Timeout | null = null
 
@@ -201,6 +202,7 @@ export function setHost(win: BrowserWindow): void {
 
 // starts docking an app that was just launched. the window is looked for until it shows up
 export function attach(appId: string, pid: number): void {
+  failed.delete(appId)
   if (!user32()) return
   docked.set(appId, { appId, pid, hwnd: null, style: 0, exStyle: 0, parent: 0, original: null, sweptAt: 0, bounds: null, visible: false, clip: null, region: '', placed: null, hidden: false, strays: [] })
   unhook(appId)
@@ -276,6 +278,7 @@ function grab(e: Docked): boolean {
     u.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, e.exStyle)
     e.hwnd = null
     console.error('craft: docking failed, the app stays a normal window', err)
+    failed.add(e.appId)
     docked.delete(e.appId)
     return false
   }
@@ -390,12 +393,21 @@ export function releaseAll(): void {
 }
 
 export function forget(appId: string): void {
+  failed.delete(appId)
   docked.delete(appId)
   unhook(appId)
 }
 
 export function isDocked(appId: string): boolean {
   return !!docked.get(appId)?.hwnd
+}
+
+export function dockState(appId: string): CraftDockState {
+  if (!user32()) return 'unsupported'
+  if (failed.has(appId)) return 'failed'
+  const entry = docked.get(appId)
+  if (!entry?.hwnd) return 'waiting'
+  return entry.hidden ? 'hidden' : 'docked'
 }
 
 // asks the app to close the way its close button does, so it can ask to save first.

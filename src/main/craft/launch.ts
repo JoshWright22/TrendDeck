@@ -5,6 +5,7 @@ import { spec } from './catalog'
 import { askClose, attach, forget, release } from './dock'
 import { applyStaged, installed } from './install'
 import { setLive } from './state'
+import { projectOperation, snapshotFile } from './recovery'
 
 // one window per app. it's started with a loopback control port and a fresh token in its
 // environment: the token lives in main only, the renderer and the agent never see it.
@@ -26,6 +27,11 @@ export interface Running {
 const running = new Map<string, Running>()
 const exitHooks: ((r: Running) => void)[] = []
 const startHooks: ((r: Running) => void)[] = []
+const beforeCloseHooks: ((r: Running) => Promise<void>)[] = []
+
+export function onBeforeAppClose(fn: (r: Running) => Promise<void>): void {
+  beforeCloseHooks.push(fn)
+}
 
 export function onAppExit(fn: (r: Running) => void): void {
   exitHooks.push(fn)
@@ -71,6 +77,7 @@ export async function launch(opts: { appId: string; brandId: string; projectId: 
   const s = spec(opts.appId)
   const have = await installed(opts.appId)
   if (!have) throw new Error(`${s.name} isn't installed`)
+  if (opts.file) await projectOperation(opts.folder, () => snapshotFile(opts.folder, opts.file!, opts.appId, 'before-open'))
   const port = await freePort()
   const token = randomBytes(32).toString('hex')
   const args = [...s.controlArgs(port), ...(opts.file ? [opts.file] : [])]
@@ -91,13 +98,18 @@ export async function launch(opts: { appId: string; brandId: string; projectId: 
   child.once('exit', () => {
     running.delete(opts.appId)
     forget(opts.appId)
-    setLive(opts.appId, { running: false, brandId: null, projectId: null, file: null })
+    setLive(opts.appId, { running: false, brandId: null, projectId: null, file: null, autosave: undefined })
     for (const fn of exitHooks) fn(r)
     void applyStaged(opts.appId)
     done()
   })
   attach(opts.appId, pid)
-  setLive(opts.appId, { running: true, brandId: opts.brandId, projectId: opts.projectId, file: opts.file })
+  setLive(opts.appId, {
+    running: true, brandId: opts.brandId, projectId: opts.projectId, file: opts.file,
+    autosave: { state: 'unavailable', savedAt: null, note: s.bridgeArgs && s.save && opts.file
+      ? 'Live autosave is connecting. Save in the editor until it is ready.'
+      : 'Live autosave is unavailable for this document. Save in the editor.' }
+  })
   for (const fn of startHooks) fn(r)
   return r
 }
@@ -107,18 +119,28 @@ export async function launch(opts: { appId: string; brandId: string; projectId: 
 export async function close(appId: string, waitMs = 120_000): Promise<boolean> {
   const r = running.get(appId)
   if (!r) return true
-  if (!askClose(r.pid)) {
-    // no window found to ask, it's stuck or never showed one
-    r.child.kill()
+  for (const hook of beforeCloseHooks) await hook(r)
+  return requestClose(r, waitMs)
+}
+
+async function requestClose(r: Running, waitMs: number): Promise<boolean> {
+  if (running.get(r.appId) !== r) return true
+  if (!askClose(r.pid)) return false
+  let timer: NodeJS.Timeout | undefined
+  try {
+    return await Promise.race([r.exited.then(() => true), new Promise<boolean>((ok) => { timer = setTimeout(() => ok(false), waitMs) })])
+  } finally {
+    clearTimeout(timer)
   }
-  const out = await Promise.race([r.exited.then(() => true), new Promise<boolean>((ok) => setTimeout(() => ok(false), waitMs))])
-  return out
 }
 
 // TrendDeck is quitting: every app is let go as a normal window and asked to close.
 // one that's still open after the wait (its save prompt is up) just stays open on its own
 export async function closeAllForQuit(waitMs = 60_000): Promise<void> {
   const all = [...running.values()]
-  for (const r of all) release(r.appId)
-  await Promise.all(all.map((r) => close(r.appId, waitMs)))
+  await Promise.all(all.map(async (r) => {
+    for (const hook of beforeCloseHooks) await hook(r)
+  }))
+  for (const r of all) if (running.get(r.appId) === r) release(r.appId)
+  await Promise.all(all.map((r) => requestClose(r, waitMs)))
 }

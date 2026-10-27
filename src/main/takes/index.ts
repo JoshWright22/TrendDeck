@@ -8,13 +8,13 @@ import { diffTake, paraphrases } from '@shared/take-diff'
 import { ID_PATTERN } from '@shared/types'
 import { addSpeech, logFriction, readCadenceProfile } from '../brand-memory'
 import { checkProjectFile, FileRefError, relativeIn } from '../cards/files'
-import { addCard, changeCard, getCard, newCardId } from '../cards/store'
+import { addCard, changeCard, getCard, listCards, newCardId } from '../cards/store'
 import { projectOf } from '../cards/tools'
 import { findProject, projectFolder } from '../craft/paths'
 import { safeName, uniqueName } from '../craft/rules'
 import { ffmpegPaths, run } from '../qc/ffmpeg'
 import { ToolError, type GatewayTool } from '../gateway/types'
-import { obj, str } from '../gateway/validate'
+import { int, obj, str } from '../gateway/validate'
 import { scriptLines } from '../scripts'
 import { getData } from '../store'
 import { onRecording, type RecordingInput } from './ingest'
@@ -138,19 +138,35 @@ async function saveRecording(brandId: string, threadId: string | null, projectId
 
 export const TAKE_TOOLS: GatewayTool[] = [
   {
+    name: 'take_list',
+    title: 'List saved takes in this chat',
+    risk: 'read',
+    description: 'Saved take cards in the current brand and chat, newest first, optionally filtered by project. Returns card ids, project-relative files and transcription state, not audio or transcripts. Use take_get to read a result. For OBS recordings on disk without a card, use obs_takes; an empty list does not mean no recordings exist.',
+    inputSchema: obj({ projectId: str('only takes from this project in the current brand', 100, 1), limit: int('maximum number of takes, default 20', 1, 100) }),
+    run: async (turn, args) => {
+      if (!turn.threadId) throw new ToolError('take_list needs a chat. Open the project chat to list its take cards; use obs_takes for project recordings on disk.')
+      const project = args.projectId === undefined ? null : projectOf(turn, args.projectId)
+      return (await listCards(turn.brandId, turn.threadId))
+        .filter((card): card is TakeCard => card.type === 'take' && (!project || card.projectId === project.id))
+        .sort((first, second) => second.at - first.at)
+        .slice(0, typeof args.limit === 'number' ? args.limit : 20)
+        .map((card) => ({ cardId: card.id, projectId: card.projectId, title: card.title, file: card.media.file, source: card.source, state: card.state, at: card.at }))
+    }
+  },
+  {
     name: 'take_get',
     title: 'Read a take',
     risk: 'read',
     description:
-      "A take card's transcript with word times, the cadence feedback, and how it compares with the script: each line said, said differently, flubbed or missed, and the pickup list of lines to record again with where they went wrong.",
+      "Read a take card from take_list in the current brand: transcription state, transcript with word times, cadence feedback, script comparison and pickup list. Does not start recording, retry transcription or upload audio. Pending and failed takes include their card id and file so the recording remains discoverable.",
     inputSchema: obj({ cardId: str('the take card id', 100, 1) }, ['cardId']),
     run: async (turn, args) => {
       const card = await getCard(turn.brandId, String(args.cardId))
       if (!card || card.type !== 'take') throw new ToolError(`no take ${String(args.cardId)}`)
-      if (card.state !== 'ready' || !card.transcript) return `This take is ${card.state === 'failed' ? `not transcribed: ${card.error}` : 'still being transcribed'}.`
+      const details = { cardId: card.id, projectId: card.projectId, title: card.title, file: card.media.file, source: card.source, state: card.state }
+      if (card.state !== 'ready' || !card.transcript) return { ...details, error: card.error, transcript: null, message: card.state === 'failed' ? 'This take could not be transcribed. Use show_video with the file to check playback.' : 'No transcript is available yet. Do not assume analysis is complete.' }
       return {
-        file: card.media.file,
-        projectId: card.projectId,
+        ...details,
         transcript: card.transcript.words.map((w) => `${w.start.toFixed(2)} ${w.text.trim()}`).join('\n').slice(0, 40_000),
         feedback: card.feedback,
         script: card.diff ? { file: card.diff.scriptFile, lines: card.diff.lines.map((l) => ({ id: l.lineId, status: l.status, from: l.from, to: l.to, said: l.said })), pickups: card.diff.pickups } : 'the project has no script to compare with'
@@ -160,9 +176,11 @@ export const TAKE_TOOLS: GatewayTool[] = [
   {
     name: 'take_show',
     title: 'Show a recording as a take',
-    risk: 'read',
-    description: 'Turns a recording in the project folder into a take card in the chat: playback, transcript, cadence feedback and the script diff with a pickup list.',
+    risk: 'edit',
+    alwaysAsk: true,
+    description: 'Creates a new take card from an existing project recording and starts transcription with the configured dictation source: this may send audio to a remote transcription service. Always asks permission. Does not record new footage. For playback without transcription use show_video; for existing analysis use take_list and take_get.',
     inputSchema: obj({ projectId: str("the project, by id. leave it out for this chat's project", 100), file: str('the recording, relative to the project folder', 260, 1) }, ['file']),
+    summarize: (turn, args) => `Create a take from ${String(args.file)} in ${projectOf(turn, args.projectId).name} and transcribe it using the configured dictation source. This may send the recording's audio to a remote transcription service`,
     run: async (turn, args) => {
       const p = projectOf(turn, args.projectId)
       const root = await projectFolder(turn.brandId, p.id)

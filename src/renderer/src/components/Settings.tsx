@@ -415,13 +415,12 @@ const UPDATE_TEXT = {
   idle: 'Check for updates',
   checking: 'Checking...',
   latest: "You're on the latest version",
-  downloading: 'Downloading, restarts when done',
+  downloading: 'Downloading; use Update when ready',
   installing: 'Restarting to update',
   error: "Couldn't reach GitHub, try again",
   dev: 'Updates only work in the installed app'
 } as const
 
-// checks GitHub now and installs whatever it finds, the app restarts on its own
 function UpdateButton(): ReactNode {
   const [state, setState] = useState<keyof typeof UPDATE_TEXT>('idle')
   const busy = state === 'checking' || state === 'downloading' || state === 'installing'

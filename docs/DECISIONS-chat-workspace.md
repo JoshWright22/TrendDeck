@@ -16,6 +16,15 @@ Calls made while moving review, suggestions, progress, storage and context into 
 - Inactive cards do not install dock observers. Native stray-window enumeration is throttled, live editing does not trigger still captures, and message entrance transforms are disabled around native editor surfaces.
 - `npm run test:craft-native` verifies actual cross-process Windows child parenting, viewport bounds, clipping, zoom geometry and restoration using disposable off-screen fixture windows. This does not prove every third-party Craft build works.
 
+## Craft-first collaboration
+
+- Craft editors are the first-release integration target. Adobe Photoshop, Krita and other external editors remain post-release work; do not list them as supported embeddings.
+- A visible card becomes eligible even when only a small part is in view. Explicit activation survives the card mounting, and ownership changes never automatically scroll the chat. Streaming replies do not pull an active whole-chat editor away from the creator.
+- Native editor wheel input belongs to the editor, not the DOM. The external chat rail and Browse chat mode let the creator scroll the conversation without closing the project. Jump to latest sits outside the native stage instead of hiding it with an overlapping bubble.
+- Circle and comment captures the current editor before hiding its native window, then offers circle/freehand markup and text on a screenshot. Sending stores a separate marked PNG for review_frame_get, includes the app/project/file and captured card/turn context, and leaves the project unchanged. Card revision is not a document revision; the agent must inspect the current document before applying feedback. Cancel sends nothing.
+- Supported live bridges autosave every 30 seconds and before agent edits/controlled closes. Up to 30 distinct project-document snapshots live in .trenddeck/autosaves per project. Media is not duplicated. A failed save blocks destructive lifecycle operations; dialogs are never automatically dismissed. Unknown files and apps without save/bridge support cannot promise autosave, and snapshots currently require manual restoration with the editor closed.
+- Dictate creates instructions in the composer; Take records footage, previews it, then saves for analysis without inserting it into an edit. A pending capture/unsaved preview cannot be hidden by toggling its toolbar button. OBS/take tools are registered through the agent gateway, and take_list discovers saved cards in the current brand/chat. Capture approval and remote-transcription disclosure remain explicit.
+
 ## Retaining your feedback
 
 - Sent chats are stored locally. Removed chats are archived before removal; if the archive cannot be saved, deletion is refused.

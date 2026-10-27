@@ -1,0 +1,65 @@
+.cx-visual-review {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cx-visual-review h4,
+.cx-visual-review p {
+  margin: 0;
+}
+
+.cx-visual-review-tools,
+.cx-visual-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cx-visual-review-tools button[aria-pressed='true'] {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+
+.cx-visual-review-image {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  user-select: none;
+}
+
+.cx-visual-review-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.cx-visual-review-image svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.cx-visual-review textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+}
+
+.cx-visual-review-hint {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.cx-visual-review-error {
+  color: var(--danger, #dc4545);
+}
+
+.cx-visual-review-actions {
+  justify-content: flex-end;
+}

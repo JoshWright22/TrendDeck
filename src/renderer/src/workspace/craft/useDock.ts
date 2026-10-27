@@ -38,7 +38,7 @@ function covered(r: Rect): boolean {
 // or the pane is hidden; going away (another stage, another project) hides it too. minimizing
 // isn't sent, document.hidden is also true when other windows merely cover TrendDeck, and the
 // app's window is owned by TrendDeck's so it minimizes along with it
-export function useDock(appId: string, box: RefObject<HTMLElement | null>, active: boolean, priority = 0): void {
+export function useDock(appId: string, box: RefObject<HTMLElement | null>, active: boolean, priority = 0, suspended = false): void {
   useEffect(() => {
     const api = craftApi()
     if (!api || !active) return
@@ -64,7 +64,7 @@ export function useDock(appId: string, box: RefObject<HTMLElement | null>, activ
       }
       const clip = { x: Math.round(seen.left), y: Math.round(seen.top), width: Math.round(seen.right - seen.left), height: Math.round(seen.bottom - seen.top) }
       // a sliver isn't worth showing, and an overlay over any of it hides the window
-      const visible = bounds.width > 0 && bounds.height > 0 && clip.width >= 40 && clip.height >= 40 && !covered(clip)
+      const visible = !suspended && bounds.width > 0 && bounds.height > 0 && clip.width >= 40 && clip.height >= 40 && !covered(clip)
       const whole = containedBy(b, seen)
       send({ appId, bounds, visible, clip: visible && !whole ? clip : null })
     }
@@ -94,5 +94,5 @@ export function useDock(appId: string, box: RefObject<HTMLElement | null>, activ
       document.removeEventListener('animationend', soon, true)
       targets.remove(target)
     }
-  }, [appId, box, active, priority])
+  }, [appId, box, active, priority, suspended])
 }

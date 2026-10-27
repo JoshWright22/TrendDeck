@@ -10,6 +10,14 @@ if (process.platform !== 'win32') {
 }
 
 const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+const eventually = async (check) => {
+  let lastError
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try { check(); return } catch (error) { lastError = error }
+    await pause(50)
+  }
+  throw lastError
+}
 const option = (name) => process.argv.find((value) => value.startsWith(`${name}=`))?.slice(name.length + 1)
 const handle = (window) => Number(window.getNativeWindowHandle().readBigUInt64LE())
 
@@ -31,10 +39,15 @@ if (!process.versions.electron) {
   app.commandLine.appendSwitch('disable-gpu')
   const directory = option('--directory')
   const childMode = process.argv.includes('--native-child')
+  const profile = path.join(directory, childMode ? 'child-profile' : 'host-profile')
+  fs.mkdirSync(profile, { recursive: true })
+  app.setPath('userData', profile)
+  app.setPath('sessionData', profile)
   let child
   app.whenReady().then(async () => {
     const window = new BrowserWindow({ width: 1000, height: 720, x: -16000, y: -16000, show: false, skipTaskbar: true, title: 'TrendDeck native containment fixture', webPreferences: { sandbox: true } })
     await window.loadURL('data:text/html,<title>Native fixture</title><p>Containment test</p>')
+    window.webContents.setZoomFactor(1)
     const library = require('koffi').load('user32.dll')
     const getParent = library.func('intptr_t __stdcall GetParent(intptr_t hwnd)')
     const getStyle = library.func('intptr_t __stdcall GetWindowLongPtrW(intptr_t hwnd, int index)')
@@ -60,6 +73,7 @@ if (!process.versions.electron) {
     await pause(500)
     assert.equal(Number(getParent(fixture.hwnd)), handle(window), 'Editor is a child, not an owned top-level overlay')
     assert.ok(Number(getStyle(fixture.hwnd, -16)) & 0x40000000, 'Native child style is applied')
+    assert.equal(dock.dockState('fixture'), 'docked', 'The renderer can verify live containment')
     const koffi = require('koffi')
     koffi.struct('TEST_RECT', { left: 'long', top: 'long', right: 'long', bottom: 'long' })
     const getRect = library.func('bool __stdcall GetWindowRect(intptr_t hwnd, _Out_ TEST_RECT *rect)')
@@ -68,7 +82,10 @@ if (!process.versions.electron) {
     const { screen } = require('electron')
     const content = window.getContentBounds()
     const expected = screen.dipToScreenRect(window, { x: content.x + 40, y: content.y + 60, width: 640, height: 400 })
-    assert.deepEqual(rect, { left: expected.x, top: expected.y, right: expected.x + expected.width, bottom: expected.y + expected.height }, 'The child matches the chat viewport without stretching')
+    await eventually(() => {
+      getRect(fixture.hwnd, rect)
+      assert.deepEqual(rect, { left: expected.x, top: expected.y, right: expected.x + expected.width, bottom: expected.y + expected.height }, 'The child matches the chat viewport without stretching')
+    })
     dock.setDock({ appId: 'fixture', bounds: { x: 40, y: 60, width: 640, height: 400 }, visible: true, clip: { x: 40, y: 100, width: 640, height: 320 } })
     await pause(100)
     const gdi = koffi.load('gdi32.dll')
@@ -82,18 +99,25 @@ if (!process.versions.electron) {
     const clipped = screen.dipToScreenRect(window, { x: content.x + 40, y: content.y + 100, width: 640, height: 320 })
     assert.deepEqual(rect, { left: clipped.x - expected.x, top: clipped.y - expected.y, right: clipped.x + clipped.width - expected.x, bottom: clipped.y + clipped.height - expected.y })
     deleteObject(region)
+    dock.setDock({ appId: 'fixture', bounds: { x: 40, y: 60, width: 640, height: 400 }, visible: false })
+    assert.equal(dock.dockState('fixture'), 'hidden', 'Browsing chat hides but does not close the editor')
+    assert.equal(Number(getParent(fixture.hwnd)), handle(window), 'Browsing keeps the editor parented')
     for (const zoom of [0.8, 1.25, 1.5]) {
       window.webContents.setZoomFactor(zoom)
       dock.setDock({ appId: 'fixture', bounds: { x: 40, y: 60, width: 640, height: 400 }, visible: true })
       await pause(150)
       getRect(fixture.hwnd, rect)
       const scaled = screen.dipToScreenRect(window, { x: content.x + Math.round(40 * zoom), y: content.y + Math.round(60 * zoom), width: Math.round(640 * zoom), height: Math.round(400 * zoom) })
-      assert.deepEqual(rect, { left: scaled.x, top: scaled.y, right: scaled.x + scaled.width, bottom: scaled.y + scaled.height }, `Viewport geometry at ${zoom * 100}% zoom`)
+      await eventually(() => {
+        getRect(fixture.hwnd, rect)
+        assert.deepEqual(rect, { left: scaled.x, top: scaled.y, right: scaled.x + scaled.width, bottom: scaled.y + scaled.height }, `Viewport geometry at ${zoom * 100}% zoom`)
+      })
     }
     dock.release('fixture')
     await pause(200)
     assert.equal(Number(getParent(fixture.hwnd)), 0, 'Undocking restores the original native parent')
     assert.equal(Number(getStyle(fixture.hwnd, -16)), fixture.style, 'Undocking restores the editor window style')
+    assert.equal(dock.dockState('fixture'), 'waiting', 'A released editor is no longer reported as docked')
     console.log('Native Craft test passed: cross-process child hosting, viewport geometry, clipping and safe release.')
     fs.writeFileSync(path.join(directory, 'stop'), '')
     await pause(300)

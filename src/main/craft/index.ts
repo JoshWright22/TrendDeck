@@ -4,7 +4,7 @@ import { registerToolSource } from '../gateway/call'
 import { registerSecretSource } from '../gateway/secrets'
 import { loadAllToolCaches, loadToolCache, pickFile, setupAgentSessions, stopAllSessions, stopSession } from './agent'
 import { isAppId, spec } from './catalog'
-import { setDock, setHost } from './dock'
+import { dockState, setDock, setHost } from './dock'
 import { checkUpdates, installLatest, loadInstalled, setRunningCheck, startUpdateChecks, uninstall } from './install'
 import { close, closeAllForQuit, controlTokens, isRunning, launch, runningApp } from './launch'
 import { appFiles, findProject, knownFolder, projectFolder } from './paths'
@@ -93,7 +93,7 @@ export function setupCraft(): void {
   ipcMain.handle('craft:uninstall', async (e, appId: unknown) => {
     if (!fromApp(e)) throw new Error('bad craft call')
     const id = appIdOf(appId)
-    await stopSession(id, false)
+    await stopSession(id)
     await uninstall(id)
   })
   ipcMain.handle('craft:open', (e, req: unknown) => {
@@ -104,12 +104,16 @@ export function setupCraft(): void {
   })
   ipcMain.handle('craft:close', async (e, appId: unknown) => {
     if (!fromApp(e)) throw new Error('bad craft call')
-    await close(appIdOf(appId))
+    if (!(await close(appIdOf(appId)))) throw new Error('The editor is still open. Save or cancel its dialog in the editor; TrendDeck will not force it closed.')
   })
   ipcMain.on('craft:dock', (e, raw: unknown) => {
     if (!fromApp(e)) return
     const d = cleanDock(raw)
     if (d) setDock(d)
+  })
+  ipcMain.handle('craft:dock-state', (e, appId: unknown) => {
+    if (!fromApp(e)) throw new Error('bad craft call')
+    return dockState(appIdOf(appId))
   })
   ipcMain.handle('craft:files', async (e, brandId: unknown, projectId: unknown, appId: unknown) => {
     if (!fromApp(e) || typeof brandId !== 'string' || typeof projectId !== 'string') return []
@@ -139,8 +143,8 @@ export function setupCraft(): void {
     if (!anyOpen) return
     e.preventDefault()
     quitting = true
-    void stopAllSessions().then(async () => {
-      await closeAllForQuit()
+    void closeAllForQuit().then(async () => {
+      await stopAllSessions()
       app.quit()
     }).catch((error) => {
       quitting = false

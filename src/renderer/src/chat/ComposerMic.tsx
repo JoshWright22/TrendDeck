@@ -67,6 +67,7 @@ export default function ComposerMic({ d, disabled }: { d: DictationControl; disa
   useEffect(loadSources, [d.config])
 
   const toggleHandsFree = (): void => {
+    if (disabled && !handsFree) return
     d.setOption({ handsFree: !handsFree })
     if (!handsFree) d.start('hands-free')
     else d.stop()
@@ -79,7 +80,7 @@ export default function ComposerMic({ d, disabled }: { d: DictationControl; disa
         className="ui-menu-btn cx-mic-btn"
         aria-pressed={listening}
         aria-label={listening ? 'Stop dictation' : 'Dictate'}
-        title={listening ? 'Stop dictation' : `Dictate. Click to start and stop, or hold ${holdKey}`}
+        title={listening ? 'Stop dictation' : `Dictate instructions to the agent, not footage. Click to start and stop, or hold ${holdKey}`}
         disabled={disabled || d.state === 'finishing'}
         onClick={() => (listening ? d.stop() : d.start('click'))}
         onContextMenu={(e) => {
@@ -88,6 +89,7 @@ export default function ComposerMic({ d, disabled }: { d: DictationControl; disa
         }}
       >
         <MicIcon />
+        <span>Dictate</span>
       </button>
       <Menu
         label="Dictation options"
@@ -96,7 +98,7 @@ export default function ComposerMic({ d, disabled }: { d: DictationControl; disa
         align="left"
         trigger={<Chevron />}
         items={[
-          { label: handsFree ? 'Turn hands-free off' : 'Turn hands-free on', onSelect: toggleHandsFree },
+          { label: handsFree ? 'Turn hands-free off' : 'Turn hands-free on', onSelect: toggleHandsFree, disabled: disabled && !handsFree },
           ...sources.map((src, i) => ({
             label: `${src.active ? 'Using ' : ''}${src.label}${src.kind === 'api' ? ' (cloud)' : ''}`,
             disabled: src.active,

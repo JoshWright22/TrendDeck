@@ -22,8 +22,7 @@ ipcMain.handle('update:install', () => installNow?.())
 ipcMain.handle('update:check', async () => {
   if (!app.isPackaged || !checkNow) return 'dev'
   if (ready) {
-    installNow?.()
-    return 'installing'
+    return 'downloading'
   }
   try {
     return await checkNow()
