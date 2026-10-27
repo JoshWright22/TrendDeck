@@ -297,14 +297,13 @@
   transform: none;
 }
 
+/* Whole chat leaves a margin each side of the editor where the wheel always scrolls the chat */
 .cx-embed.size-fill {
-  width: 100cqw;
+  --embed-gutter: clamp(24px, 4cqw, 56px);
+  width: calc(100cqw - 2 * var(--embed-gutter));
   max-width: none;
-  margin-left: calc(50% - 50cqw);
+  margin-left: calc(50% - 50cqw + var(--embed-gutter));
   padding: 0;
-  border-right: 0;
-  border-left: 0;
-  border-radius: 0;
 }
 
 .cx-embed.size-fill > :not(.cx-embed-stage) {
