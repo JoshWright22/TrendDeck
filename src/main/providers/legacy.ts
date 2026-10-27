@@ -1,6 +1,7 @@
 import type { ModelOption } from '@shared/chat'
+import { baseAgentId } from '@shared/agents'
 import type { ApprovalDecision, PermissionMode, ProviderCapabilities } from '@shared/providers'
-import { CLIS } from '../agents/catalog'
+import { cliFor } from '../agents/catalog'
 import { getCustom } from '../agents/config'
 import { which } from '../agents/detect'
 import { runApi, runCli, runCommand, type RunHooks } from '../agents/run'
@@ -44,8 +45,9 @@ class LegacySession implements ProviderSession {
 
   async sendTurn(input: TurnInput): Promise<void> {
     const hooks: RunHooks = { ...sinkFor((e) => this.emit(e)), signal: this.ctl.signal }
-    const attach = this.start.mcp?.attach
-    const cli = CLIS.find((c) => c.id === this.agentId)
+    const mcp = this.start.mcp?.attach
+    const attach = { args: mcp?.args ?? [], env: { ...(mcp?.env ?? {}), ...(this.start.env ?? {}) } }
+    const cli = cliFor(this.agentId)
     if (cli) {
       const opts = { model: this.start.model, effort: this.start.effort, session: cli.resume ? this.session : undefined }
       await runCli(cli, input.text, opts, hooks, attach)
@@ -97,7 +99,7 @@ class LegacySession implements ProviderSession {
 }
 
 async function findCli(agentId: string): Promise<string | null> {
-  const cli = CLIS.find((c) => c.id === agentId)
+  const cli = cliFor(agentId)
   if (!cli) return null
   for (const bin of cli.bins) {
     const path = await which(bin)
@@ -110,10 +112,10 @@ export const legacyAdapter: ProviderAdapter = {
   kind: 'legacy-cli',
   capabilities: caps,
   // claude and codex have their own adapters, this one only runs them as a fallback
-  handles: (agentId) => !NATIVE.has(agentId),
+  handles: (agentId) => !NATIVE.has(baseAgentId(agentId)),
 
   async health(agentId): Promise<ProviderHealth> {
-    const cli = CLIS.find((c) => c.id === agentId)
+    const cli = cliFor(agentId)
     if (cli) {
       const path = await findCli(agentId)
       return { installed: path !== null, detail: path ?? '', signedIn: null, note: path ? undefined : `Sign in with: ${cli.setup}` }
@@ -131,7 +133,7 @@ export const legacyAdapter: ProviderAdapter = {
   },
 
   async listModels(agentId): Promise<ModelOption[]> {
-    const cli = CLIS.find((c) => c.id === agentId)
+    const cli = cliFor(agentId)
     if (cli) return cli.modelFlag ? (cli.models ?? DEFAULT_MODEL) : DEFAULT_MODEL
     return apiModels(agentId)
   },
@@ -163,7 +165,7 @@ async function apiModels(agentId: string): Promise<ModelOption[]> {
 }
 
 export const legacyKind = async (agentId: string): Promise<'legacy-cli' | 'legacy-command' | 'legacy-api'> => {
-  if (CLIS.some((c) => c.id === agentId)) return 'legacy-cli'
+  if (cliFor(agentId)) return 'legacy-cli'
   const custom = await getCustom(agentId)
   return custom?.kind === 'api' ? 'legacy-api' : 'legacy-command'
 }

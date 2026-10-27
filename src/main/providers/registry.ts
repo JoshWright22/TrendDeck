@@ -1,4 +1,5 @@
 import type { ProviderInfo } from '@shared/providers'
+import { baseAgentId } from '@shared/agents'
 import { claudeAdapter } from './claude'
 import { codexAdapter } from './codex/adapter'
 import { legacyAdapter, legacyKind } from './legacy'
@@ -8,15 +9,16 @@ import type { ProviderAdapter } from './types'
 // pi-ai.ts is a stub and isn't listed on purpose
 const ADAPTERS: ProviderAdapter[] = [claudeAdapter, codexAdapter, legacyAdapter]
 
-// agents whose own adapter couldn't run here (e.g. a codex too old for app-server), until restart
+// clis whose own adapter couldn't run here (e.g. a codex too old for app-server), until restart.
+// every account of that cli goes the old way then
 const unavailable = new Set<string>()
 
 export function markUnavailable(agentId: string): void {
-  unavailable.add(agentId)
+  unavailable.add(baseAgentId(agentId))
 }
 
 export function adapterFor(agentId: string): ProviderAdapter {
-  if (unavailable.has(agentId)) return legacyAdapter
+  if (unavailable.has(baseAgentId(agentId))) return legacyAdapter
   return ADAPTERS.find((a) => a.handles(agentId)) ?? legacyAdapter
 }
 

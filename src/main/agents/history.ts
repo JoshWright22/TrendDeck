@@ -127,6 +127,13 @@ function cleanMessage(raw: unknown): ThreadMessage | null {
     const plan = cleanPlan(m.plan)
     if (plan.length) msg.plan = plan
     if (Array.isArray(m.handoffFrom)) msg.handoffFrom = m.handoffFrom.filter(isStr).slice(0, 10)
+    if (Array.isArray(m.skipped)) {
+      const skipped = m.skipped
+        .filter((s) => s && isStr(s.agentId) && (s.reason === 'rate_limit' || s.reason === 'usage_limit' || s.reason === 'auth'))
+        .slice(0, 20)
+        .map((s) => ({ agentId: s.agentId.slice(0, 80), reason: s.reason }))
+      if (skipped.length) msg.skipped = skipped
+    }
     if (m.model) msg.model = str(m.model, 120)
     if (m.thinking) msg.thinking = str(m.thinking, MAX_TEXT)
     if (m.thinkingTokens) msg.thinkingTokens = Number(m.thinkingTokens) || 0

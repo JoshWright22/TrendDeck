@@ -16,8 +16,10 @@ import type {
   SpawnOptions
 } from '@anthropic-ai/claude-agent-sdk'
 import type { ModelOption } from '@shared/chat'
+import { baseAgentId } from '@shared/agents'
 import type { ApprovalDecision, PermissionMode, PlanStep, ProviderCapabilities } from '@shared/providers'
 import { CLIS } from '../agents/catalog'
+import { accountEnv } from '../agents/config'
 import { resolveLaunch, which, type Launch } from '../agents/detect'
 import { claudeParser, describeTool } from '../agents/parse'
 import { agentEnv, killTree, MAX_RUN_MS, workDir } from '../agents/run'
@@ -150,7 +152,7 @@ function appToolName(tool: string): string {
 }
 
 class ClaudeSession implements ProviderSession {
-  readonly agentId = 'claude'
+  readonly agentId: string
   private session: string | undefined
   private query: Query | null = null
   private abort: AbortController | null = null
@@ -165,6 +167,7 @@ class ClaudeSession implements ProviderSession {
     private start: SessionStart,
     private claude: { path: string; launch: Launch }
   ) {
+    this.agentId = start.agentId
     this.session = start.resume
     this.mode = start.permissionMode
   }
@@ -240,7 +243,7 @@ class ClaudeSession implements ProviderSession {
     const mcp = this.start.mcp
     const mapped = mapMode(this.mode)
     const options: Options = {
-      ...(await baseOptions(this.claude, mcp?.attach.env ?? {})),
+      ...(await baseOptions(this.claude, { ...(mcp?.attach.env ?? {}), ...(this.start.env ?? {}) })),
       abortController: abort,
       includePartialMessages: true,
       canUseTool: this.canUseTool,
@@ -392,10 +395,10 @@ async function liveModels(): Promise<ModelOption[] | null> {
 }
 
 // signed in when claude code's own credentials file is there. on macos it's in the keychain,
-// and we don't go poking at that, so the answer is "can't tell"
-async function signedIn(): Promise<boolean | null> {
+// and we don't go poking at that, so the answer is "can't tell". only checks the file exists
+async function signedIn(folder: string | undefined): Promise<boolean | null> {
   if (process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_CODE_OAUTH_TOKEN) return true
-  const dir = process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
+  const dir = folder || process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
   try {
     await fs.access(join(dir, '.credentials.json'))
     return true
@@ -407,12 +410,12 @@ async function signedIn(): Promise<boolean | null> {
 export const claudeAdapter: ProviderAdapter = {
   kind: 'claude-sdk',
   capabilities,
-  handles: (agentId) => agentId === 'claude',
+  handles: (agentId) => baseAgentId(agentId) === 'claude',
 
-  async health(): Promise<ProviderHealth> {
+  async health(agentId): Promise<ProviderHealth> {
     const claude = await findClaude()
     if (!claude) return { installed: false, detail: '', signedIn: null, note: `Sign in with: ${SPEC.setup}` }
-    const auth = await signedIn()
+    const auth = await signedIn((await accountEnv(agentId)).CLAUDE_CONFIG_DIR)
     return {
       installed: true,
       detail: claude.path,

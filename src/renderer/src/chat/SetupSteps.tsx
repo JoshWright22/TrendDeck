@@ -11,7 +11,7 @@ interface Props {
 
 // shown in place of the chat when no agent is on this computer yet
 export default function SetupSteps({ agents, scanning, onRescan, onAdd }: Props): ReactNode {
-  const clis = agents.filter((a) => a.kind === 'cli')
+  const clis = agents.filter((a) => a.kind === 'cli' && !a.base)
   return (
     <div className="cx-setup">
       <p className="cx-hello">Deal an agent in first</p>

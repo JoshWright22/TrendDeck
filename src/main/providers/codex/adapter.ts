@@ -4,8 +4,10 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { app } from 'electron'
 import type { ModelOption, UsageWindow } from '@shared/chat'
+import { baseAgentId } from '@shared/agents'
 import type { ApprovalDecision, PermissionMode, PlanStep, ProviderCapabilities, UserInputQuestion } from '@shared/providers'
 import { CLIS } from '../../agents/catalog'
+import { accountEnv } from '../../agents/config'
 import { resolveLaunch, which, type Launch } from '../../agents/detect'
 import { Steps } from '../../agents/parse'
 import { agentEnv, killTree, MAX_RUN_MS, workDir } from '../../agents/run'
@@ -168,7 +170,7 @@ function limitsFrom(raw: Json): UsageWindow[] {
 type Answer = { decision: ApprovalDecision; feedback?: string; remember?: boolean }
 
 class CodexSession implements ProviderSession {
-  readonly agentId = 'codex'
+  readonly agentId: string
   private server: Server | null = null
   private thread: string | undefined
   private turnId: string | null = null
@@ -181,6 +183,7 @@ class CodexSession implements ProviderSession {
   private changes = new Map<string, string>()
 
   constructor(private start: SessionStart) {
+    this.agentId = start.agentId
     this.thread = start.resume
     this.mode = start.permissionMode
   }
@@ -277,7 +280,7 @@ class CodexSession implements ProviderSession {
     if (signal.aborted) return
     const cwd = await workDir()
     const mapped = mapMode(this.mode, cwd)
-    const server = await startServer(this.start.mcp?.attach.args ?? [], this.start.mcp?.attach.env ?? {})
+    const server = await startServer(this.start.mcp?.attach.args ?? [], { ...(this.start.mcp?.attach.env ?? {}), ...(this.start.env ?? {}) })
     this.server = server
     this.interrupted = false
     const { rpc } = server
@@ -507,10 +510,11 @@ async function liveModels(): Promise<ModelOption[]> {
   }
 }
 
-// signed in when codex's own auth file is there, or an api key is set. never asks codex to log in
-async function signedIn(): Promise<boolean> {
+// signed in when codex's own auth file is there, or an api key is set. never asks codex to log in,
+// and only checks the file exists
+async function signedIn(folder: string | undefined): Promise<boolean> {
   if (process.env.OPENAI_API_KEY || process.env.CODEX_API_KEY) return true
-  const home = process.env.CODEX_HOME || join(homedir(), '.codex')
+  const home = folder || process.env.CODEX_HOME || join(homedir(), '.codex')
   return fs
     .access(join(home, 'auth.json'))
     .then(() => true)
@@ -520,12 +524,12 @@ async function signedIn(): Promise<boolean> {
 export const codexAdapter: ProviderAdapter = {
   kind: 'codex-app-server',
   capabilities,
-  handles: (agentId) => agentId === 'codex',
+  handles: (agentId) => baseAgentId(agentId) === 'codex',
 
-  async health(): Promise<ProviderHealth> {
+  async health(agentId): Promise<ProviderHealth> {
     const codex = await findCodex()
     if (!codex) return { installed: false, detail: '', signedIn: null, note: `Sign in with: ${SPEC.setup}` }
-    const auth = await signedIn()
+    const auth = await signedIn((await accountEnv(agentId)).CODEX_HOME)
     return { installed: true, detail: codex.path, signedIn: auth, note: auth ? undefined : `Not signed in. Run: ${SPEC.setup}` }
   },
 

@@ -34,6 +34,7 @@ import TakeRecorder from './TakeRecorder'
 import { useTakeTranscriber } from './useTakeTranscriber'
 import { joinTranscripts, useDictation } from '../dictation/useDictation'
 import type { Transcription } from '@shared/speech'
+import { AUTO_AGENT, skippedLine } from '@shared/agents'
 import type { BrandMemoryState } from '@shared/brand-memory'
 import AgentSettings from './AgentSettings'
 import SetupSteps from './SetupSteps'
@@ -205,7 +206,7 @@ export default function ChatView({
   onInlineCraft
 }: Props): ReactNode {
   const [agents, setAgents] = useState<AgentInfo[] | null>(null)
-  const [config, setConfig] = useState<AgentConfig>({ defaultAgentId: null, custom: [] })
+  const [config, setConfig] = useState<AgentConfig>({ defaultAgentId: null, custom: [], accounts: [], rank: [], autoOff: [] })
   const [threads, setThreads] = useState<ThreadSummary[]>([])
   const [thread, setThread] = useState<Thread | null>(null)
   const [draft, setDraft, draftSaved] = useChatDraft(brand.id, openId, project?.id ?? 'general')
@@ -345,6 +346,20 @@ export default function ChatView({
           })
           if (ev.type === 'plan') return patch((m) => ({ ...m, plan: ev.plan }))
           if (ev.type === 'handoff') return patch((m) => ({ ...m, handoffFrom: ev.fromAgentIds }))
+          // auto moved on to the next agent, what the last one started is gone
+          if (ev.type === 'reroute') {
+            return patch((m) => ({
+              ...m,
+              agentId: ev.agentId,
+              model: ev.model,
+              skipped: ev.skipped,
+              text: '',
+              thinking: undefined,
+              thinkingTokens: undefined,
+              handoffFrom: undefined,
+              plan: undefined
+            }))
+          }
           if (ev.type === 'approval') {
             const rec: ApprovalRecord = { ...ev.request, status: 'pending' }
             return patch((m) => ({ ...m, approvals: [...(m.approvals ?? []).filter((a) => a.requestId !== rec.requestId), rec] }))
@@ -442,13 +457,18 @@ export default function ChatView({
   useEffect(() => jumpDown(), [openId])
 
   const usable = useMemo(() => (agents ?? []).filter((a) => a.installed), [agents])
+  // auto picks the agent per reply in main, so it has no model or effort of its own here
   const agentId =
-    [picked, thread?.agentId, config.defaultAgentId].find((id) => id && usable.some((a) => a.id === id)) ??
+    [picked, thread?.agentId, config.defaultAgentId].find(
+      (id) => id && ((id === AUTO_AGENT && usable.length > 0) || usable.some((a) => a.id === id))
+    ) ??
     usable[0]?.id ??
     null
   const agent = usable.find((a) => a.id === agentId)
-  const agentName = (id?: string): string => agents?.find((a) => a.id === id)?.name ?? 'Agent'
+  const agentName = (id?: string): string => (id === AUTO_AGENT ? 'Auto' : (agents?.find((a) => a.id === id)?.name ?? 'Agent'))
   const busy = !!thread?.messages.some((m) => m.status === 'streaming')
+  // who is answering right now, the actual agent when the chat is on auto
+  const answeringId = thread?.messages.find((m) => m.status === 'streaming')?.agentId ?? agentId ?? undefined
 
   const model = agentId ? ((thread ? thread.models?.[agentId] : newModels[agentId]) ?? '') : ''
   const modelOptions = useMemo(() => {
@@ -524,7 +544,7 @@ export default function ChatView({
       }
       const res = await chat().steer(brandId, threadId, body, agentId)
       if (res.mode === 'queued') {
-        setNotice(`${agentName(agentId)} can't take messages mid reply, so it's queued for when this one is done`)
+        setNotice(`${agentName(answeringId)} can't take messages mid reply, so it's queued for when this one is done`)
         setQueued(await chat().listQueue(brandId, threadId))
       } else if (res.mode === 'sent') void loadThread(threadId)
     } catch (err) {
@@ -612,7 +632,7 @@ export default function ChatView({
     if (busy && thread) {
       const res = await chat().steer(brandId, thread.id, body, agentId)
       if (res.mode === 'queued') {
-        setNotice(`${agentName(agentId)} can't take messages mid reply, so it's queued for when this one is done`)
+        setNotice(`${agentName(answeringId)} can't take messages mid reply, so it's queued for when this one is done`)
         setQueued(await chat().listQueue(brandId, thread.id))
       } else if (res.mode === 'sent') void loadThread(thread.id)
       return
@@ -911,7 +931,7 @@ export default function ChatView({
 
   // who answered shows once, then again only when the agent or model changes
   const showWho = (m: ThreadMessage, i: number): boolean => {
-    if (m.status === 'stopped' || m.handoffFrom?.length) return true
+    if (m.status === 'stopped' || m.handoffFrom?.length || m.skipped?.length) return true
     const prev = thread?.messages.slice(0, i).reverse().find((p) => p.role === 'agent')
     return !prev || prev.agentId !== m.agentId || (prev.model ?? '') !== (m.model ?? '')
   }
@@ -924,6 +944,10 @@ export default function ChatView({
         </div>
       ) : null}
     <div className={`cx-msg agent${m.status === 'streaming' ? ' streaming' : ''}`}>
+      {/* when nobody was left the error says so, the line would name the last one that failed */}
+      {m.skipped?.length && m.agentId && m.agentId !== AUTO_AGENT && !m.skipped.some((s) => s.agentId === m.agentId) ? (
+        <p className="cx-skipped">{skippedLine(m.skipped, agentName(m.agentId), agentName, m.status === 'streaming')}</p>
+      ) : null}
       {showWho(m, i) && (
       <div className="cx-who">
         <RisingMark className="cx-who-mark" />
@@ -1276,7 +1300,9 @@ export default function ChatView({
                     ? 'Type a note to deny with feedback, or approve above'
                     : busy
                       ? 'Steer this reply (Enter), or queue it for after (Alt+Enter)'
-                      : `Message ${agentName(agentId)}`
+                      : agentId === AUTO_AGENT
+                        ? 'Message your agents'
+                        : `Message ${agentName(agentId)}`
               }
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
@@ -1330,11 +1356,18 @@ export default function ChatView({
                 title="Agent for this chat"
                 up
                 value={agentId ?? ''}
-                options={agentId ? usable.map((a) => ({ value: a.id, label: a.name })) : [{ value: '', label: 'No agent' }]}
+                options={
+                  agentId
+                    ? [
+                        { value: AUTO_AGENT, label: 'Auto', hint: 'Picks the first free agent in your order' },
+                        ...usable.map((a) => ({ value: a.id, label: a.name }))
+                      ]
+                    : [{ value: '', label: 'No agent' }]
+                }
                 onChange={pickAgent}
                 actions={[{ label: 'Add or edit agents...', onSelect: () => setManage(true) }]}
               />
-              {agentId && (
+              {agent && (
                 <Dropdown
                   className="cx-model"
                   label="Model"

@@ -1,7 +1,13 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { promises as fs } from 'node:fs'
+import { homedir } from 'node:os'
+import { delimiter, dirname, isAbsolute, join } from 'node:path'
 import { ID_PATTERN } from '@shared/types'
+import { ACCOUNT_ENV, AUTO_AGENT, baseAgentId, isAccountId } from '@shared/agents'
 import type {
+  AgentAccount,
   AgentInfo,
   ChatEvent,
   CustomAgentInput,
@@ -23,13 +29,27 @@ import {
   type UserInputRequest
 } from '@shared/providers'
 import { getData } from '../store'
-import { CLIS } from './catalog'
-import { getConfig, getCustom, removeCustom, saveCustom, setDefault } from './config'
+import { CLIS, cliFor } from './catalog'
+import {
+  accountEnv,
+  getAccount,
+  getConfig,
+  getCustom,
+  removeAccount,
+  removeCustom,
+  saveAccount,
+  saveCustom,
+  setDefault,
+  setRank
+} from './config'
+import { which } from './detect'
+import { agentEnv } from './run'
+import { blockedFor, classifyAgentError, cooldownFor, limitReply, noneLeftMessage, pickAgent, plainError, type Pick } from './route'
 import { brandContext, flatPrompt, history, historyRoom, turnNotes, turnText, voiceHash, voiceRoom } from './context'
 import { getBrandContext } from '../voice'
 import { addThread, cleanAttachments, dropChats, findThread, persist, removeThread, threadsFor } from './history'
 import { beginAgentTurn, type AgentKind, type AgentSession } from '../mcp'
-import { recordLimits, usageFor } from './usage'
+import { clearAuthCooldowns, clearCooldown, liveCooldowns, recordLimits, setCooldown, usageFor, windowsFor } from './usage'
 import { adapterFor, fallbackAdapter, markUnavailable, providerInfo } from '../providers/registry'
 import { buildHandoff, missedSince } from '../providers/handoff'
 import { brandMode, setBrandMode } from '../providers/settings'
@@ -49,15 +69,21 @@ const DEFAULT_MODEL: ModelOption[] = [{ id: '', label: 'Model' }]
 
 let detected: AgentInfo[] | null = null
 
+// the builtin clis, each followed by its extra accounts
 async function detect(): Promise<AgentInfo[]> {
+  const { accounts } = await getConfig()
+  const entries = CLIS.flatMap((c) => [
+    { id: c.id, name: c.name, cli: c, folder: undefined as string | undefined },
+    ...accounts.filter((a) => baseAgentId(a.id) === c.id).map((a) => ({ id: a.id, name: a.name, cli: c, folder: a.folder }))
+  ])
   const found = await Promise.all(
-    CLIS.map(async (c): Promise<AgentInfo> => {
-      const adapter = adapterFor(c.id)
-      const health = await adapter.health(c.id)
-      const info = await providerInfo(c.id)
-      return {
-        id: c.id,
-        name: c.name,
+    entries.map(async ({ id, name, cli: c, folder }): Promise<AgentInfo> => {
+      const adapter = adapterFor(id)
+      const health = await adapter.health(id)
+      const info = await providerInfo(id)
+      const out: AgentInfo = {
+        id,
+        name,
         kind: 'cli',
         installed: health.installed,
         detail: health.detail,
@@ -66,8 +92,14 @@ async function detect(): Promise<AgentInfo[]> {
         models: c.modelFlag ? (c.models ?? DEFAULT_MODEL) : DEFAULT_MODEL,
         efforts: c.efforts,
         provider: info.kind,
-        capabilities: info.capabilities
+        capabilities: info.capabilities,
+        signedIn: health.signedIn
       }
+      if (folder) {
+        out.base = c.id
+        out.folder = folder
+      }
+      return out
     })
   )
   detected = found
@@ -75,6 +107,8 @@ async function detect(): Promise<AgentInfo[]> {
 }
 
 async function listAgents(rescan: boolean): Promise<AgentInfo[]> {
+  // signing in again is what a rescan is for, so auto gives those agents another go
+  if (rescan) await clearAuthCooldowns()
   const builtins = !detected || rescan ? await detect() : detected
   const { custom } = await getConfig()
   const extra = await Promise.all(
@@ -96,13 +130,94 @@ async function listAgents(rescan: boolean): Promise<AgentInfo[]> {
 }
 
 function agentName(agentId: string): string {
+  if (agentId === AUTO_AGENT) return 'Auto'
   return CLIS.find((c) => c.id === agentId)?.name ?? detected?.find((a) => a.id === agentId)?.name ?? agentId
+}
+
+// the folder the usual account of a cli uses
+function defaultFolder(base: string): string {
+  if (base === 'claude') return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
+  return process.env.CODEX_HOME || join(homedir(), '.codex')
+}
+
+const LOGIN: Record<string, string> = { claude: 'claude /login', codex: 'codex login' }
+
+// a console window running the cli's own login with the account's folder set. you sign in there
+// yourself, the app never sees what goes on in it
+async function openSignIn(agentId: string): Promise<void> {
+  const base = baseAgentId(agentId)
+  const login = LOGIN[base]
+  const cli = cliFor(agentId)
+  if (!login || !cli) throw new Error('That agent signs in its own way')
+  if (agentId !== base && !(await getAccount(agentId))) throw new Error('That account was removed')
+  let path: string | null = null
+  for (const bin of cli.bins) {
+    path = await which(bin)
+    if (path) break
+  }
+  if (!path) throw new Error(`${cli.name} isn't installed or isn't on PATH`)
+  const extra = await accountEnv(agentId)
+  const env: NodeJS.ProcessEnv = { ...agentEnv(extra) }
+  delete env.NO_COLOR
+  delete env.FORCE_COLOR
+  // the cli was found on a path the console might not have
+  const pathKey = Object.keys(env).find((k) => k.toLowerCase() === 'path') ?? 'PATH'
+  env[pathKey] = [dirname(path), env[pathKey]].filter(Boolean).join(delimiter)
+  if (process.platform === 'win32') {
+    const child = spawn('cmd.exe', ['/d', '/c', `start "TrendDeck sign in" cmd.exe /k ${login}`], {
+      env,
+      detached: true,
+      stdio: 'ignore',
+      windowsVerbatimArguments: true
+    })
+    child.on('error', () => {})
+    child.unref()
+    return
+  }
+  const q = (v: string): string => `'${v.replace(/'/g, `'\\''`)}'`
+  const line = [...Object.entries(extra).map(([k, v]) => `export ${k}=${q(v)}`), `export PATH=${q(dirname(path))}:"$PATH"`, login].join('; ')
+  const child =
+    process.platform === 'darwin'
+      ? spawn('osascript', ['-e', `tell application "Terminal" to do script ${JSON.stringify(line)}`, '-e', 'tell application "Terminal" to activate'], {
+          detached: true,
+          stdio: 'ignore'
+        })
+      : spawn('x-terminal-emulator', ['-e', 'sh', '-c', `${line}; exec sh`], { env, detached: true, stdio: 'ignore' })
+  child.on('error', () => {})
+  child.unref()
+}
+
+// the next agent auto would use, past the ones in exclude. sign ins are checked again for the
+// ones that looked signed out, that's only a file check
+async function pickAuto(exclude: string[]): Promise<Pick> {
+  const [agents, cfg, cooldowns] = await Promise.all([listAgents(false), getConfig(), liveCooldowns()])
+  const fresh = await Promise.all(
+    agents.map(async (a) => {
+      if (a.signedIn !== false) return a
+      const h = await adapterFor(a.id).health(a.id)
+      a.signedIn = h.signedIn
+      a.installed = h.installed
+      return a
+    })
+  )
+  const usage = await windowsFor(fresh.filter((a) => a.installed).map((a) => a.id))
+  return pickAgent({
+    agents: fresh.map((a) => ({ id: a.id, installed: a.installed, signedIn: a.signedIn })),
+    rank: cfg.rank,
+    autoOff: cfg.autoOff,
+    usage,
+    cooldowns,
+    now: Date.now(),
+    exclude
+  })
 }
 
 // one run per thread at a time
 interface Live {
   ctl: AbortController
+  // the agent answering right now. with auto it can change mid reply
   agentId: string
+  auto: boolean
   thread: Thread
   reply: ThreadMessage
   // set once the adapter started, steering and approvals go through it
@@ -132,21 +247,24 @@ function validId(v: unknown): v is string {
 
 // which config the agent server writes for this agent, the rest read the generic env and file
 function attachKind(agentId: string): AgentKind {
-  return agentId === 'claude' || agentId === 'codex' || agentId === 'opencode' ? agentId : 'generic'
+  const base = baseAgentId(agentId)
+  return base === 'claude' || base === 'codex' || base === 'opencode' ? base : 'generic'
 }
 
 async function modeFor(brandId: string, thread: Thread | null): Promise<PermissionMode> {
   return thread?.permissionMode ?? (await brandMode(brandId))
 }
 
-function startRun(brandId: string, thread: Thread, reply: ThreadMessage, agentId: string): void {
-  const live: Live = { ctl: new AbortController(), agentId, thread, reply, session: null, inputs: [] }
+function startRun(brandId: string, thread: Thread, reply: ThreadMessage, agentId: string, auto: boolean): void {
+  const live: Live = { ctl: new AbortController(), agentId, auto, thread, reply, session: null, inputs: [] }
   runs.set(runKey(brandId, thread.id), live)
   void runReply(brandId, live)
 }
 
+const errText = (err: unknown): string => (err instanceof Error ? err.message : String(err))
+
 async function runReply(brandId: string, live: Live): Promise<void> {
-  const { thread, reply, agentId, ctl } = live
+  const { thread, reply, ctl } = live
   const key = runKey(brandId, thread.id)
   let lastSave = Date.now()
   const ids = { brandId, threadId: thread.id, messageId: reply.id }
@@ -186,7 +304,7 @@ async function runReply(brandId: string, live: Live): Promise<void> {
         return
       }
       case 'session':
-        if (e.id) thread.sessions = { ...thread.sessions, [agentId]: e.id.slice(0, 200) }
+        if (e.id) thread.sessions = { ...thread.sessions, [live.agentId]: e.id.slice(0, 200) }
         return
       case 'usage': {
         const ctx = e.contextTokens ?? (e.inputTokens || e.outputTokens ? (e.inputTokens ?? 0) + (e.outputTokens ?? 0) : 0)
@@ -195,7 +313,7 @@ async function runReply(brandId: string, live: Live): Promise<void> {
         return
       }
       case 'limits':
-        void recordLimits(agentId, e.windows)
+        void recordLimits(live.agentId, e.windows)
         return
       case 'plan':
         reply.plan = e.plan
@@ -233,7 +351,7 @@ async function runReply(brandId: string, live: Live): Promise<void> {
     }
     for (const r of live.inputs.splice(0)) sendProvider({ type: 'user-input-resolved', ...ids, requestId: r.requestId })
     // the agent's session now knows everything up to this reply
-    if (status === 'done') thread.seen = { ...thread.seen, [agentId]: reply.id }
+    if (status === 'done') thread.seen = { ...thread.seen, [live.agentId]: reply.id }
     thread.updatedAt = Date.now()
     runs.delete(key)
     void persist(brandId).catch(() => {})
@@ -250,6 +368,10 @@ async function runReply(brandId: string, live: Live): Promise<void> {
   try {
     const brand = getData()?.brands.find((b) => b.id === brandId)
     if (!brand) throw new Error('That brand is gone')
+    // auto found nobody when the message went out
+    if (live.agentId === AUTO_AGENT) {
+      throw new Error(noneLeftMessage(await pickAuto([]), [], agentName, Date.now()))
+    }
     const base = await brandContext(brand, thread.id)
     // the user message and the empty reply are the last two
     const userMsg = thread.messages[thread.messages.length - 2]
@@ -263,98 +385,167 @@ async function runReply(brandId: string, live: Live): Promise<void> {
     const histRoom = historyRoom(context.length + message.length)
     const past = history(thread, 2, histRoom)
     const sentVoice = voiceHash(voice.text)
-    const model = thread.models?.[agentId] || undefined
-    const effort = thread.efforts?.[agentId] || undefined
     const permissionMode = await modeFor(brandId, thread)
-    const custom = CLIS.some((c) => c.id === agentId) ? null : await getCustom(agentId)
-    if (!CLIS.some((c) => c.id === agentId) && !custom) throw new Error('That agent was removed. Pick another one.')
 
-    // the prompt for a fresh session or a resumed one. a resumed session already has the
-    // brand, the voice and the chat so far: it gets the new message, the voice pack again
-    // only when it changed, and a handoff of turns other agents answered since it last looked
-    const promptFor = (resumed: boolean): string => {
-      if (!resumed) {
-        const handoff = buildHandoff(thread.messages.slice(0, -2), agentId, agentName, histRoom)
+    // one agent's go at the reply. fresh skips its saved session, for an agent auto moved to
+    const attempt = async (agentId: string, fresh: boolean): Promise<void> => {
+      const model = thread.models?.[agentId] || undefined
+      const effort = thread.efforts?.[agentId] || undefined
+      const cli = cliFor(agentId)
+      const custom = cli ? null : await getCustom(agentId)
+      if (!cli && !custom) throw new Error('That agent was removed. Pick another one.')
+      if (isAccountId(agentId) && !(await getAccount(agentId))) throw new Error('That account was removed. Pick another agent.')
+      if (agentId.includes('@') && !isAccountId(agentId)) throw new Error('That agent was removed. Pick another one.')
+      const env = await accountEnv(agentId)
+
+      // the prompt for a fresh session or a resumed one. a resumed session already has the
+      // brand, the voice and the chat so far: it gets the new message, the voice pack again
+      // only when it changed, and a handoff of turns other agents answered since it last looked
+      const promptFor = (resumed: boolean): string => {
+        if (!resumed) {
+          const handoff = buildHandoff(thread.messages.slice(0, -2), agentId, agentName, histRoom)
+          if (handoff) {
+            reply.handoffFrom = handoff.from
+            sendProvider({ type: 'handoff', ...ids, fromAgentIds: handoff.from, toAgentId: agentId })
+            return [context, '', handoff.text, '', '## New message from the user', message].join('\n')
+          }
+          return flatPrompt(context, past, message)
+        }
+        const parts: string[] = []
+        if (thread.voiceSent?.[agentId] !== sentVoice) parts.push(voice.text, '')
+        const handoff = buildHandoff(missedSince(thread, agentId, 2), agentId, agentName, histRoom)
         if (handoff) {
           reply.handoffFrom = handoff.from
           sendProvider({ type: 'handoff', ...ids, fromAgentIds: handoff.from, toAgentId: agentId })
-          return [context, '', handoff.text, '', '## New message from the user', message].join('\n')
+          parts.push(handoff.text, '')
         }
-        return flatPrompt(context, past, message)
+        if (!parts.length) return message
+        return [...parts, '## New message from the user', message].join('\n')
       }
-      const parts: string[] = []
-      if (thread.voiceSent?.[agentId] !== sentVoice) parts.push(voice.text, '')
-      const handoff = buildHandoff(missedSince(thread, agentId, 2), agentId, agentName, histRoom)
-      if (handoff) {
-        reply.handoffFrom = handoff.from
-        sendProvider({ type: 'handoff', ...ids, fromAgentIds: handoff.from, toAgentId: agentId })
-        parts.push(handoff.text, '')
+
+      // plain api agents are one request with no process and no tool calls, so they get no turn
+      const needsTools = !(custom && custom.kind === 'api')
+      const openTurn = async (): Promise<AgentSession | null> =>
+        needsTools ? (turn ??= await beginAgentTurn(brandId, attachKind(agentId), { threadId: thread.id, messageId: reply.id })) : null
+
+      const run = async (adapter: ProviderAdapter, resume: string | undefined): Promise<void> => {
+        const start: SessionStart = {
+          agentId,
+          brandId,
+          threadId: thread.id,
+          resume,
+          model,
+          effort,
+          permissionMode,
+          env,
+          mcp: await openTurn(),
+          emit,
+          signal: ctl.signal
+        }
+        await session?.close()
+        session = await adapter.startSession(start)
+        live.session = session
+        const text = promptFor(resume !== undefined)
+        thread.voiceSent = { ...thread.voiceSent, [agentId]: sentVoice }
+        await session.sendTurn({ text, system: context, history: past, message })
       }
-      if (!parts.length) return message
-      return [...parts, '## New message from the user', message].join('\n')
+
+      let adapter = adapterFor(agentId)
+      // legacy clis only resume when the catalog says they can
+      const canResume = (a: ProviderAdapter): boolean => a.capabilities.resume || (a === fallbackAdapter && !!cli?.resume)
+      let resume = !fresh && canResume(adapter) ? thread.sessions?.[agentId] : undefined
+      try {
+        await run(adapter, resume)
+      } catch (err) {
+        if (ctl.signal.aborted) throw err
+        if (err instanceof ProviderUnavailable && adapter !== fallbackAdapter) {
+          // e.g. a codex too old for app-server: this turn and the next go the old way
+          markUnavailable(agentId)
+          adapter = fallbackAdapter
+          resume = !fresh && canResume(adapter) ? thread.sessions?.[agentId] : undefined
+          if (!reply.text) await run(adapter, resume)
+          else throw err
+        } else if (resume && !reply.text && classifyAgentError(errText(err)) === 'other') {
+          // the agent lost the session (cleared, other machine), start over with the full prompt
+          if (thread.sessions) delete thread.sessions[agentId]
+          if (thread.seen) delete thread.seen[agentId]
+          await run(adapter, undefined)
+        } else throw err
+      }
+      if (ctl.signal.aborted) return
+      // claude code sometimes prints its limit or login notice as the reply itself
+      const notice = reply.steps?.length ? 'other' : limitReply(reply.text)
+      if (notice !== 'other') {
+        const text = reply.text
+        reply.text = ''
+        throw new Error(text)
+      }
     }
 
-    // plain api agents are one request with no process and no tool calls, so they get no turn
-    const needsTools = !(custom && custom.kind === 'api')
-    const openTurn = async (): Promise<AgentSession | null> =>
-      needsTools ? (turn ??= await beginAgentTurn(brandId, attachKind(agentId), { threadId: thread.id, messageId: reply.id })) : null
-
-    const run = async (adapter: ProviderAdapter, resume: string | undefined): Promise<void> => {
-      const start: SessionStart = {
-        agentId,
-        brandId,
-        threadId: thread.id,
-        resume,
-        model,
-        effort,
-        permissionMode,
-        mcp: await openTurn(),
-        emit,
-        signal: ctl.signal
+    // agents auto already tried for this reply, and when each is back
+    const tried: { agentId: string; until: number | null }[] = []
+    for (let fresh = false; ; fresh = true) {
+      const agentId = live.agentId
+      try {
+        await attempt(agentId, fresh)
+        break
+      } catch (err) {
+        if (ctl.signal.aborted) throw err
+        const text = errText(err)
+        const kind = classifyAgentError(text)
+        if (kind === 'other') throw err
+        const now = Date.now()
+        const cooldown = cooldownFor(kind, text, now)
+        await setCooldown(agentId, cooldown)
+        // only a reply with nothing to show and no tool run behind it moves on, so no tool runs twice
+        const untouched = !reply.text.trim() && !reply.steps?.length && !reply.approvals?.length
+        if (!live.auto || !untouched) throw new Error(plainError(kind, agentName(agentId), cooldown.until, now))
+        tried.push({ agentId, until: cooldown.until })
+        reply.skipped = [...(reply.skipped ?? []), { agentId, reason: kind }]
+        // this agent's process and tool turn go, the next agent opens its own
+        await (session as ProviderSession | null)?.close().catch(() => {})
+        session = null
+        live.session = null
+        await (turn as AgentSession | null)?.end()
+        turn = null
+        const pick = await pickAuto(tried.map((t) => t.agentId))
+        if (!pick.agentId) throw new Error(noneLeftMessage(pick, tried, agentName, Date.now()))
+        live.agentId = pick.agentId
+        reply.agentId = pick.agentId
+        const model = thread.models?.[pick.agentId] || undefined
+        if (model) reply.model = model
+        else delete reply.model
+        reply.thinking = undefined
+        reply.thinkingTokens = undefined
+        reply.handoffFrom = undefined
+        reply.contextTokens = undefined
+        reply.plan = undefined
+        sendProvider({ type: 'reroute', ...ids, agentId: pick.agentId, model, skipped: reply.skipped })
+        void persist(brandId).catch(() => {})
       }
-      await session?.close()
-      session = await adapter.startSession(start)
-      live.session = session
-      const text = promptFor(resume !== undefined)
-      thread.voiceSent = { ...thread.voiceSent, [agentId]: sentVoice }
-      await session.sendTurn({ text, system: context, history: past, message })
-    }
-
-    let adapter = adapterFor(agentId)
-    // legacy clis only resume when the catalog says they can
-    const canResume = (a: ProviderAdapter): boolean =>
-      a.capabilities.resume || (a === fallbackAdapter && !!CLIS.find((c) => c.id === agentId)?.resume)
-    let resume = canResume(adapter) ? thread.sessions?.[agentId] : undefined
-    try {
-      await run(adapter, resume)
-    } catch (err) {
-      if (ctl.signal.aborted) throw err
-      if (err instanceof ProviderUnavailable && adapter !== fallbackAdapter) {
-        // e.g. a codex too old for app-server: this turn and the next go the old way
-        markUnavailable(agentId)
-        adapter = fallbackAdapter
-        resume = canResume(adapter) ? thread.sessions?.[agentId] : undefined
-        if (!reply.text) await run(adapter, resume)
-        else throw err
-      } else if (resume && !reply.text) {
-        // the agent lost the session (cleared, other machine), start over with the full prompt
-        if (thread.sessions) delete thread.sessions[agentId]
-        if (thread.seen) delete thread.seen[agentId]
-        await run(adapter, undefined)
-      } else throw err
     }
     if (ctl.signal.aborted) finish('stopped')
     else if (!reply.text.trim()) finish('error', 'The agent finished without saying anything')
-    else finish('done')
+    else {
+      void clearCooldown(live.agentId)
+      finish('done')
+    }
   } catch (err) {
     if (ctl.signal.aborted) finish('stopped')
-    else finish('error', err instanceof Error ? err.message : String(err))
+    else finish('error', errText(err))
   } finally {
     await (session as ProviderSession | null)?.close().catch(() => {})
     live.session = null
     // the process has exited by now, its token dies with the turn
     await (turn as AgentSession | null)?.end()
   }
+}
+
+// the agent a new reply starts on: the one asked for, or auto's first pick. 'auto' when auto
+// has nobody, the reply then says why
+async function replyAgent(agentId: string): Promise<string> {
+  if (agentId !== AUTO_AGENT) return agentId
+  return (await pickAuto([])).agentId ?? AUTO_AGENT
 }
 
 function newReply(agentId: string, model: string | undefined): ThreadMessage {
@@ -382,9 +573,11 @@ async function sendMessage(
     thread.permissionMode = mode
     await addThread(brandId, thread)
   }
-  if (typeof o.model === 'string') thread.models = { ...thread.models, [agentId]: o.model.slice(0, 120) }
-  if (typeof o.effort === 'string') thread.efforts = { ...thread.efforts, [agentId]: o.effort.slice(0, 20) }
-  const reply = newReply(agentId, thread.models?.[agentId] || undefined)
+  const auto = agentId === AUTO_AGENT
+  if (!auto && typeof o.model === 'string') thread.models = { ...thread.models, [agentId]: o.model.slice(0, 120) }
+  if (!auto && typeof o.effort === 'string') thread.efforts = { ...thread.efforts, [agentId]: o.effort.slice(0, 20) }
+  const answering = await replyAgent(agentId)
+  const reply = newReply(answering, thread.models?.[answering] || undefined)
   const files = cleanAttachments(o.attachments)
   const userMsg: ThreadMessage = { id: randomUUID(), role: 'user', text: body, at: now }
   if (files.length) userMsg.attachments = files
@@ -394,7 +587,7 @@ async function sendMessage(
   thread.updatedAt = now
   await persist(brandId)
   send({ type: 'threads', brandId })
-  startRun(brandId, thread, reply, agentId)
+  startRun(brandId, thread, reply, answering, auto)
   return { threadId: thread.id, messageId: reply.id, userId: userMsg.id }
 }
 
@@ -437,7 +630,8 @@ async function steer(brandId: string, thread: Thread, text: string, agentId: str
     const r = await sendMessage(brandId, thread.id, body, agentId)
     return { mode: 'sent', threadId: thread.id, messageId: r.userId, replyId: r.messageId }
   }
-  if (live.agentId === agentId && live.session && (await live.session.steer(body).catch(() => false))) {
+  const same = live.agentId === agentId || (live.auto && agentId === AUTO_AGENT)
+  if (same && live.session &&(await live.session.steer(body).catch(() => false))) {
     const msg: ThreadMessage = { id: randomUUID(), role: 'user', text: body, at: Date.now(), steer: true }
     // saved right before the reply it went into
     const i = thread.messages.indexOf(live.reply)
@@ -462,11 +656,73 @@ export function setupAgents(): void {
     for (const live of runs.values()) live.ctl.abort()
   })
 
-  ipcMain.handle('chat:agents', (_e, rescan: unknown) => listAgents(rescan === true))
+  // with what holds each one back from auto right now
+  ipcMain.handle('chat:agents', async (_e, rescan: unknown) => {
+    const agents = await listAgents(rescan === true)
+    const now = Date.now()
+    const [usage, cooldowns] = await Promise.all([windowsFor(agents.filter((a) => a.installed).map((a) => a.id)), liveCooldowns(now)])
+    return agents.map((a): AgentInfo => {
+      const b = blockedFor({ id: a.id, installed: a.installed, signedIn: a.signedIn }, usage[a.id], cooldowns[a.id], now)
+      return b && b.why !== 'missing' && b.why !== 'signed_out' ? { ...a, held: { why: b.why, until: b.until } } : { ...a, held: undefined }
+    })
+  })
   ipcMain.handle('chat:config', () => getConfig())
   ipcMain.handle('chat:save-agent', (_e, input: CustomAgentInput) => saveCustom(input))
   ipcMain.handle('chat:remove-agent', (_e, id: unknown) => (validId(id) ? removeCustom(id) : getConfig()))
   ipcMain.handle('chat:default-agent', (_e, id: unknown) => setDefault(typeof id === 'string' ? id : null))
+  ipcMain.handle('chat:rank', (_e, rank: unknown, autoOff: unknown) => setRank(rank, autoOff))
+
+  ipcMain.handle('chat:save-account', async (_e, input: unknown) => {
+    const a = (input ?? {}) as Partial<AgentAccount>
+    if (typeof a.id !== 'string' || !isAccountId(a.id)) throw new Error('bad account id')
+    if (typeof a.folder !== 'string' || !isAbsolute(a.folder)) throw new Error('Pick a folder for this account')
+    if (a.folder.replace(/[\\/]+$/, '').toLowerCase() === defaultFolder(baseAgentId(a.id)).toLowerCase()) {
+      throw new Error('That folder is the usual account already. Pick or make another one.')
+    }
+    // a new account starts in an empty folder the cli fills when you sign in
+    await fs.mkdir(a.folder, { recursive: true })
+    const cfg = await saveAccount({ id: a.id, name: String(a.name ?? ''), folder: a.folder })
+    detected = null
+    return cfg
+  })
+  ipcMain.handle('chat:remove-account', async (_e, id: unknown) => {
+    if (typeof id !== 'string' || !isAccountId(id)) return getConfig()
+    const cfg = await removeAccount(id)
+    detected = null
+    return cfg
+  })
+  // names only, nothing inside the folders is read
+  ipcMain.handle('chat:account-folders', async (_e, base: unknown) => {
+    if (typeof base !== 'string' || !(base in ACCOUNT_ENV)) return { found: [], fresh: '' }
+    const home = homedir()
+    const { accounts } = await getConfig()
+    // the usual account's folder and the ones other accounts use aren't offered
+    const used = new Set([...accounts.map((a) => a.folder.toLowerCase()), defaultFolder(base).toLowerCase()])
+    const names = await fs.readdir(home, { withFileTypes: true }).catch(() => [])
+    const found = names
+      .filter((d) => d.isDirectory() && d.name.toLowerCase().startsWith(`.${base}`) && d.name.toLowerCase() !== `.${base}`)
+      .map((d) => join(home, d.name))
+      .filter((p) => !used.has(p.toLowerCase()))
+      .sort()
+    const taken = new Set(names.map((d) => d.name.toLowerCase()))
+    let n = 2
+    while (taken.has(`.${base}-${n}`) || used.has(join(home, `.${base}-${n}`).toLowerCase())) n++
+    return { found, fresh: join(home, `.${base}-${n}`) }
+  })
+  ipcMain.handle('chat:pick-folder', async (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    const opts: Electron.OpenDialogOptions = {
+      title: 'Pick the account folder',
+      defaultPath: homedir(),
+      properties: ['openDirectory', 'createDirectory', 'showHiddenFiles']
+    }
+    const res = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+    return res.canceled ? null : (res.filePaths[0] ?? null)
+  })
+  ipcMain.handle('chat:sign-in', async (_e, id: unknown) => {
+    if (typeof id !== 'string') throw new Error('bad agent id')
+    await openSignIn(id)
+  })
 
   ipcMain.handle('chat:threads', async (_e, brandId: unknown) => {
     if (!validId(brandId)) return []
@@ -521,12 +777,13 @@ export function setupAgents(): void {
     thread.voiceSent = {}
     thread.seen = {}
     thread.agentId = agentId
-    const reply = newReply(agentId, thread.models?.[agentId] || undefined)
+    const answering = await replyAgent(agentId)
+    const reply = newReply(answering, thread.models?.[answering] || undefined)
     thread.messages.push(reply)
     thread.updatedAt = Date.now()
     await persist(brandId)
     send({ type: 'threads', brandId })
-    startRun(brandId, thread, reply, agentId)
+    startRun(brandId, thread, reply, answering, agentId === AUTO_AGENT)
     return { threadId: thread.id, messageId: reply.id }
   }
 

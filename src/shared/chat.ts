@@ -30,6 +30,13 @@ export interface AgentInfo {
   // which adapter runs it and what that adapter can do
   provider?: ProviderKind
   capabilities?: ProviderCapabilities
+  // false when we know it isn't signed in, null when we can't tell
+  signedIn?: boolean | null
+  // extra accounts: the builtin cli they run (claude, codex) and their config folder
+  base?: string
+  folder?: string
+  // what keeps auto off it right now, and when that's over (null: once you sign in again)
+  held?: { why: 'limit' | SkipReason; until: number | null }
 }
 
 export interface ModelOption {
@@ -59,9 +66,31 @@ export interface CustomAgentInput extends Omit<CustomAgent, 'hasKey'> {
   clearKey?: boolean
 }
 
+// another sign in for a builtin cli, with its own config folder (CLAUDE_CONFIG_DIR, CODEX_HOME)
+export interface AgentAccount {
+  // claude@slug or codex@slug
+  id: string
+  name: string
+  folder: string
+}
+
 export interface AgentConfig {
+  // an agent id, 'auto' for the ranked pick, null for the first one found
   defaultAgentId: string | null
   custom: CustomAgent[]
+  accounts: AgentAccount[]
+  // agent ids in the order auto tries them, ones missing here go after in the usual order
+  rank: string[]
+  // agent ids auto never picks
+  autoOff: string[]
+}
+
+// why auto went past an agent
+export type SkipReason = 'rate_limit' | 'usage_limit' | 'auth'
+
+export interface SkippedAgent {
+  agentId: string
+  reason: SkipReason
 }
 
 export type MessageStatus = 'streaming' | 'done' | 'stopped' | 'error'
@@ -121,12 +150,15 @@ export interface ThreadMessage {
   steer?: boolean
   // agent messages: agents whose turns this agent got as a summary first
   handoffFrom?: string[]
+  // agent messages: agents auto tried first that couldn't answer
+  skipped?: SkippedAgent[]
 }
 
 export interface Thread {
   id: string
   title: string
   updatedAt: number
+  // 'auto' picks the agent per reply from the ranked list
   agentId: string | null
   // model per agent id, empty or missing means the agent's default
   models?: Record<string, string>
@@ -205,6 +237,17 @@ export interface ChatApi {
   saveCustomAgent(agent: CustomAgentInput): Promise<AgentConfig>
   removeCustomAgent(id: string): Promise<AgentConfig>
   setDefaultAgent(id: string | null): Promise<AgentConfig>
+  // the auto order and which agents it may use
+  setRank(rank: string[], autoOff: string[]): Promise<AgentConfig>
+  saveAccount(account: AgentAccount): Promise<AgentConfig>
+  removeAccount(id: string): Promise<AgentConfig>
+  // folder names in your home folder that look like one, e.g. .claude-work. never reads inside them
+  // fresh is a free name for a new one, like ~/.claude-2
+  accountFolders(base: string): Promise<{ found: string[]; fresh: string }>
+  // a folder picker, null when cancelled
+  pickFolder(): Promise<string | null>
+  // opens a console window running the cli's own login for that account
+  signIn(agentId: string): Promise<void>
   listThreads(brandId: string): Promise<ThreadSummary[]>
   getThread(brandId: string, threadId: string): Promise<Thread | null>
   deleteThread(brandId: string, threadId: string): Promise<void>

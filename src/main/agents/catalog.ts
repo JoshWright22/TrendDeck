@@ -1,4 +1,5 @@
 import type { ModelOption } from '@shared/chat'
+import { baseAgentId } from '@shared/agents'
 
 // the agent clis we know how to run headless. each one gets the prompt in one go
 // and prints its answer. claude keeps a session per thread, the rest start fresh
@@ -150,3 +151,6 @@ export const CLIS: CliSpec[] = [
     url: 'https://github.com/MoonshotAI/kimi-cli'
   }
 ]
+
+// the cli an agent id runs, extra accounts (claude@work) included
+export const cliFor = (agentId: string): CliSpec | undefined => CLIS.find((c) => c.id === baseAgentId(agentId))

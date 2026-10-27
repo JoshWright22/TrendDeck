@@ -3,7 +3,7 @@
 // steer and queue, plans, permission modes) comes in on chat:provider-event so a
 // renderer that only knows the old events keeps working
 
-import type { ThreadMessage } from './chat'
+import type { SkippedAgent, ThreadMessage } from './chat'
 
 // how much an agent may do without asking, per thread
 // supervised: asks before every app tool call and anything else that changes things
@@ -123,6 +123,8 @@ export type ProviderChatEvent =
   | { type: 'permission-mode'; brandId: string; threadId: string; mode: PermissionMode }
   // the agent changed mid thread and got a summary of the turns it didn't see
   | { type: 'handoff'; brandId: string; threadId: string; messageId: string; fromAgentIds: string[]; toAgentId: string }
+  // auto moved the reply to the next ranked agent, what the last one wrote is dropped
+  | { type: 'reroute'; brandId: string; threadId: string; messageId: string; agentId: string; model?: string; skipped: SkippedAgent[] }
   | {
       type: 'usage'
       brandId: string

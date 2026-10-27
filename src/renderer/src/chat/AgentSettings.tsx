@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import type { AgentConfig, AgentInfo, CustomAgent, CustomAgentInput } from '@shared/chat'
 import Modal from '../components/Modal'
+import AgentRank, { AccountForm } from './AgentRank'
 import { chat } from './api'
 
 interface Props {
@@ -36,7 +37,8 @@ export default function AgentSettings({ agents, config, scanning, onRescan, onCh
   const [form, setForm] = useState<CustomAgentInput | null>(null)
   const [hasKey, setHasKey] = useState(false)
   const [error, setError] = useState('')
-  const clis = agents.filter((a) => a.kind === 'cli')
+  // the cli an account is being added for
+  const [account, setAccount] = useState<string | null>(null)
 
   const set = (patch: Partial<CustomAgentInput>): void => setForm((f) => (f ? { ...f, ...patch } : f))
 
@@ -50,6 +52,21 @@ export default function AgentSettings({ agents, config, scanning, onRescan, onCh
     } catch (err) {
       setError(cleanError(err))
     }
+  }
+
+  if (account) {
+    return (
+      <AccountForm
+        base={account}
+        agents={agents}
+        config={config}
+        onSaved={(cfg) => {
+          setAccount(null)
+          onChange(cfg)
+        }}
+        onClose={() => setAccount(null)}
+      />
+    )
   }
 
   if (form) {
@@ -162,18 +179,7 @@ export default function AgentSettings({ agents, config, scanning, onRescan, onCh
 
   return (
     <Modal title="Agents" onClose={onClose}>
-      <p className="form-hint">Found on this computer. Sign in to one in a terminal and it shows up here.</p>
-      <ul className="cx-agent-list">
-        {clis.map((a) => (
-          <li key={a.id} className={a.installed ? '' : 'missing'}>
-            <span className={`cx-dot${a.installed ? ' on' : ''}`} />
-            <span className="cx-agent-name">{a.name}</span>
-            <span className="muted small cx-agent-detail" title={a.detail}>
-              {a.installed ? a.detail : 'not found'}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <AgentRank agents={agents} config={config} onChange={onChange} onAddAccount={setAccount} />
       <div className="cx-agent-sub">
         <span>Your own</span>
         <span className="spacer" />

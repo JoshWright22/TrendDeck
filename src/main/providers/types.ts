@@ -51,6 +51,8 @@ export interface SessionStart {
   model?: string
   effort?: string
   permissionMode: PermissionMode
+  // extra env for the agent's process, e.g. the account's CLAUDE_CONFIG_DIR
+  env?: Record<string, string>
   // the app's tool server for this turn. null for agents that get no tools (plain api agents)
   mcp: AgentSession | null
   emit: (event: ProviderEvent) => void

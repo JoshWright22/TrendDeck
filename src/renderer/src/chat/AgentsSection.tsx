@@ -1,15 +1,20 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import type { AgentConfig, AgentInfo } from '@shared/chat'
+import AgentRank, { AccountForm } from './AgentRank'
 import AgentSettings from './AgentSettings'
 import { chat } from './api'
 import './chat.css'
 
-// settings section: which agents are on this computer, and the same editor the composer opens
+const EMPTY: AgentConfig = { defaultAgentId: null, custom: [], accounts: [], rank: [], autoOff: [] }
+
+// settings section: which agents are on this computer, the order auto tries them in, and the
+// same editor the composer opens
 export default function AgentsSection(): ReactNode {
   const [agents, setAgents] = useState<AgentInfo[] | null>(null)
-  const [config, setConfig] = useState<AgentConfig>({ defaultAgentId: null, custom: [] })
+  const [config, setConfig] = useState<AgentConfig>(EMPTY)
   const [scanning, setScanning] = useState(false)
   const [open, setOpen] = useState(false)
+  const [account, setAccount] = useState<string | null>(null)
 
   const load = useCallback(async (rescan = false) => {
     setScanning(true)
@@ -26,7 +31,10 @@ export default function AgentsSection(): ReactNode {
     void load()
   }, [load])
 
-  const found = (agents ?? []).filter((a) => a.installed)
+  const changed = (cfg: AgentConfig): void => {
+    setConfig(cfg)
+    void load()
+  }
 
   return (
     <>
@@ -34,13 +42,11 @@ export default function AgentsSection(): ReactNode {
         Agents only run when you send a chat message. Sign in to one in a terminal and it shows up here, or add your
         own command or API.
       </p>
-      <p className="about-line">
-        {agents === null
-          ? 'Looking...'
-          : found.length === 0
-            ? 'None found yet'
-            : found.map((a) => a.name).join(', ')}
-      </p>
+      {agents === null ? (
+        <p className="about-line">Looking...</p>
+      ) : (
+        <AgentRank agents={agents} config={config} onChange={changed} onAddAccount={setAccount} />
+      )}
       <div className="suggest">
         <button type="button" className="pill teal" onClick={() => setOpen(true)}>
           Add or edit agents
@@ -49,16 +55,25 @@ export default function AgentsSection(): ReactNode {
           {scanning ? 'Checking...' : 'Check again'}
         </button>
       </div>
+      {account && (
+        <AccountForm
+          base={account}
+          agents={agents ?? []}
+          config={config}
+          onSaved={(cfg) => {
+            setAccount(null)
+            changed(cfg)
+          }}
+          onClose={() => setAccount(null)}
+        />
+      )}
       {open && (
         <AgentSettings
           agents={agents ?? []}
           config={config}
           scanning={scanning}
           onRescan={() => void load(true)}
-          onChange={(cfg) => {
-            setConfig(cfg)
-            void load()
-          }}
+          onChange={changed}
           onClose={() => setOpen(false)}
         />
       )}
