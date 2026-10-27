@@ -185,8 +185,16 @@ describe('pickAgent', () => {
 
 describe('plainError', () => {
   it('words per kind', () => {
-    expect(plainError('auth', 'Claude 2', null, NOW)).toMatch(/^Claude 2 isn't signed in/)
+    expect(plainError('auth', 'Claude 2', null, NOW)).toMatch(/^Claude 2 can't be used right now/)
     expect(plainError('usage_limit', 'Codex', NOW + HOUR, NOW)).toMatch(/^Codex hit its usage limit. It's back at 1:00 PM/)
     expect(plainError('rate_limit', 'Codex', null, NOW)).toMatch(/^Codex is rate limited. Try again in a few minutes/)
   })
 })
+
+describe('more claude code wordings', () => {
+  it('reads a session limit and an organization that turned access off', () => {
+    expect(classifyAgentError("You've hit your session limit · resets 2:40am (America/Los_Angeles)")).toBe('usage_limit')
+    expect(classifyAgentError('Your organization has disabled Claude subscription access for Claude Code · Use an Anthropic API key instead, or ask your admin to enable access')).toBe('auth')
+  })
+})
+

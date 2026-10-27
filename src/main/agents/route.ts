@@ -10,7 +10,8 @@ export type ErrorKind = SkipReason | 'other'
 
 const USAGE: RegExp[] = [
   /usage limit/i,
-  /hit your (usage )?limit/i,
+  /hit your (usage |session |weekly |daily )?limit/i,
+  /session limit/i,
   /credit balance is too low/i,
   /insufficient[_ ]quota/i,
   /exceeded your current quota/i,
@@ -30,7 +31,10 @@ const AUTH: RegExp[] = [
   /\bunauthori[sz]ed\b/i,
   /authentication[_ ](error|failed)/i,
   /\b(oauth )?token (has )?(expired|been revoked)\b/i,
-  /\bforbidden\b/i
+  /\bforbidden\b/i,
+  // the account can't use claude code at all, e.g. its organization turned subscription access off
+  /disabled (claude )?subscription access/i,
+  /use an anthropic api key instead/i
 ]
 
 const RATE: RegExp[] = [/rate[ _-]?limit/i, /\b429\b/, /too many requests/i, /\boverloaded\b/i, /\b529\b/]
@@ -251,7 +255,7 @@ export function plainError(
   fmt: (at: number, now: number) => string = clockTime
 ): string {
   const when = until && until > now ? ` It's back at ${fmt(until, now)}.` : ''
-  if (kind === 'auth') return `${name} isn't signed in. Sign in to it in Settings, Agents.`
+  if (kind === 'auth') return `${name} can't be used right now: it's signed out or its account doesn't allow it. Sign in again, or add another account, in Settings, Agents. Or pick Auto.`
   if (kind === 'usage_limit') return `${name} hit its usage limit.${when || ' Try again later.'} Or pick another agent, or Auto.`
   return `${name} is rate limited.${when || ' Try again in a few minutes.'} Or pick another agent, or Auto.`
 }
