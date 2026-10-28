@@ -5,6 +5,7 @@ import { stageHeight } from '@shared/craft-embed'
 import { webSpec, type WebEmbedState } from '@shared/craft-web'
 import { DEFAULT_ZOOM, ZOOMS } from '@shared/craft-web-view'
 import { craftApi, putCraft, useCraftApp } from '../../workspace/craft/store'
+import { markUserScroll } from '../scrollIntent'
 import VideoReview from '../VideoReview'
 import { liveMax, newestOnDoc, pinEmbed, registerEmbed, setEmbedVisible, takeReveal, useEmbeds, useLiveEmbeds } from './embed-owner'
 import { cleanError, type CardActions } from './useCards'
@@ -81,7 +82,10 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   const revealAt = useRef(0)
   useEffect(() => {
     if (takeReveal(card.id)) revealAt.current = Date.now()
-    if (Date.now() - revealAt.current < 4000) rootRef.current?.scrollIntoView({ block: 'start' })
+    if (Date.now() - revealAt.current < 4000) {
+      markUserScroll(scroller(rootRef.current))
+      rootRef.current?.scrollIntoView({ block: 'start' })
+    }
   })
 
   // any of it in view, or within a screen of it, counts as visible
@@ -208,7 +212,11 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     // a wheel the editor didn't use scrolls the chat (see preload/craft-web.ts)
     const onMessage = (e: Electron.IpcMessageEvent): void => {
       const dy = Number(e.args[0])
-      if (e.channel === 'craft-web:wheel' && Number.isFinite(dy)) scroller(rootRef.current)?.scrollBy({ top: dy })
+      if (e.channel === 'craft-web:wheel' && Number.isFinite(dy)) {
+        const sc = scroller(rootRef.current)
+        markUserScroll(sc)
+        sc?.scrollBy({ top: dy })
+      }
     }
     attach()
     view.addEventListener('did-attach', attach)
@@ -379,7 +387,11 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
         <span className="muted">{card.file ?? project?.name ?? ''}</span>
         <span className="cx-embed-older-text">Open further down in the chat.</span>
         <span className="spacer" />
-        <button type="button" onClick={() => document.querySelector(`[data-embed-id="${newest}"]`)?.scrollIntoView({ block: 'start' })}>
+        <button type="button" onClick={() => {
+          const to = document.querySelector<HTMLElement>(`[data-embed-id="${newest}"]`)
+          markUserScroll(scroller(to))
+          to?.scrollIntoView({ block: 'start' })
+        }}>
           Go to it
         </button>
       </article>

@@ -4,6 +4,7 @@ import type { Brand, TrendItem, TrendSource } from '@shared/types'
 import type { Project } from '@shared/workspace'
 import LoginRequests from './LoginRequests'
 import ProjectProgress from './ProjectProgress'
+import { markUserScroll, userScrolledRecently } from './scrollIntent'
 import type {
   AgentConfig,
   AgentInfo,
@@ -455,22 +456,57 @@ export default function ChatView({
   // follow the reply only while you're at the bottom, scrolling up to read stops it
   const scroller = useRef<HTMLDivElement>(null)
   const [following, setFollowing] = useState(true)
+  const followRef = useRef(true)
+  const follow = (on: boolean): void => {
+    followRef.current = on
+    setFollowing(on)
+  }
+  const atEnd = (el: HTMLElement): boolean => el.scrollHeight - el.scrollTop - el.clientHeight < 60
   const onScroll = (): void => {
     const el = scroller.current
-    if (el) setFollowing(el.scrollHeight - el.scrollTop - el.clientHeight < 60)
+    if (!el) return
+    if (atEnd(el)) follow(true)
+    // only you scrolling up stops it, not the chat settling under you
+    else if (userScrolled.current || userScrolledRecently(el)) follow(false)
+    else if (followRef.current) el.scrollTop = el.scrollHeight
   }
+  // a held scrollbar counts as you scrolling for as long as it's held
+  const userScrolled = useRef(false)
+  const mark = (): void => markUserScroll(scroller.current)
+  useEffect(() => {
+    const up = (): void => {
+      userScrolled.current = false
+    }
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+    return () => {
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+  }, [])
   const jumpDown = (): void => {
-    setFollowing(true)
+    follow(true)
     listEnd.current?.scrollIntoView({ block: 'end' })
   }
   useEffect(() => {
     if (document.documentElement.dataset.embedFill) {
-      setFollowing(false)
+      follow(false)
       return
     }
-    if (following) listEnd.current?.scrollIntoView({ block: 'end' })
+    if (followRef.current) listEnd.current?.scrollIntoView({ block: 'end' })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread?.messages.length, lastSize])
+  // images, cards and editors size themselves after they're drawn: stay at the bottom while they do
+  useEffect(() => {
+    const el = scroller.current
+    const body = el?.firstElementChild
+    if (!el || !body || document.documentElement.dataset.embedFill) return
+    const ro = new ResizeObserver(() => {
+      if (followRef.current && !atEnd(el)) el.scrollTop = el.scrollHeight
+    })
+    ro.observe(body)
+    return () => ro.disconnect()
+  }, [])
   useEffect(() => jumpDown(), [openId])
 
   const usable = useMemo(() => (agents ?? []).filter((a) => a.installed), [agents])
@@ -1137,7 +1173,19 @@ export default function ChatView({
             </div>
           )}
         </header>
-        <div className="cx-messages" ref={scroller} onScroll={onScroll}>
+        <div
+          className="cx-messages"
+          ref={scroller}
+          onScroll={onScroll}
+          onWheel={mark}
+          onTouchMove={mark}
+          onKeyDown={mark}
+          onPointerDown={(e) => {
+            // the scrollbar: a press on the scroller itself, not on a message
+            if (e.target === e.currentTarget) userScrolled.current = true
+            mark()
+          }}
+        >
           <div className="cx-column">
             <LoginRequests brandId={brand.id} threadId={openId} onOpenSite={onOpenSite} />
             {thread && thread.messages.length > 0 ? (
