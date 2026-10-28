@@ -201,6 +201,32 @@ const SAVE_IDS = new Set(['file.save', 'file.saveAs', 'file.saveCopy', 'file.sav
 const RELOAD_IDS = new Set(['file.revert', 'file.open'])
 // web builds report these as errors (threads), the native engine does them
 const NATIVE_IDS = new Set(['media.createProxies', 'file.projectManager'])
+// edits that read through whole media files: the web build does them on the page's one thread,
+// slowly, and the editor stops answering until it's done (extracting a 30 minute clip's audio
+// froze it for minutes). the native engine does them in seconds on the saved project, which the
+// editor then opens again
+const HEAVY_IDS = new Set([
+  'clip.extractAudio',
+  'clip.audioPeak',
+  'clip.generateAudioWaveform',
+  'clip.sceneEditDetection',
+  'essentialSound.autoMatch',
+  'sequence.renderAudio',
+  'sequence.renderEffectsInToOut',
+  'sequence.renderInToOut',
+  'sequence.renderSelection',
+  'sequence.transcribe',
+  'transcript.generate'
+])
+
+export function heavyCommand(id: string, params: Record<string, unknown>): boolean {
+  if (HEAVY_IDS.has(id)) return true
+  // normalizing measures every clip's peak
+  if (id === 'clip.audioGain') return typeof params.mode === 'string' && params.mode.startsWith('normalize')
+  // lining clips up by their sound compares all of it
+  if (id === 'clip.synchronize' || id === 'clip.mergeClips' || id === 'clip.createMulticam') return params.method === 'audio'
+  return false
+}
 
 export type WebStep =
   | { kind: 'execute'; command: string; params: Record<string, unknown> }
@@ -213,6 +239,9 @@ export type WebStep =
   | { kind: 'snapshot'; tool: string; args: Record<string, unknown> }
   // runs in the native engine on the saved project: exports and the rest of NATIVE_IDS
   | { kind: 'native'; command: string; params: Record<string, unknown> }
+  // an edit too heavy for the page: the native engine makes it on the saved project, the editor
+  // opens the result
+  | { kind: 'nativeEdit'; command: string; params: Record<string, unknown> }
   | { kind: 'save'; command: string; path: string | null }
   | { kind: 'reload'; path: string | null }
   | { kind: 'unsupported'; why: string }
@@ -221,6 +250,7 @@ const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object'
 
 function commandStep(id: string, params: Record<string, unknown>): WebStep {
   if (FILMCRAFT_EXPORT_IDS.has(id) || NATIVE_IDS.has(id)) return { kind: 'native', command: id, params }
+  if (heavyCommand(id, params)) return { kind: 'nativeEdit', command: id, params }
   if (SAVE_IDS.has(id)) return { kind: 'save', command: id, path: typeof params.path === 'string' ? params.path : null }
   if (RELOAD_IDS.has(id)) return { kind: 'reload', path: typeof params.path === 'string' ? params.path : null }
   return { kind: 'execute', command: id, params }

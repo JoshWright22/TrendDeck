@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filmcraftWebStep, mapProjectPaths, mimeOf, nativeExportParams, parseRange, PathTable, pickLive, projectPaths, proxyArgs, wantsProxy, webSpec, webTarget } from './craft-web'
+import { filmcraftWebStep, heavyCommand, mapProjectPaths, mimeOf, nativeExportParams, parseRange, PathTable, pickLive, projectPaths, proxyArgs, wantsProxy, webSpec, webTarget } from './craft-web'
 
 describe('craft-web urls', () => {
   it('serves the app build and project files by token, nothing else', () => {
@@ -164,5 +164,17 @@ describe('proxies', () => {
     expect(args.slice(args.indexOf('-vf'), args.indexOf('-vf') + 2)).toEqual(['-vf', 'scale=-2:540'])
     expect(args).toContain('-threads')
     expect(args.at(-1)).toBe('out.mp4')
+  })
+})
+
+describe('heavy filmcraft edits', () => {
+  it('sends edits that read whole media files to the native engine, the rest to the page', () => {
+    expect(filmcraftWebStep('command_run', { id: 'clip.extractAudio', params: { items: [7] } })).toMatchObject({ kind: 'nativeEdit', command: 'clip.extractAudio' })
+    expect(filmcraftWebStep('command_run', { id: 'clip.audioGain', params: { mode: 'normalizeAll', db: -1 } })).toMatchObject({ kind: 'nativeEdit' })
+    expect(filmcraftWebStep('command_run', { id: 'clip.audioGain', params: { mode: 'set', db: -3 } })).toMatchObject({ kind: 'execute' })
+    expect(filmcraftWebStep('command_run', { id: 'clip.synchronize', params: { method: 'audio' } })).toMatchObject({ kind: 'nativeEdit' })
+    expect(filmcraftWebStep('command_run', { id: 'clip.synchronize', params: { method: 'timecode' } })).toMatchObject({ kind: 'execute' })
+    expect(heavyCommand('essentialSound.autoMatch', {})).toBe(true)
+    expect(heavyCommand('timeline.place', {})).toBe(false)
   })
 })

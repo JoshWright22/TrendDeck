@@ -78,6 +78,18 @@ function openInApp(host: WebContents | null | undefined, url: string): void {
   if (host && !host.isDestroyed() && isHttpUrl(url)) host.send('open:url', url)
 }
 
+// one TrendDeck at a time: opening it again brings up the one that's running. two would each run
+// their own agents and editors on the same projects and write the same chat files
+let mainWin: BrowserWindow | null = null
+if (app.isPackaged && !app.requestSingleInstanceLock()) app.exit(0)
+app.on('second-instance', () => {
+  if (!app.isReady()) return
+  if (!mainWin || mainWin.isDestroyed()) return createWindow()
+  if (mainWin.isMinimized()) mainWin.restore()
+  mainWin.show()
+  mainWin.focus()
+})
+
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
@@ -107,6 +119,7 @@ function createWindow(): void {
   // craft apps dock over this window's workspace pane
   craftHost(win)
 
+  mainWin = win
   win.once('ready-to-show', () => {
     // a downloaded update that got this far works, boot.ts keeps using it
     bootInfo()?.markGood()

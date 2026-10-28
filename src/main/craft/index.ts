@@ -148,6 +148,7 @@ export function setupCraft(): void {
     startUpdateChecks()
   })
 
+  const QUIT_WAIT_MS = 45_000
   // TrendDeck quitting asks every open app to close (they can ask to save) and saves headless
   // engines. one that stays open (its save prompt is up) is left running on its own
   app.on('before-quit', (e) => {
@@ -156,6 +157,14 @@ export function setupCraft(): void {
     if (!anyOpen) return
     e.preventDefault()
     quitting = true
+    // an editor stuck on a job never answers its save: the app would stay running with no window
+    // and hold the project, so after a while it quits anyway. everything up to the last save and
+    // the recovery copies in .trenddeck/autosaves are on disk
+    setTimeout(() => {
+      if (!quitting) return
+      console.error('craft: an editor did not finish saving, quitting anyway')
+      app.exit(0)
+    }, QUIT_WAIT_MS).unref()
     void releaseAllWeb().then(() => closeAllForQuit()).then(async () => {
       await stopAllSessions()
       app.quit()

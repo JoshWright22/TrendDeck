@@ -1,17 +1,17 @@
 import { execFile } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { promises as fs } from 'node:fs'
-import { basename, extname, isAbsolute, join } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join } from 'node:path'
 import { session as electronSession, webContents, type WebContents } from 'electron'
 import { CRAFT_WEB_PARTITION, CRAFT_WEB_SCHEME, filmcraftWebStep, mapProjectPaths, PathTable, projectPaths, webSpec, type WebEmbedState, type WebStep } from '@shared/craft-web'
 import { dockOpenClose, dockSizes, prefsToRestore, stepZoom, type DockAction } from '@shared/craft-web-view'
 import { broadcast } from '../gateway/wait'
 import { setWebHooks, sessionOf, stopSession, type Session } from './agent'
-import { spec } from './catalog'
+import { fill, spec } from './catalog'
 import { ensureWeb, installed, installedWeb } from './install'
 import { makeProxy, nativeCommand, type JobWhere } from './jobs'
 import { cleanEnv, runningApp } from './launch'
-import type { McpCallResult, McpContent } from './mcp'
+import { McpClient, type McpCallResult, type McpContent } from './mcp'
 import { projectOperation, snapshotFile } from './recovery'
 import { isInside, safeName } from './rules'
 import { appUrl, craftWebResponse, projectUrl } from './web-protocol'
@@ -55,6 +55,8 @@ interface Embed {
   debugger: boolean
   // the saved layout is going back in, what the page shows until then isn't yours
   restoring: boolean
+  // the page froze and is starting again on purpose, its renderer going away isn't a failure
+  restarting: boolean
 }
 
 const embeds = new Map<string, Embed>()
@@ -341,7 +343,7 @@ async function runStep(e: Embed, step: WebStep, tool: string, args: Record<strin
   switch (step.kind) {
     case 'execute': {
       const { params, outputs } = webParams(e, step.params)
-      const r = await execute(e, step.command, params)
+      const r = await answered(e, execute(e, step.command, params), step.command)
       await copyOutputs(e, outputs)
       return text(r)
     }
@@ -361,7 +363,7 @@ async function runStep(e: Embed, step: WebStep, tool: string, args: Record<strin
       return text({ completed, failed: failedAt, results })
     }
     case 'request':
-      return text(await call(e, 'request', step.method, step.params))
+      return text(await answered(e, call(e, 'request', step.method, step.params), step.method))
     case 'commands': {
       const list = ((await call(e, 'commands')) as { id: string; label?: string }[]) ?? []
       const f = step.filter?.toLowerCase()
@@ -385,6 +387,8 @@ async function runStep(e: Embed, step: WebStep, tool: string, args: Record<strin
       if (!e.file) return failed('Save the project in the project folder first.')
       return nativeCommand({ appId: e.appId, brandId: e.brandId, projectId: e.projectId, folder: e.folder, file: e.file, command: step.command, params: step.params, where: e.where })
     }
+    case 'nativeEdit':
+      return nativeEdit(e, step.command, step.params)
     case 'save':
       if (step.path && e.file && step.path.toLowerCase() !== e.file.toLowerCase()) {
         await saveWeb(e, 'copy', step.path)
@@ -400,6 +404,109 @@ async function runStep(e: Embed, step: WebStep, tool: string, args: Record<strin
   }
   void tool
   void args
+}
+
+// ---- heavy edits and a frozen editor ----
+
+// an edit the page should answer well within this. one that takes longer has the page stuck
+export const WEB_ANSWER_MS = 90_000
+let answerMs = WEB_ANSWER_MS
+export function setWebAnswerMs(ms: number): void {
+  answerMs = ms
+}
+
+class Frozen extends Error {}
+
+// the page's answer, or, when it doesn't come, the editor started again from the last save (made
+// just before this edit) so the next call has a working editor instead of waiting behind this one
+async function answered<T>(e: Embed, p: Promise<T>, what: string): Promise<T> {
+  let timer: NodeJS.Timeout | undefined
+  const late = new Promise<never>((_ok, no) => {
+    timer = setTimeout(() => no(new Frozen(what)), answerMs)
+  })
+  try {
+    return await Promise.race([p, late])
+  } catch (err) {
+    if (!(err instanceof Frozen)) throw err
+    p.catch(() => {})
+    void unfreeze(e, what)
+    throw new Error(`${spec(e.appId).name} in the chat stopped answering during ${what}, so TrendDeck is starting it again from the save made just before it. That edit didn't happen. Wait for the editor to open again, then try it once more or another way.`)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function unfreeze(e: Embed, what: string): Promise<void> {
+  const g = e.guest
+  if (e.restarting || !g || g.isDestroyed() || e.state === 'closed') return
+  e.restarting = true
+  let settle!: (err?: Error) => void
+  e.ready = new Promise<void>((ok, no) => {
+    settle = (err) => (err ? no(err) : ok())
+  })
+  e.ready.catch(() => {})
+  e.settle = settle
+  e.session.ready = e.ready
+  e.state = 'loading'
+  e.note = `${spec(e.appId).name} got stuck on ${what} and is starting again from your last save.`
+  emit(e)
+  try {
+    // a page busy in a loop doesn't take a reload, its renderer goes and a new one loads
+    g.forcefullyCrashRenderer()
+    g.reload()
+    e.table = new PathTable()
+    e.doc = null
+    await waitReady(e)
+    await restoreView(e).catch(() => {})
+    await openDocument(e)
+    e.state = 'ready'
+    e.note = ''
+    e.settle()
+    emit(e)
+  } catch (err) {
+    fail(e, err, true)
+  } finally {
+    e.restarting = false
+  }
+}
+
+// a heavy edit in the native engine: the editor's project is saved, the engine opens it, makes
+// the edit and saves, and the editor opens the result. the caller holds the folder's projectOperation
+async function nativeEdit(e: Embed, command: string, params: Record<string, unknown>): Promise<McpCallResult> {
+  await saveWeb(e, `before-${command}`)
+  if (!e.file) return failed('Save the project in the project folder first.')
+  const have = await installed(e.appId)
+  const sp = spec(e.appId)
+  if (!have || !sp.save) return failed(`${sp.name} isn't installed`)
+  const run = { ...params }
+  // files it writes go next to the project unless the call says where, never the engine's own folder
+  if (command === 'clip.extractAudio') {
+    if (typeof run.dir !== 'string' || !run.dir) run.dir = dirname(e.file)
+    await fs.mkdir(run.dir as string, { recursive: true })
+  }
+  const client = new McpClient({ command: have.cli, args: ['mcp', ...sp.headlessArgs(e.file, e.folder)], env: cleanEnv({}) as Record<string, string>, cwd: e.folder, timeoutMs: 30 * 60_000 })
+  let r: McpCallResult
+  try {
+    await client.start()
+    if (sp.openTool) {
+      const opened = fill(sp.openTool, e.file)
+      const o = await client.callTool(opened.name, opened.args, { timeoutMs: 60_000 })
+      if (o.isError) return o
+    }
+    r = await client.callTool('command_run', { id: command, params: run }, { timeoutMs: 30 * 60_000 })
+    if (r.isError) return r
+    const save = fill(sp.save, e.file)
+    const saved = await client.callTool(save.name, save.args, { timeoutMs: 60_000 })
+    if (saved.isError) return saved
+  } finally {
+    client.close()
+  }
+  await snapshotFile(e.folder, e.file, e.appId, command)
+  e.loadedAt = Date.now()
+  await reload(e)
+  e.savedAt = Date.now()
+  emit(e)
+  return r
 }
 
 async function webCall(e: Embed, tool: string, args: Record<string, unknown>): Promise<McpCallResult> {
@@ -662,7 +769,7 @@ export async function prepareWeb(p: PrepareInput): Promise<{ src: string; partit
   ready.catch(() => {})
   const e: Embed = {
     ...p, token, guest: null, state: 'loading', note: '', savedAt: null, ready, settle, table: new PathTable(), doc: null, saved: null,
-    touched: false, editedAt: 0, loadedAt: Date.now(), timers: [], inputSave: null, seenJobs: new Set(), debugger: false, restoring: false,
+    touched: false, editedAt: 0, loadedAt: Date.now(), timers: [], inputSave: null, seenJobs: new Set(), debugger: false, restoring: false, restarting: false,
     session: null as unknown as Session
   }
   e.session = {
@@ -699,7 +806,7 @@ export function attachWeb(cardId: string, guestId: number, host: WebContents): v
     if (embeds.get(cardId) === e && e.guest === wc) void releaseWeb(cardId, false)
   })
   wc.on('render-process-gone', (_ev, d) => {
-    if (e.guest === wc) fail(e, new Error(`the editor stopped (${d.reason}). Your last save is in the project folder`), true)
+    if (e.guest === wc && !e.restarting) fail(e, new Error(`the editor stopped (${d.reason}). Your last save is in the project folder`), true)
   })
   // what you do in the editor saves a few seconds after you stop
   const touch = (): void => {
