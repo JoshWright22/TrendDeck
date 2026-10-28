@@ -7,7 +7,7 @@ import { DEFAULT_ZOOM, ZOOMS } from '@shared/craft-web-view'
 import { craftApi, putCraft, useCraftApp } from '../../workspace/craft/store'
 import { markUserScroll } from '../scrollIntent'
 import VideoReview from '../VideoReview'
-import { liveMax, newestOnDoc, pinEmbed, registerEmbed, setEmbedVisible, takeReveal, useEmbeds, useLiveEmbeds } from './embed-owner'
+import { liveMax, newestOnDoc, pinEmbed, registerEmbed, setEmbedVisible, takeReveal, useEmbeds, useLiveEmbeds, waitsForReply } from './embed-owner'
 import { cleanError, type CardActions } from './useCards'
 import { sendReview } from './VideoCard'
 import './craft-embed.css'
@@ -75,7 +75,7 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   const wanted = inChat && liveSet.has(card.id) && !fullHere && !cantRun && status !== undefined
   const live = !!page && web?.state === 'ready'
 
-  useEffect(() => registerEmbed(card.id, card.appId, card.appName, card.projectId, card.at), [card.id, card.appId, card.appName, card.projectId, card.at])
+  useEffect(() => registerEmbed(card.id, card.appId, card.appName, card.projectId, card.at, card.messageId ?? null), [card.id, card.appId, card.appName, card.projectId, card.at, card.messageId])
 
   // opened from the picker or Open here: the chat scrolls to it, it starts once it's in view. again
   // while it grows into its size and opens, so it ends up at the top of the chat
@@ -376,6 +376,19 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
       <article className="cx-card2" aria-label={`${card.appName} in the chat`}>
         <strong>{card.appName}</strong>
         <p className="cx-card2-note">This build can't show the Craft apps in the chat.</p>
+      </article>
+    )
+  }
+
+  // this reply's editor: it opens here once your agent is done, the one above shows the edits meanwhile
+  if (waitsForReply(card.id)) {
+    return (
+      <article ref={rootRef} data-embed-id={card.id} className="cx-card2 cx-embed-older" aria-label={`${card.appName} in the chat`}>
+        <strong>{card.appName}</strong>
+        <span className="muted">{card.file ?? project?.name ?? ''}</span>
+        <span className="cx-embed-older-text">
+          {newest !== card.id ? 'Opens here when your agent is done. Its edits show in the editor above meanwhile.' : 'Opens here when your agent is done.'}
+        </span>
       </article>
     )
   }

@@ -10,6 +10,8 @@ interface Entry {
   appId: string
   appName: string
   projectId: string
+  // the reply it's in, while that reply is still being written it waits
+  messageId: string | null
   at: number
   pinned: number
   visible: boolean
@@ -18,13 +20,30 @@ interface Entry {
 const entries = new Map<string, Entry>()
 const requested = new Map<string, number>()
 const subs = new Set<() => void>()
+// replies your agent is still writing. a card in one waits until the reply is done, the editor you
+// have open meanwhile stays where it is and shows the edits land; then the new one, under the
+// reply's text, takes over
+let writing: ReadonlySet<string> = new Set()
+const waiting = (e: Entry): boolean => !!e.messageId && writing.has(e.messageId)
+
+export function setWritingReplies(ids: ReadonlySet<string>): void {
+  const before = [...entries.values()].filter(waiting).map((e) => e.id).join()
+  writing = ids
+  if ([...entries.values()].filter(waiting).map((e) => e.id).join() !== before) recompute()
+}
+
+// a card in a reply that's still being written
+export function waitsForReply(id: string): boolean {
+  const e = entries.get(id)
+  return !!e && waiting(e)
+}
 let live: Set<string> = new Set()
 let version = 0
 
 function recompute(): void {
   const cands = [...entries.values()]
     // only the newest card on a file runs it, older ones point to that one
-    .filter((e) => webSpec(e.appId) && newestOnDoc(e.id) === e.id)
+    .filter((e) => webSpec(e.appId) && !waiting(e) && newestOnDoc(e.id) === e.id)
     .map((e) => ({ id: e.id, key: `${e.appId}|${e.projectId}`, visible: e.visible, rank: Math.max(e.at, e.pinned) }))
   const next = pickLive(cands, live, liveMax())
   version += 1
@@ -55,13 +74,13 @@ export function setLiveMax(n: number): void {
 export function newestOnDoc(id: string): string {
   const e = entries.get(id)
   if (!e) return id
-  let best = e
-  for (const o of entries.values()) if (o.appId === e.appId && o.projectId === e.projectId && o.at > best.at) best = o
-  return best.id
+  // one still waiting for its reply doesn't count yet
+  const same = [...entries.values()].filter((o) => o.appId === e.appId && o.projectId === e.projectId && !waiting(o))
+  return same.length ? same.reduce((a, b) => (b.at > a.at ? b : a)).id : e.id
 }
 
-export function registerEmbed(id: string, appId: string, appName: string, projectId: string, at: number): () => void {
-  entries.set(id, { id, appId, appName, projectId, at, pinned: requested.get(id) ?? entries.get(id)?.pinned ?? 0, visible: false })
+export function registerEmbed(id: string, appId: string, appName: string, projectId: string, at: number, messageId: string | null = null): () => void {
+  entries.set(id, { id, appId, appName, projectId, messageId, at, pinned: requested.get(id) ?? entries.get(id)?.pinned ?? 0, visible: false })
   requested.delete(id)
   recompute()
   return () => {

@@ -29,6 +29,7 @@ import { EmbedCard, type EmbedActions } from './Embeds'
 import MediaReview from './MediaReview'
 import CardList from './cards/CardList'
 import { useCards, type CardActions } from './cards/useCards'
+import { setWritingReplies } from './cards/embed-owner'
 import ComposerMic from './ComposerMic'
 import TakeRecorder from './TakeRecorder'
 import { useTakeTranscriber } from './useTakeTranscriber'
@@ -520,6 +521,9 @@ export default function ChatView({
   const agent = usable.find((a) => a.id === agentId)
   const agentName = (id?: string): string => (id === AUTO_AGENT ? 'Auto' : (agents?.find((a) => a.id === id)?.name ?? 'Agent'))
   const busy = !!thread?.messages.some((m) => m.status === 'streaming')
+  // a reply's editor card waits until the reply is done (embed-owner)
+  const writingIds = thread?.messages.filter((m) => m.status === 'streaming').map((m) => m.id).join() ?? ''
+  useEffect(() => setWritingReplies(new Set(writingIds ? writingIds.split(',') : [])), [writingIds])
   // who is answering right now, the actual agent when the chat is on auto
   const answeringId = thread?.messages.find((m) => m.status === 'streaming')?.agentId ?? agentId ?? undefined
 

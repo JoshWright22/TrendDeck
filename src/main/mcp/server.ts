@@ -3,9 +3,11 @@ import type { AddressInfo } from 'node:net'
 import { callGatewayTool, mcpToolList } from '../gateway'
 import { turnForToken, type Turn } from './turns'
 
-// mcp over plain http on 127.0.0.1, json in and json out, no streaming needed for these tools
+// mcp over plain http on 127.0.0.1, json in and json out, a tool call answered as a stream so a
+// long one isn't given up on
 const VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05']
 const MAX_BODY = 1024 * 1024
+const KEEPALIVE_MS = 15_000
 
 let server: Server | null = null
 let port = 0
@@ -104,6 +106,21 @@ async function onRequest(req: IncomingMessage, res: ServerResponse): Promise<voi
   }
   const batch = Array.isArray(parsed)
   const msgs = (batch ? parsed : [parsed]) as RpcRequest[]
+  // a tool can take minutes (an export, a FilmCraft job) and claude code gives up on a plain json
+  // reply that hasn't come within a minute, while the call goes on here. a stream starts at once
+  // and stays open with a comment now and then until the answer is ready
+  if (msgs.some((m) => m.method === 'tools/call' && m.id !== undefined) && /text\/event-stream/.test(req.headers.accept ?? '')) {
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
+    const alive = setInterval(() => res.write(': working\n\n'), KEEPALIVE_MS)
+    try {
+      const out = (await Promise.all(msgs.map((m) => answer(turn, m)))).filter((r) => r !== null)
+      for (const r of out) res.write(`event: message\ndata: ${JSON.stringify(r)}\n\n`)
+    } finally {
+      clearInterval(alive)
+      res.end()
+    }
+    return
+  }
   const out = (await Promise.all(msgs.map((m) => answer(turn, m)))).filter((r) => r !== null)
   if (out.length === 0) return reply(res, 202)
   reply(res, 200, batch ? out : out[0])

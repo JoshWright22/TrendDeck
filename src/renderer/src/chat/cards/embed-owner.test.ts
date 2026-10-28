@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { embedFor, newestOnDoc, pinEmbed, registerEmbed, setEmbedVisible } from './embed-owner'
+import { embedFor, newestOnDoc, pinEmbed, registerEmbed, setEmbedVisible, setWritingReplies, waitsForReply } from './embed-owner'
 
 const cleanup: (() => void)[] = []
 afterEach(() => {
@@ -37,5 +37,30 @@ describe('Craft editor activation', () => {
     expect(newestOnDoc('old')).toBe('new')
     expect(newestOnDoc('new')).toBe('new')
     expect(newestOnDoc('photo')).toBe('photo')
+  })
+})
+
+describe('a reply\'s editor card', () => {
+  it('waits while the reply is written, the one before keeps the editor, then it takes over', () => {
+    const offA = registerEmbed('a', 'filmcraft', 'FilmCraft', 'p', 1, 'm1')
+    setWritingReplies(new Set(['m2']))
+    const offB = registerEmbed('b', 'filmcraft', 'FilmCraft', 'p', 2, 'm2')
+    expect(waitsForReply('b')).toBe(true)
+    expect(newestOnDoc('a')).toBe('a')
+    expect(newestOnDoc('b')).toBe('a')
+    setWritingReplies(new Set())
+    expect(waitsForReply('b')).toBe(false)
+    expect(newestOnDoc('a')).toBe('b')
+    offA()
+    offB()
+  })
+
+  it('a first card waits too, with nothing above it', () => {
+    setWritingReplies(new Set(['m3']))
+    const off = registerEmbed('c', 'filmcraft', 'FilmCraft', 'q', 3, 'm3')
+    expect(waitsForReply('c')).toBe(true)
+    expect(newestOnDoc('c')).toBe('c')
+    off()
+    setWritingReplies(new Set())
   })
 })
