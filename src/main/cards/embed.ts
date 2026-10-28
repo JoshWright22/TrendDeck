@@ -20,7 +20,7 @@ import { webSpec } from '@shared/craft-web'
 import { cachedTools, pickFile, sessionOf, stopSession, waitForBridge } from '../craft/agent'
 import { APPS, fill, isAppId, spec } from '../craft/catalog'
 import { runningApp } from '../craft/launch'
-import { attachWeb, cardForGuest, prepareWeb, releaseWeb, reloadWeb, webLiveOn, webReady, webState, webStill, webUnsaved } from '../craft/web'
+import { attachWeb, cardForGuest, prepareWeb, releaseWeb, reloadWeb, setWebZoom, webLiveOn, webReady, webState, webStill, webUnsaved } from '../craft/web'
 import { appFiles, findProject, knownFolder, projectFolder } from '../craft/paths'
 import { isInside, PathError, resolveInProject, safeName, uniqueName } from '../craft/rules'
 import { liveOf, status } from '../craft/state'
@@ -495,6 +495,10 @@ export function setupEmbeds(deps: { addToProject: (brandId: string, projectId: s
   ipcMain.handle('embed:web-state', (e, cardId: unknown) => {
     if (!fromApp(e) || !isCardId(cardId)) bad()
     return webState(cardId)
+  })
+  ipcMain.handle('embed:web-zoom', (e, appId: unknown, step: unknown) => {
+    if (!fromApp(e) || !isAppId(appId) || (step !== -1 && step !== 0 && step !== 1)) bad()
+    return setWebZoom(appId, step)
   })
   ipcMain.handle('embed:open-full', async (e, brandId: unknown, cardId: unknown) => {
     if (!fromApp(e) || !isId(brandId) || !isCardId(cardId)) bad()

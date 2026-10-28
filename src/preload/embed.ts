@@ -27,5 +27,6 @@ export const embedApi: EmbedApi = {
     ipcRenderer.on('craft-web:state', listener)
     return () => ipcRenderer.removeListener('craft-web:state', listener)
   },
+  webZoom: (appId, step) => ipcRenderer.invoke('embed:web-zoom', appId, step),
   openFull: (brandId, cardId) => ipcRenderer.invoke('embed:open-full', brandId, cardId)
 }

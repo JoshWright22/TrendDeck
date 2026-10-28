@@ -112,6 +112,9 @@ export interface EmbedApi {
   webRelease(brandId: string, cardId: string): Promise<boolean>
   webState(cardId: string): Promise<WebEmbedState | null>
   onWebState(fn: (s: WebEmbedState) => void): () => void
+  // the app's size in the chat, kept for the next time it embeds: one size up (1), down (-1), or
+  // just what it is (0). the new size
+  webZoom(appId: string, step: -1 | 0 | 1): Promise<number>
   // the desktop app in its own window, the editor in the chat saves and lets go first
   openFull(brandId: string, cardId: string): Promise<CraftAppStatus>
 }

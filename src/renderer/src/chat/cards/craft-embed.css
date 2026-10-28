@@ -29,6 +29,38 @@
   color: var(--chalk);
 }
 
+/* the app's size in the chat: smaller, the percentage, bigger */
+.cx-embed-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+
+.cx-card2 .cx-embed-zoom button {
+  min-width: 26px;
+  min-height: 22px;
+  padding: 0 6px;
+  border: 0;
+  background: transparent;
+  color: var(--smoke);
+}
+
+.cx-card2 .cx-embed-zoom button:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--chalk);
+}
+
+.cx-embed-zoom-value {
+  min-width: 38px;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--smoke);
+}
+
 .cx-embed-stage {
   position: relative;
   width: 100%;

@@ -3,6 +3,7 @@ import type { WebviewTag } from 'electron'
 import type { CraftEmbedCard, ProjectFileRef } from '@shared/cards'
 import { stageHeight } from '@shared/craft-embed'
 import { webSpec, type WebEmbedState } from '@shared/craft-web'
+import { DEFAULT_ZOOM, ZOOMS } from '@shared/craft-web-view'
 import { craftApi, putCraft, useCraftApp } from '../../workspace/craft/store'
 import VideoReview from '../VideoReview'
 import { liveMax, newestOnDoc, pinEmbed, registerEmbed, setEmbedVisible, takeReveal, useEmbeds, useLiveEmbeds } from './embed-owner'
@@ -53,6 +54,12 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   // the editor has the wheel. until you click into it, a wheel over it scrolls the chat: the
   // editors draw on one canvas that takes every wheel event, so none would ever reach the chat
   const [active, setActive] = useState(false)
+  // starting the editor here, and a try again from Open here (one that failed or never came back)
+  const [opening, setOpening] = useState(false)
+  const [slow, setSlow] = useState(false)
+  const [tries, setTries] = useState(0)
+  // the app's size in the chat, the same for every embed of it
+  const [zoom, setZoom] = useState<number | null>(null)
   const project = a.brand.projects.find((p) => p.id === card.projectId)
 
   const inChat = !!webSpec(card.appId)
@@ -108,15 +115,40 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   // goes only after that (a still of it stays)
   const pageRef = useRef(page)
   pageRef.current = page
+  const wantedRef = useRef(wanted)
+  wantedRef.current = wanted
+  const openingRef = useRef(false)
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
   useEffect(() => {
     if (!api) return
     let alive = true
     if (wanted && !pageRef.current) {
+      // one start at a time. it can wait a while: an edit your agent is making on this project
+      // finishes first
+      if (openingRef.current) return
+      openingRef.current = true
+      setOpening(true)
       setError('')
-      void api.webOpen(a.brand.id, card.id).then(
-        (p) => alive && setPage(p),
-        (err: unknown) => alive && setError(cleanError(err))
-      )
+      void api
+        .webOpen(a.brand.id, card.id)
+        .then(
+          (p) => {
+            if (mounted.current && wantedRef.current) setPage(p)
+            // not wanted here any more by the time it was ready
+            else void api.webRelease(a.brand.id, card.id).catch(() => {})
+          },
+          (err: unknown) => mounted.current && setError(cleanError(err))
+        )
+        .finally(() => {
+          openingRef.current = false
+          if (mounted.current) setOpening(false)
+        })
     } else if (!wanted && pageRef.current) {
       void (async () => {
         const shot = await api.still(a.brand.id, card.id, null).catch(() => null)
@@ -136,7 +168,23 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
     return () => {
       alive = false
     }
-  }, [api, wanted, a.brand.id, card.id])
+  }, [api, wanted, a.brand.id, card.id, tries])
+
+  useEffect(() => {
+    setSlow(false)
+    if (!opening) return
+    const t = window.setTimeout(() => setSlow(true), 4000)
+    return () => clearTimeout(t)
+  }, [opening])
+
+  useEffect(() => {
+    if (!api || !inChat) return
+    void api.webZoom(card.appId, 0).then(setZoom, () => {})
+  }, [api, inChat, card.appId])
+
+  const resize = (step: -1 | 1): void => {
+    void api?.webZoom(card.appId, step).then(setZoom, (err: unknown) => setError(cleanError(err)))
+  }
 
   // the card going away (another chat) lets go too. autosave has kept the project current
   useEffect(() => () => {
@@ -278,6 +326,8 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
       if (cantRun) putCraft(await craftApi()!.install(card.appId))
       if (inChat) {
         pinEmbed(card.id)
+        // already wanted here but not running (it failed, or the page went away): start it again
+        setTries((t) => t + 1)
         return
       }
       putCraft(await api!.open(a.brand.id, card.id))
@@ -348,7 +398,9 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
         ? `${card.appName} opens in its own window.`
         : page
           ? web?.state === 'failed' ? web.note : 'Opening the project...'
-          : still ? '' : `${card.appName} isn't running. Up to ${liveMax()} editor${liveMax() === 1 ? '' : 's'} run at once, change it in Settings, Craft apps.`
+          : opening
+            ? slow ? `Waiting for your agent's ${card.appName} edit to finish, then it opens here.` : `Starting ${card.appName}...`
+            : still ? '' : `${card.appName} isn't running. Up to ${liveMax()} editor${liveMax() === 1 ? '' : 's'} run at once, change it in Settings, Craft apps.`
 
   return (
     <article
@@ -368,6 +420,17 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
         <strong>{card.appName}</strong>
         <span className="muted">{card.file ?? project?.name ?? ''}</span>
         <span className="spacer" />
+        {inChat && !cantRun && (
+          <span className="cx-embed-zoom" role="group" aria-label={`Size of ${card.appName} in the chat`}>
+            <button type="button" title="Smaller" aria-label="Smaller" disabled={zoom === null || zoom <= ZOOMS[0]} onClick={() => resize(-1)}>
+              -
+            </button>
+            <span className="cx-embed-zoom-value" title={`Kept for every ${card.appName} in the chat`}>{Math.round((zoom ?? DEFAULT_ZOOM) * 100)}%</span>
+            <button type="button" title="Bigger" aria-label="Bigger" disabled={zoom === null || zoom >= ZOOMS[ZOOMS.length - 1]} onClick={() => resize(1)}>
+              +
+            </button>
+          </span>
+        )}
         {fullHere ? (
           <button type="button" className="cx-embed-full" onClick={() => void closeFull()} disabled={busy}>
             Close the full app
@@ -418,8 +481,8 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
             <div className={`cx-embed-cover${still ? ' over-still' : ''}`}>
               {coverText && <span>{coverText}</span>}
               {!page && !fullHere && (
-                <button type="button" className="primary" disabled={busy || installKind === 'installing' || status === undefined} onClick={() => void openHere()}>
-                  {status === undefined ? 'Loading editor status' : installKind === 'installing' ? 'Installing' : cantRun ? `Install ${card.appName}` : inChat ? 'Open here' : `Open ${card.appName}`}
+                <button type="button" className="primary" disabled={busy || opening || installKind === 'installing' || status === undefined} onClick={() => void openHere()}>
+                  {status === undefined ? 'Loading editor status' : opening ? 'Starting' : installKind === 'installing' ? 'Installing' : cantRun ? `Install ${card.appName}` : inChat ? 'Open here' : `Open ${card.appName}`}
                 </button>
               )}
             </div>

@@ -4,6 +4,7 @@ import { promises as fs } from 'node:fs'
 import { basename, extname, isAbsolute, join } from 'node:path'
 import { session as electronSession, webContents, type WebContents } from 'electron'
 import { CRAFT_WEB_PARTITION, CRAFT_WEB_SCHEME, filmcraftWebStep, mapProjectPaths, PathTable, projectPaths, webSpec, type WebEmbedState, type WebStep } from '@shared/craft-web'
+import { dockOpenClose, dockSizes, prefsToRestore, stepZoom, type DockAction } from '@shared/craft-web-view'
 import { broadcast } from '../gateway/wait'
 import { setWebHooks, sessionOf, stopSession, type Session } from './agent'
 import { spec } from './catalog'
@@ -14,6 +15,7 @@ import type { McpCallResult, McpContent } from './mcp'
 import { projectOperation, snapshotFile } from './recovery'
 import { isInside, safeName } from './rules'
 import { appUrl, craftWebResponse, projectUrl } from './web-protocol'
+import { setView, viewOf } from './web-view'
 
 // the Craft apps' web builds in the chat: each card hosts the app as a <webview> on
 // craft-web://<app>/. main finds its guest page, loads the project into it, keeps the project
@@ -51,6 +53,8 @@ interface Embed {
   inputSave: NodeJS.Timeout | null
   seenJobs: Set<number>
   debugger: boolean
+  // the saved layout is going back in, what the page shows until then isn't yours
+  restoring: boolean
 }
 
 const embeds = new Map<string, Embed>()
@@ -514,12 +518,67 @@ async function dropFile(e: Embed, file: string): Promise<void> {
   for (const type of ['dragEnter', 'dragOver', 'drop']) await cdp(e, 'Input.dispatchDragEvent', { type, x: Math.round(w / 2), y: Math.round(h / 2), data })
 }
 
+// ---- how it looks: its size, FilmCraft's settings and panels (see @shared/craft-web-view) ----
+
+async function applyZoom(wc: WebContents, appId: string): Promise<void> {
+  const { zoom } = await viewOf(appId)
+  if (!wc.isDestroyed()) wc.setZoomFactor(zoom)
+}
+
+// a size up or down for every editor of the app in the chat, and the next time it embeds
+export async function setWebZoom(appId: string, step: -1 | 0 | 1): Promise<number> {
+  const now = (await viewOf(appId)).zoom
+  if (!step) return now
+  const { zoom } = await setView(appId, { zoom: stepZoom(now, step) })
+  for (const e of embeds.values()) if (e.appId === appId && e.guest && !e.guest.isDestroyed()) e.guest.setZoomFactor(zoom)
+  return zoom
+}
+
+// newer FilmCraft has ui.docking, older (0.13) keeps the frame tree in ui.inspect's ui.dock
+async function dockLayout(e: Embed): Promise<unknown> {
+  const docking = (await call(e, 'request', 'ui.docking', {}).catch(() => null)) as { layout?: unknown } | null
+  if (docking?.layout) return docking.layout
+  return ((await call(e, 'inspect').catch(() => null)) as { ui?: { dock?: unknown } } | null)?.ui?.dock ?? null
+}
+const prefsNow = async (e: Embed): Promise<unknown> => ((await execute(e, 'prefs.get', {})) as { values?: unknown } | null)?.values ?? null
+
+// what you set up in FilmCraft here, kept for the next embed
+async function captureView(e: Embed): Promise<void> {
+  if (webSpec(e.appId)?.kind !== 'api' || e.state !== 'ready' || e.restoring || !e.guest || e.guest.isDestroyed()) return
+  const [dock, prefs] = await Promise.all([dockLayout(e), prefsNow(e)])
+  if (dock || prefs) await setView(e.appId, { ...(dock ? { dock } : {}), ...(prefs ? { prefs } : {}) })
+}
+
+// the settings and panels as you left them last time. each step on its own: one FilmCraft
+// doesn't take (a panel a newer version renamed) leaves the rest as they come back
+async function restoreView(e: Embed): Promise<void> {
+  if (webSpec(e.appId)?.kind !== 'api') return
+  const saved = await viewOf(e.appId)
+  if (!saved.prefs && !saved.dock) return
+  e.restoring = true
+  try {
+    if (saved.prefs) {
+      for (const [key, value] of Object.entries(prefsToRestore(await prefsNow(e), saved.prefs))) {
+        await execute(e, 'prefs.set', { key, value }).catch(() => {})
+      }
+    }
+    if (saved.dock) {
+      const act = (action: DockAction): Promise<unknown> => execute(e, 'window.dockAction', { action }).catch(() => {})
+      for (const a of dockOpenClose(await dockLayout(e), saved.dock)) await act(a)
+      for (const a of dockSizes(await dockLayout(e), saved.dock)) await act(a)
+    }
+  } finally {
+    e.restoring = false
+  }
+}
+
 // ---- lifecycle ----
 
 async function load(e: Embed): Promise<void> {
   try {
     await waitReady(e)
     if (webSpec(e.appId)?.kind === 'api') {
+      await restoreView(e).catch((err) => console.warn(`craft: ${e.appId}'s layout didn't come back`, err))
       await openDocument(e)
       e.timers.push(setInterval(() => void saveSoon(e, 'autosave').catch((err) => fail(e, err, false)), AUTOSAVE_MS))
       e.timers.push(setInterval(() => void watchExports(e).catch(() => {}), 2_000))
@@ -603,7 +662,7 @@ export async function prepareWeb(p: PrepareInput): Promise<{ src: string; partit
   ready.catch(() => {})
   const e: Embed = {
     ...p, token, guest: null, state: 'loading', note: '', savedAt: null, ready, settle, table: new PathTable(), doc: null, saved: null,
-    touched: false, editedAt: 0, loadedAt: Date.now(), timers: [], inputSave: null, seenJobs: new Set(), debugger: false,
+    touched: false, editedAt: 0, loadedAt: Date.now(), timers: [], inputSave: null, seenJobs: new Set(), debugger: false, restoring: false,
     session: null as unknown as Session
   }
   e.session = {
@@ -633,6 +692,9 @@ export function attachWeb(cardId: string, guestId: number, host: WebContents): v
   if (origin && origin !== e.appId) throw new Error('bad craft web guest')
   if (e.guest === wc) return
   e.guest = wc
+  // the size you picked for this app, again after every load of the page
+  void applyZoom(wc, e.appId)
+  wc.on('dom-ready', () => void applyZoom(wc, e.appId))
   wc.once('destroyed', () => {
     if (embeds.get(cardId) === e && e.guest === wc) void releaseWeb(cardId, false)
   })
@@ -645,7 +707,11 @@ export function attachWeb(cardId: string, guestId: number, host: WebContents): v
     e.editedAt = Date.now()
     if (webSpec(e.appId)?.kind !== 'api' || e.state !== 'ready') return
     if (e.inputSave) clearTimeout(e.inputSave)
-    e.inputSave = setTimeout(() => void saveSoon(e, 'autosave').catch((err) => fail(e, err, false)), INPUT_SAVE_MS)
+    e.inputSave = setTimeout(() => {
+      void saveSoon(e, 'autosave').catch((err) => fail(e, err, false))
+      // a panel moved or a setting changed is input too
+      void captureView(e).catch(() => {})
+    }, INPUT_SAVE_MS)
   }
   wc.on('before-input-event', (_ev, input) => {
     if (input.type === 'keyUp') touch()
@@ -660,6 +726,7 @@ export function attachWeb(cardId: string, guestId: number, host: WebContents): v
 export async function releaseWeb(cardId: string, save = true): Promise<void> {
   const e = embeds.get(cardId)
   if (!e) return
+  if (save) await captureView(e).catch(() => {})
   if (save && e.state === 'ready' && webSpec(e.appId)?.kind === 'api' && e.guest && !e.guest.isDestroyed()) {
     await saveSoon(e, 'close').catch((err) => {
       fail(e, err, false)
