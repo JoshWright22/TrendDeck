@@ -208,6 +208,25 @@ export default function ChatView({
   const [threads, setThreads] = useState<ThreadSummary[]>([])
   const [thread, setThread] = useState<Thread | null>(null)
   const [draft, setDraft, draftSaved] = useChatDraft(brand.id, openId, project?.id ?? 'general')
+  // the video's steps sit behind a header button, out of the way of the chat
+  const [stepsOpen, setStepsOpen] = useState(false)
+  const stepsPanel = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!stepsOpen) return
+    const down = (e: PointerEvent): void => {
+      const t = e.target as HTMLElement | null
+      if (!stepsPanel.current?.contains(t) && !t?.closest('.cx-steps-btn, .ui-pop')) setStepsOpen(false)
+    }
+    const key = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setStepsOpen(false)
+    }
+    document.addEventListener('pointerdown', down)
+    document.addEventListener('keydown', key)
+    return () => {
+      document.removeEventListener('pointerdown', down)
+      document.removeEventListener('keydown', key)
+    }
+  }, [stepsOpen])
   const [files, setFiles] = useState<Attachment[]>([])
   const [picked, setPicked] = useState<string | null>(null)
   // model picked before the chat exists, per agent
@@ -1104,16 +1123,20 @@ export default function ChatView({
             {context && <span className="cx-head-context" title={`Linked to ${context}`}>{context}</span>}
           </h2>
           <span className="spacer" />
+          {linkedProjects.length > 0 && (
+            <button type="button" className="ws-head-btn cx-steps-btn" aria-expanded={stepsOpen} onClick={() => setStepsOpen(!stepsOpen)}>
+              Steps
+            </button>
+          )}
           {headerRight}
+          {stepsOpen && linkedProjects.length > 0 && (
+            <div className="cx-progress-list" ref={stepsPanel}>
+              {linkedProjects.slice(0, 3).map((p) => (
+                <ProjectProgress key={`progress:${brand.id}:${p.id}`} brand={brand} project={p} actions={cardActions} />
+              ))}
+            </div>
+          )}
         </header>
-
-        {linkedProjects.length > 0 && (
-          <div className="cx-progress-list">
-            {linkedProjects.slice(0, 3).map((p) => (
-              <ProjectProgress key={`progress:${brand.id}:${p.id}`} brand={brand} project={p} actions={cardActions} />
-            ))}
-          </div>
-        )}
         <div className="cx-messages" ref={scroller} onScroll={onScroll}>
           <div className="cx-column">
             <LoginRequests brandId={brand.id} threadId={openId} onOpenSite={onOpenSite} />
