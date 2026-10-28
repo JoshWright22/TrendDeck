@@ -267,6 +267,8 @@ export interface DictationOptions {
   holdKey: string
   // the composer keeps listening without holding a key
   handsFree: boolean
+  // the microphone's name as Windows shows it, '' for the Windows default
+  mic: string
 }
 
 export interface DictationConfig extends DictationOptions {
@@ -308,6 +310,8 @@ export interface DictationApi {
   onModelProgress(fn: (progress: LocalModelProgress) => void): () => void
   // the saved config changed outside this page, e.g. the agent set dictation up
   onConfigChanged(fn: (config: DictationConfig) => void): () => void
+  // the names of the microphones this computer has, so the agent can pick one
+  reportMics(names: string[]): void
 
   providers(): Promise<SttProviderInfo[]>
   saveProvider(input: ProviderInput): Promise<DictationConfig>
@@ -341,6 +345,8 @@ export const DICTATION_CHANNELS = {
 // main to the window, not an invoke channel
 export const DICTATION_PROGRESS_EVENT = 'dictation:model-progress'
 export const DICTATION_CONFIG_EVENT = 'dictation:config-changed'
+// the window to main, a send
+export const DICTATION_MICS_EVENT = 'dictation:mics'
 
 export const DICTATION_MAX_BYTES = 25 * 1024 * 1024
 export const DICTATION_TIMEOUT_MS = 120_000
@@ -356,7 +362,8 @@ export const DEFAULT_DICTATION_OPTIONS: DictationOptions = {
   // long enough for a breath mid sentence, short ones split what you say into two messages
   autoSendPauseMs: 2_500,
   holdKey: 'Ctrl+Space',
-  handsFree: false
+  handsFree: false,
+  mic: ''
 }
 
 export function prefsFor(info: LocalModelInfo, prefs: Record<string, LocalPrefs>): LocalPrefs {

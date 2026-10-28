@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { DEFAULT_DICTATION_OPTIONS } from '@shared/dictation'
 import { dictationSources, useDictationSource } from '../dictation/engine'
 import { matchesKey, type DictationControl } from '../dictation/useDictation'
@@ -60,6 +60,14 @@ export default function ComposerMic({ d, disabled }: { d: DictationControl; disa
       window.removeEventListener('keyup', up)
     }
   }, [d, holdKey, disabled])
+
+  // Dictate left on stays on: after a restart or an update it starts listening again by itself
+  const resumed = useRef(false)
+  useEffect(() => {
+    if (resumed.current || !d.config || disabled) return
+    resumed.current = true
+    if (d.config.handsFree && d.state === 'idle') d.start('hands-free')
+  }, [d, disabled])
 
   // downloaded local models and configured providers, for the quick switch
   const [sources, setSources] = useState<Awaited<ReturnType<typeof dictationSources>>>([])

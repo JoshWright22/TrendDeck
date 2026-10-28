@@ -4,7 +4,7 @@ import type { SpokenWord, Transcription } from '@shared/speech'
 import { createSegmenter, type Segmenter, type Utterance } from '@shared/vad'
 import { cleanError } from '../plain-error'
 import { dictationReady, transcribePcm, warmUp } from './engine'
-import { openMic, type Mic } from './mic'
+import { listMics, openMic, type Mic } from './mic'
 
 // the composer's dictation: the mic, cut into utterances at pauses, each one transcribed while
 // you keep talking. finished text goes to onText, the one being transcribed to onPartial (shown
@@ -72,6 +72,7 @@ export function useDictation(h: DictationHandlers): DictationControl {
   configRef.current = config
   const stateRef = useRef<DictationState>('idle')
   stateRef.current = state
+  const frameRef = useRef<((frame: Float32Array) => void) | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -87,6 +88,33 @@ export function useDictation(h: DictationHandlers): DictationControl {
       off?.()
     }
   }, [])
+
+  // the mic names for Settings and the agent, again when one is plugged in or out
+  useEffect(() => {
+    void listMics()
+    const md = navigator.mediaDevices
+    const changed = (): void => void listMics()
+    md?.addEventListener?.('devicechange', changed)
+    return () => md?.removeEventListener?.('devicechange', changed)
+  }, [])
+
+  // another mic picked while listening (Settings or the agent): switch to it without stopping
+  const micName = config?.mic ?? ''
+  const openedMic = useRef(micName)
+  useEffect(() => {
+    if (openedMic.current === micName) return
+    openedMic.current = micName
+    const onFrame = frameRef.current
+    if (stateRef.current !== 'listening' || !onFrame) return
+    const old = mic.current
+    void openMic(onFrame, micName)
+      .then((m) => {
+        if (mic.current !== old || stateRef.current !== 'listening') return m.close()
+        old?.close()
+        mic.current = m
+      })
+      .catch(() => {})
+  }, [micName])
 
   const clearPause = (): void => {
     if (pauseTimer.current !== null) window.clearTimeout(pauseTimer.current)
@@ -160,14 +188,16 @@ export function useDictation(h: DictationHandlers): DictationControl {
       const segmenter = createSegmenter(transcribe, how === 'hold' ? { pause: 0.8 } : {})
       seg.current = segmenter
       try {
-        mic.current = await openMic((frame) => {
+        const onFrame = (frame: Float32Array): void => {
           if (seg.current !== segmenter) return
           const wasSpeaking = segmenter.speaking
           segmenter.push(frame)
           if (!wasSpeaking && segmenter.speaking) clearPause()
           // a frame is 128 ms, so the meter redraws about 8 times a second
           setLevel(Math.min(1, segmenter.level * 12))
-        })
+        }
+        frameRef.current = onFrame
+        mic.current = await openMic(onFrame, configRef.current?.mic ?? '')
         if (seg.current !== segmenter) {
           mic.current?.close()
           return

@@ -1,9 +1,9 @@
 import type { IpcRenderer } from 'electron'
 import {
-  DICTATION_CHANNELS as C, DICTATION_CONFIG_EVENT, DICTATION_PROGRESS_EVENT, type DictationApi, type DictationConfig, type LocalModelProgress
+  DICTATION_CHANNELS as C, DICTATION_CONFIG_EVENT, DICTATION_MICS_EVENT, DICTATION_PROGRESS_EVENT, type DictationApi, type DictationConfig, type LocalModelProgress
 } from '../../shared/dictation'
 
-export function dictationBridge(ipcRenderer: Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener'>): DictationApi {
+export function dictationBridge(ipcRenderer: Pick<IpcRenderer, 'invoke' | 'on' | 'removeListener' | 'send'>): DictationApi {
   return {
     getConfig: () => ipcRenderer.invoke(C.getConfig),
     saveConfig: (options) => ipcRenderer.invoke(C.saveConfig, options),
@@ -26,6 +26,7 @@ export function dictationBridge(ipcRenderer: Pick<IpcRenderer, 'invoke' | 'on' |
       ipcRenderer.on(DICTATION_CONFIG_EVENT, listener)
       return () => { ipcRenderer.removeListener(DICTATION_CONFIG_EVENT, listener) }
     },
+    reportMics: (names) => ipcRenderer.send(DICTATION_MICS_EVENT, names),
     providers: () => ipcRenderer.invoke(C.providers),
     saveProvider: (input) => ipcRenderer.invoke(C.saveProvider, input),
     deleteProvider: (id) => ipcRenderer.invoke(C.deleteProvider, id),

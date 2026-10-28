@@ -6,6 +6,7 @@ import {
 } from '@shared/dictation'
 import { Dropdown } from '../../chat/ui'
 import { lastWhisperDevice, onWhisperDevice, useDictationSource, type Device } from '../../dictation/engine'
+import { listMics } from '../../dictation/mic'
 import { cleanError } from '../../plain-error'
 import './dictation-settings.css'
 
@@ -497,6 +498,15 @@ function ProviderForm({ ctx, choices, existing, onDone }: {
 function Composer({ ctx }: { ctx: Ctx }): ReactNode {
   const { config } = ctx
   const [recording, setRecording] = useState(false)
+  const [mics, setMics] = useState<string[]>([])
+  useEffect(() => {
+    void listMics().then(setMics)
+    const md = navigator.mediaDevices
+    const changed = (): void => void listMics().then(setMics)
+    md?.addEventListener?.('devicechange', changed)
+    return () => md?.removeEventListener?.('devicechange', changed)
+  }, [])
+  const micChoices = config.mic && !mics.includes(config.mic) ? [...mics, config.mic] : mics
 
   useEffect(() => {
     if (!recording) return
@@ -518,6 +528,20 @@ function Composer({ ctx }: { ctx: Ctx }): ReactNode {
 
   return (
     <div className="dz-group">
+      <label>
+        Microphone
+        <Dropdown
+          className="block"
+          label="Microphone"
+          value={config.mic}
+          options={[
+            { value: '', label: 'Windows default' },
+            ...micChoices.map((m) => ({ value: m, label: m, hint: mics.includes(m) ? undefined : 'Not plugged in, the Windows default is used' }))
+          ]}
+          onChange={(mic) => void ctx.save({ mic })}
+        />
+      </label>
+      {!mics.length && <p className="form-hint">Turn Dictate on once and the microphones show up here.</p>}
       <div className="dz-row-main">
         <span className="dz-row-name">Hold to talk</span>
         <button type="button" className="btn ghost dz-shortcut" aria-label="Change the hold-to-talk shortcut" onClick={() => setRecording(!recording)}>

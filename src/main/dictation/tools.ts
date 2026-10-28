@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { LOCAL_MODELS, prefsFor, sourceParts, type LocalModelInfo } from '../../shared/dictation'
 import { ToolError, type GatewayTool } from '../gateway/types'
 import { obj, str } from '../gateway/validate'
-import { applySource, loadStored, publicConfig, sendModelProgress } from './index'
+import { applyMic, applySource, knownMics, loadStored, publicConfig, sendModelProgress } from './index'
 import { customModels, downloadModel, findModel, installedDtypes, modelsState } from './models'
 import { gpuFacts, gpuKind, mainGpu, pickDictationModel, type GpuFacts } from './pick'
 import { allProviders, findProvider } from './sources'
@@ -87,6 +87,7 @@ export async function dictationStatus(): Promise<unknown> {
       const ready = saved.some((c) => p.fields.every((f) => !f.required || (f.secret ? c.hasSecret[f.key] : !!c.values[f.key])))
       return { name: p.label, kind: p.kind === 'api' ? 'cloud API' : 'server on this computer', configured: ready ? 'yes' : 'no' }
     }),
+    microphone: { inUse: stored.options.mic || 'the Windows default', onThisComputer: knownMics() },
     recommended: { model: pick.id, why: pick.reason },
     note: 'dictation_setup sets up local models only. Cloud APIs need a key the user adds in Settings, Dictation.'
   }
@@ -148,12 +149,37 @@ export async function setupDictationModel(args: Record<string, unknown>, waitMs 
   return `${info.label} (${size(bytes)}) is still downloading${progress}. It becomes the dictation source by itself when it finishes. Check with dictation_status.${tail}`
 }
 
+// picks the mic by a name or part of one, e.g. "Cloud II" for "HyperX Cloud II Wireless"
+export function setDictationMic(args: Record<string, unknown>): string {
+  const want = typeof args.name === 'string' ? args.name.trim() : ''
+  const mics = knownMics()
+  if (!want || /^(default|windows default)$/i.test(want)) {
+    applyMic('')
+    return 'Dictation uses the Windows default microphone now.'
+  }
+  const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const hits = mics.filter((m) => norm(m).includes(norm(want)))
+  if (!mics.length) throw new ToolError("TrendDeck hasn't seen the microphones yet. Ask the user to turn Dictate on once, then try again.")
+  if (!hits.length) throw new ToolError(`no microphone matches "${want}". this computer has: ${mics.join('; ')}`)
+  // a headset often shows up twice (the default and communications entries), the shortest is the plain one
+  const exact = hits.find((m) => norm(m) === norm(want)) ?? [...hits].sort((a, b) => a.length - b.length)[0]
+  applyMic(exact)
+  return `Dictation uses ${exact} now. It switches the next time Dictate starts listening, and if Dictate is on it switches right away.`
+}
+
 export const DICTATION_TOOLS: GatewayTool[] = [
   {
     name: 'dictation_status', title: 'Check dictation setup', risk: 'read',
     description: 'The graphics card dictation would run on (name, vendor, driver, whether WebGPU and hardware acceleration are available), the active dictation source, every local speech model with whether it is downloaded and its download size, which cloud APIs or local servers are configured (yes or no only), and the recommended local model for this GPU.',
     inputSchema: obj(),
     run: () => dictationStatus()
+  },
+  {
+    name: 'dictation_mic', title: 'Switch the dictation microphone', risk: 'read',
+    annotations: { readOnlyHint: false, idempotentHint: true },
+    description: 'Switches the microphone dictation listens to. name is the name of the mic or part of it, from dictation_status (microphone.onThisComputer), e.g. "Cloud II". "default" goes back to the Windows default. Use it when the user asks for another mic or the transcripts sound like the wrong one.',
+    inputSchema: obj({ name: str('the microphone name or part of it, or "default"', 200, 1) }),
+    run: async (_turn, args) => setDictationMic(args)
   },
   {
     name: 'dictation_setup', title: 'Set up dictation', risk: 'edit',

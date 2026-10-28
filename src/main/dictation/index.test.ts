@@ -19,7 +19,9 @@ vi.mock('electron', () => ({
   app: { getPath: () => '/test-user-data' },
   ipcMain: {
     handle: (channel: string, handler: (...args: unknown[]) => unknown) => mocks.handlers.set(channel, handler),
-    removeHandler: (channel: string) => mocks.handlers.delete(channel)
+    removeHandler: (channel: string) => mocks.handlers.delete(channel),
+    on: () => {},
+    removeListener: () => {}
   },
   safeStorage: {
     isEncryptionAvailable: () => mocks.encryptionAvailable,

@@ -13,7 +13,8 @@ const mocks = vi.hoisted(() => ({
   gpu: {} as unknown,
   features: {} as Record<string, string>,
   accel: true,
-  tools: [] as (() => unknown[])[]
+  tools: [] as (() => unknown[])[],
+  listeners: new Map<string, (...a: unknown[]) => void>()
 }))
 
 vi.mock('electron', () => ({
@@ -23,7 +24,7 @@ vi.mock('electron', () => ({
     getGPUFeatureStatus: () => mocks.features,
     isHardwareAccelerationEnabled: () => mocks.accel
   },
-  ipcMain: { handle: vi.fn(), removeHandler: vi.fn() },
+  ipcMain: { handle: vi.fn(), removeHandler: vi.fn(), on: (ch: string, fn: (...a: unknown[]) => void) => mocks.listeners.set(ch, fn), removeListener: vi.fn() },
   safeStorage: { isEncryptionAvailable: () => false, getSelectedStorageBackend: () => 'gnome_libsecret', encryptString: vi.fn(), decryptString: vi.fn() }
 }))
 
@@ -93,7 +94,7 @@ afterEach(() => {
 describe('dictation tools', () => {
   it('are registered with the gateway once, a read and an edit', () => {
     expect(mocks.tools).toHaveLength(1)
-    expect(mocks.tools[0]().map((t) => (t as { name: string }).name)).toEqual(['dictation_status', 'dictation_setup'])
+    expect(mocks.tools[0]().map((t) => (t as { name: string }).name)).toEqual(['dictation_status', 'dictation_mic', 'dictation_setup'])
     expect(tool('dictation_status').risk).toBe('read')
     expect(tool('dictation_setup').risk).toBe('edit')
   })
@@ -204,5 +205,21 @@ describe('dictation tools', () => {
     mocks.installed.add('whisper-base/q8')
     expect(await setup.summarize!(turn, { model: 'whisper-base' })).toBe('Use Whisper Base for dictation')
     expect(await setup.summarize!(turn, { model: 'nope' })).toBe('Set up dictation')
+  })
+
+  it('switches the mic by part of its name, from the names the window reported', async () => {
+    const mic = tool('dictation_mic')
+    await expect(mic.run(turn, { name: 'Cloud II' })).rejects.toThrow(/hasn't seen the microphones/)
+    mocks.listeners.get('dictation:mics')!({ sender }, ['Microphone (Realtek(R) Audio)', 'Microphone (HyperX Cloud II Wireless)'])
+    // another window's list is ignored
+    mocks.listeners.get('dictation:mics')!({ sender: {} }, ['Fake mic'])
+    const status = (await tool('dictation_status').run(turn, {})) as { microphone: { inUse: string; onThisComputer: string[] } }
+    expect(status.microphone).toEqual({ inUse: 'the Windows default', onThisComputer: ['Microphone (Realtek(R) Audio)', 'Microphone (HyperX Cloud II Wireless)'] })
+    expect(await mic.run(turn, { name: 'cloud 2' }).catch((e: Error) => e.message)).toMatch(/no microphone matches "cloud 2". this computer has: Microphone \(Realtek/)
+    expect(await mic.run(turn, { name: 'Cloud II' })).toMatch(/^Dictation uses Microphone \(HyperX Cloud II Wireless\) now/)
+    expect(JSON.parse(mocks.files.get(configPath())!).options.mic).toBe('Microphone (HyperX Cloud II Wireless)')
+    expect(sender.send).toHaveBeenCalledWith(DICTATION_CONFIG_EVENT, expect.objectContaining({ mic: 'Microphone (HyperX Cloud II Wireless)' }))
+    expect(await mic.run(turn, { name: 'default' })).toBe('Dictation uses the Windows default microphone now.')
+    expect(JSON.parse(mocks.files.get(configPath())!).options.mic).toBe('')
   })
 })

@@ -1,9 +1,9 @@
-import { app, ipcMain, safeStorage, type BrowserWindow, type IpcMainInvokeEvent, type WebContents } from 'electron'
+import { app, ipcMain, safeStorage, type BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent, type WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import {
-  DEFAULT_DICTATION_OPTIONS, DICTATION_CHANNELS, DICTATION_CONFIG_EVENT, DICTATION_PROGRESS_EVENT, DICTATION_TIMEOUT_MS, LOCAL_DTYPES, prefsFor, sourceParts,
+  DEFAULT_DICTATION_OPTIONS, DICTATION_CHANNELS, DICTATION_CONFIG_EVENT, DICTATION_MICS_EVENT, DICTATION_PROGRESS_EVENT, DICTATION_TIMEOUT_MS, LOCAL_DTYPES, prefsFor, sourceParts,
   type ApiTranscript, type DictationConfig, type DictationOptions, type LocalDtype, type LocalModelProgress, type ProviderConfig, type SttModelInfo
 } from '../../shared/dictation'
 import { registerToolSource } from '../gateway/call'
@@ -176,6 +176,23 @@ export function applySource(input: unknown): DictationConfig {
   return config
 }
 
+// the microphones the window last saw, names only. the window lists them, main can't
+let mics: string[] = []
+
+export function knownMics(): string[] {
+  return mics
+}
+
+// the dictation mic by name, '' for the Windows default. the composer opens it the next time it listens
+export function applyMic(name: string): DictationConfig {
+  const stored = loadStored()
+  stored.options = validateDictationOptions({ mic: name }, stored.options)
+  persistStored(stored)
+  const config = publicConfig(stored)
+  sendToWindows(DICTATION_CONFIG_EVENT, config)
+  return config
+}
+
 // the app windows dictation is set up for, so changes made outside them (the agent's
 // dictation_setup) still show: download progress and the new config
 const windows = new Set<WebContents>()
@@ -236,6 +253,11 @@ export function setupDictation(window: BrowserWindow, trustedRendererUrl: string
   const guardedFetch = (signal?: AbortSignal): typeof fetch => (input, init) =>
     fetch(input, { ...init, redirect: init?.redirect ?? 'error', signal: init?.signal ?? signal })
 
+  const onMics = (event: IpcMainEvent, names: unknown): void => {
+    if (event.sender !== webContents || !Array.isArray(names)) return
+    mics = names.filter((n): n is string => typeof n === 'string' && n.length > 0 && n.length <= 200).slice(0, 40)
+  }
+  ipcMain.on(DICTATION_MICS_EVENT, onMics)
   ipcMain.handle(DICTATION_CHANNELS.getConfig, (event) => {
     authorize(event)
     return publicConfig(loadStored())
@@ -448,6 +470,7 @@ export function setupDictation(window: BrowserWindow, trustedRendererUrl: string
     windows.delete(webContents)
     abort()
     for (const channel of Object.values(DICTATION_CHANNELS)) ipcMain.removeHandler(channel)
+    ipcMain.removeListener(DICTATION_MICS_EVENT, onMics)
     if (!webContents.isDestroyed()) {
       webContents.removeListener('did-start-navigation', navigation)
       webContents.removeListener('render-process-gone', abort)

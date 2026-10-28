@@ -103,6 +103,10 @@ const checks: Checks = {
   handsFree: (v) => {
     if (typeof v !== 'boolean') throw new Error('Invalid hands-free setting.')
     return v
+  },
+  mic: (v) => {
+    if (typeof v !== 'string' || v.length > 200) throw new Error('Invalid microphone.')
+    return v.trim()
   }
 }
 

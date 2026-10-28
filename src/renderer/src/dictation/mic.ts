@@ -8,12 +8,49 @@ export interface Mic {
   close(): void
 }
 
-export async function openMic(onFrame: (frame: Float32Array) => void): Promise<Mic> {
+// "Microphone (HyperX Cloud III S Wireless) (03f0:06be)" without the usb ids on the end
+const plainName = (label: string): string => label.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)$/i, '')
+
+// the names of the microphones, sent to main too so the agent can pick one. windows lists a
+// headset again as "Default - ..." and "Communications - ...", those are left out. names only
+// show once the page may use the mic, before that the list is empty
+export async function listMics(): Promise<string[]> {
+  try {
+    const all = await navigator.mediaDevices.enumerateDevices()
+    const names = [...new Set(all.filter((d) => d.kind === 'audioinput' && d.label && d.deviceId !== 'default' && d.deviceId !== 'communications').map((d) => plainName(d.label)))]
+    window.trenddeckDictation?.reportMics?.(names)
+    return names
+  } catch {
+    return []
+  }
+}
+
+// the device for a saved mic name, matching on part of it too. none: the Windows default
+async function micId(name: string): Promise<string | null> {
+  if (!name) return null
+  const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const all = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput' && d.deviceId !== 'default' && d.deviceId !== 'communications')
+  const hit = all.find((d) => plainName(d.label) === name) ?? all.find((d) => d.label && norm(d.label).includes(norm(name)))
+  return hit?.deviceId ?? null
+}
+
+const CONSTRAINTS = { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+
+export async function openMic(onFrame: (frame: Float32Array) => void, name = ''): Promise<Mic> {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('This computer has no microphone TrendDeck can use.')
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    video: false
-  })
+  let stream = await navigator.mediaDevices.getUserMedia({ audio: CONSTRAINTS, video: false })
+  // mic names only show once the page may use the mic, so the chosen one is found after the first open
+  const id = await micId(name).catch(() => null)
+  if (id && stream.getAudioTracks()[0]?.getSettings().deviceId !== id) {
+    try {
+      const picked = await navigator.mediaDevices.getUserMedia({ audio: { ...CONSTRAINTS, deviceId: { exact: id } }, video: false })
+      stream.getTracks().forEach((t) => t.stop())
+      stream = picked
+    } catch {
+      // unplugged or busy, the default it is
+    }
+  }
+  void listMics()
   let ctx: AudioContext | null = null
   try {
     ctx = new AudioContext({ sampleRate: VAD_SAMPLE_RATE })
