@@ -129,7 +129,7 @@ const SHORTCUTS =
 
 const MODE_LABELS: Record<PermissionMode, { label: string; hint: string }> = {
   supervised: { label: 'Supervised', hint: 'Asks before every tool and change' },
-  'auto-accept-edits': { label: 'Auto-accept edits', hint: 'Edits go through, the rest asks' },
+  'auto-accept-edits': { label: 'Auto-accept edits', hint: 'Edits and commands go through, the rest asks' },
   auto: { label: 'Auto', hint: "The agent's judgement, asks when unsure" },
   'full-access': { label: 'Full access', hint: 'Never asks' }
 }

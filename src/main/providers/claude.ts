@@ -86,9 +86,10 @@ function mapMode(mode: PermissionMode): Mapped {
       return { permissionMode: 'default', allowedTools: READ_ONLY }
     case 'auto-accept-edits':
       // the app's tool server checks site access itself, request_post waits for the user anyway
-      return { permissionMode: 'acceptEdits', allowedTools: [...READ_ONLY, APP_TOOLS] }
+      // shell commands go through too, like the edits. TrendDeck's own folder stays guarded (hooks)
+      return { permissionMode: 'acceptEdits', allowedTools: [...READ_ONLY, APP_TOOLS, 'Bash'] }
     case 'auto':
-      return { permissionMode: 'auto', allowedTools: [...READ_ONLY, APP_TOOLS] }
+      return { permissionMode: 'auto', allowedTools: [...READ_ONLY, APP_TOOLS, 'Bash'] }
     case 'full-access':
       return { permissionMode: 'bypassPermissions', allowedTools: [...READ_ONLY, APP_TOOLS], allowDangerouslySkipPermissions: true }
   }
