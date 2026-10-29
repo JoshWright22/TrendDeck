@@ -55,7 +55,9 @@ if (MUTE_ALL) app.commandLine.appendSwitch('mute-audio')
 const offscreen = process.env.TRENDDECK_TEST_OFFSCREEN === '1'
 app.commandLine.appendSwitch(
   'disable-features',
-  `MediaRouter,DialMediaRouteProvider,CastMediaRouteProvider,GlobalMediaControlsCastStartStop${offscreen ? ',CalculateNativeWinOcclusion' : ''}`
+  // and a window another program covers isn't treated as hidden: it would stop drawing, and the
+  // FilmCraft editor in the chat came back with its video at the wrong size for a moment after alt+tab
+  'MediaRouter,DialMediaRouteProvider,CastMediaRouteProvider,GlobalMediaControlsCastStartStop,CalculateNativeWinOcclusion'
 )
 
 // sites only play sound while you can see them
