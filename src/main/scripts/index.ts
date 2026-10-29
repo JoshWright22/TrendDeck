@@ -31,7 +31,9 @@ import { findProject, projectFolder } from '../craft/paths'
 import { PathError, resolveInProject } from '../craft/rules'
 import { ToolError, type GatewayTool, type Turn } from '../gateway/types'
 import { broadcast } from '../gateway/wait'
-import { list, obj, oneOf, str } from '../gateway/validate'
+import { bool, list, num, obj, oneOf, str } from '../gateway/validate'
+import { appCall, resultJson } from '../craft/tools'
+import { planVoice, type VoiceDump } from '@shared/voice-track'
 
 // talk-first scripts in the project folder: scripts\script.md (markdown, git keeps its history),
 // scripts\script.claims.json for the claim check, and scripts\dumps\<id>.json for every
@@ -259,7 +261,82 @@ const lineSchema = obj(
   ['text', 'origin']
 )
 
+// dictations onto the FilmCraft timeline as the voice: the stretches where they talk, pauses cut,
+// back to back on an audio track, with a caption for each line timed to the words
+async function voiceToFilmcraft(turn: Turn, args: Record<string, unknown>): Promise<unknown> {
+  const p = projectOf(turn, args.projectId)
+  const dir = await root(turn.brandId, p.id)
+  const ids = Array.isArray(args.dumps) ? args.dumps.filter((x): x is string => typeof x === 'string') : []
+  const all = await loadDumps(dir)
+  const dumps = ids.map((id) => all.find((d) => d.id === id) ?? null)
+  const missing = ids.filter((_, i) => !dumps[i])
+  if (!ids.length || missing.length) throw new ToolError(missing.length ? `no dump ${missing.join(', ')} in this project, see dumps_list` : 'name the dumps to use, in order')
+  const noAudio = dumps.filter((d) => !d!.audio).map((d) => d!.id)
+  if (noAudio.length) throw new ToolError(`these dumps have no recording: ${noAudio.join(', ')}`)
+  const at = typeof args.seconds === 'number' && args.seconds >= 0 ? args.seconds : 0
+  const pause = typeof args.pause === 'number' && args.pause > 0.1 ? args.pause : 0.6
+  const plan = planVoice(dumps.map((d) => ({ id: d!.id, words: d!.words }) as VoiceDump), at, { pause })
+  if (!plan.segments.length) throw new ToolError('no words with times in those dumps')
+  const call = async (tool: string, a: Record<string, unknown>): Promise<unknown> =>
+    resultJson(await appCall(turn.brandId, p.id, 'filmcraft', tool, a, { timeoutMs: 120_000, edits: true }))
+  // each recording once, as a project item
+  const items = new Map<string, number>()
+  for (const d of dumps) {
+    if (items.has(d!.id)) continue
+    const r = (await call('media_import', { paths: [join(dir, d!.audio!)] })) as { items?: unknown[] } | null
+    const item = Array.isArray(r?.items) && typeof r.items[0] === 'number' ? r.items[0] : null
+    if (item === null) throw new ToolError(`FilmCraft didn't take ${d!.audio}: ${JSON.stringify(r).slice(0, 200)}`)
+    items.set(d!.id, item)
+  }
+  const T = 254_016_000_000
+  const track = typeof args.audioTrack === 'string' && args.audioTrack.trim() ? args.audioTrack.trim() : 'A1'
+  const places = plan.segments.map((sg) => ({
+    id: 'timeline.place',
+    params: { item: items.get(sg.dump), audioTrack: track, seconds: sg.at, insert: false, video: false, sourceIn: Math.round(sg.sourceIn * T), duration: Math.round((sg.sourceOut - sg.sourceIn) * T) }
+  }))
+  const placed = await call('command_batch', { steps: places, stop_on_error: true })
+  let captions: unknown = null
+  if (args.captions !== false) {
+    const t = (await call('command_run', { id: 'captions.newTrack', params: { format: 'Subtitle', name: 'Voice' } })) as { track?: number } | null
+    if (typeof t?.track !== 'number') throw new ToolError(`FilmCraft made no caption track: ${JSON.stringify(t).slice(0, 200)}`)
+    captions = await call('command_batch', {
+      steps: plan.captions.map((c) => ({ id: 'captions.add', params: { track: t.track, text: c.text, seconds: c.start, durationSeconds: Math.max(0.3, c.end - c.start) } })),
+      stop_on_error: false
+    })
+  }
+  return {
+    placed: plan.segments.length,
+    track,
+    from: at,
+    to: Math.round(plan.end * 100) / 100,
+    cutPauses: plan.segments.length - dumps.length,
+    captions: args.captions === false ? 0 : plan.captions.length,
+    lines: plan.captions.map((c) => `${c.start.toFixed(2)}-${c.end.toFixed(2)} ${c.text}`).slice(0, 80),
+    results: { placed, captions }
+  }
+}
+
 export const SCRIPT_TOOLS: GatewayTool[] = [
+  {
+    name: 'voice_to_filmcraft',
+    title: 'Put dictation in FilmCraft as the voice',
+    risk: 'edit',
+    description:
+      "Puts the creator's dictations (dumps, in the order given) onto the project's FilmCraft timeline as the voiceover: only the stretches where they talk, pauses longer than pause seconds cut (a short breath stays), back to back on an audio track from seconds on, with a caption track 'Voice' whose captions are timed to their words, so the video shows what they say when they say it. Use this when they talk the video through instead of writing a script; no script or re-recording needed. To swap a line for a new take, delete that stretch and its captions on the timeline (edit.rippleDelete / captions.delete), then call this with the new dump at the same seconds. Open the editor with craft_embed so they can watch it.",
+    inputSchema: obj(
+      {
+        projectId: PROJECT_ARG,
+        dumps: list('the dictations to use, in order', str('a dump id from dumps_list', 60, 1), 50, 1),
+        seconds: num('where on the timeline the voice starts, 0 when left out', 0),
+        audioTrack: str('the audio track, A1 when left out, or "new" for a new one', 20),
+        pause: num('a silence longer than this many seconds is cut, 0.6 when left out', 0.1),
+        captions: bool('false to leave the captions out')
+      },
+      ['dumps']
+    ),
+    summarize: (_turn, args) => `Put ${Array.isArray(args.dumps) ? args.dumps.length : 0} dictation${Array.isArray(args.dumps) && args.dumps.length === 1 ? '' : 's'} into FilmCraft as the voice, pauses cut, with captions`,
+    run: (turn, args) => voiceToFilmcraft(turn, args)
+  },
   {
     name: 'dumps_list',
     title: 'List brain dumps',
