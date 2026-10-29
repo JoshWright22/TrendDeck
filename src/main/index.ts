@@ -8,6 +8,7 @@ import { setupObs } from './obs'
 import { ID_PATTERN, isHttpUrl, partitionFor, type AppData } from '@shared/types'
 import { styleSite } from './site-style'
 import { setupUpdater, updateNow } from './updater'
+import { setupContextMenu } from './context-menu'
 import { moveProjectsOutOfOneDrive } from './craft/move-root'
 import { webInUse } from './craft/web'
 import { bootInfo } from './boot-state'
@@ -251,6 +252,7 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
   await dropVisualsBrand(brandId)
 })
 
+setupContextMenu()
 setupTrends()
 setupAnalytics()
 setupMcp()
