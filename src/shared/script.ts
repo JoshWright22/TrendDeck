@@ -369,7 +369,15 @@ export interface ScriptsChanged {
 }
 
 // window.trenddeckScripts
+// the video's outline (scripts/outline.md), the side panel in the chat. mtime 0 when there's none yet
+export interface OutlineFile {
+  text: string
+  mtime: number
+}
+
 export interface ScriptsApi {
+  outline(brandId: string, projectId: string): Promise<OutlineFile>
+  saveOutline(brandId: string, projectId: string, text: string): Promise<OutlineFile>
   get(brandId: string, projectId: string, file?: string): Promise<ScriptView | null>
   change(brandId: string, projectId: string, file: string, change: LineChange): Promise<ScriptView | null>
   setStatus(brandId: string, projectId: string, file: string, status: 'draft' | 'ready'): Promise<ScriptView | null>

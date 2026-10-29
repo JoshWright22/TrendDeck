@@ -50,6 +50,10 @@ const SPEC = CLIS.find((c) => c.id === 'claude')!
 // through without asking in every mode. the app's own tools come over mcp
 const READ_ONLY = ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite']
 const APP_TOOLS = 'mcp__trenddeck'
+// what goes through without asking in auto accept edits and auto: commands and file changes anywhere
+// (claude code's own acceptEdits only covers its working folder). TrendDeck's own folder stays
+// out through the deny rules and the shell hook, which win over these
+const HANDS = ['Bash', 'PowerShell', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit']
 
 // TrendDeck's own folder holds the logins and keys the agent never sees: its file tools are kept
 // out of everything in it but the agent's own room, in every mode, full access too. claude code's
@@ -86,9 +90,9 @@ function mapMode(mode: PermissionMode): Mapped {
     case 'auto-accept-edits':
       // the app's tool server checks site access itself, request_post waits for the user anyway
       // shell commands go through too, like the edits. TrendDeck's own folder stays guarded (hooks)
-      return { permissionMode: 'acceptEdits', allowedTools: [...READ_ONLY, APP_TOOLS, 'Bash', 'PowerShell'] }
+      return { permissionMode: 'acceptEdits', allowedTools: [...READ_ONLY, APP_TOOLS, ...HANDS] }
     case 'auto':
-      return { permissionMode: 'auto', allowedTools: [...READ_ONLY, APP_TOOLS, 'Bash', 'PowerShell'] }
+      return { permissionMode: 'auto', allowedTools: [...READ_ONLY, APP_TOOLS, ...HANDS] }
     case 'full-access':
       return { permissionMode: 'bypassPermissions', allowedTools: [...READ_ONLY, APP_TOOLS], allowDangerouslySkipPermissions: true }
   }

@@ -551,6 +551,22 @@ export function setupScripts(): void {
   ipcMain.handle('scripts:change', (e, b: unknown, p: unknown, f: unknown, c: unknown) => changeScript(...ids(e, b, p), fileArg(f), cleanChange(c)))
   ipcMain.handle('scripts:status', (e, b: unknown, p: unknown, f: unknown, s: unknown) => setScriptStatus(...ids(e, b, p), fileArg(f), s === 'ready' ? 'ready' : 'draft'))
   // every dictation that goes to the agent, kept with its word times
+  // the outline the agent keeps for the video, shown and edited in the chat's side panel
+  const outlinePath = async (b: string, p: string): Promise<string> => join(await root(b, p), 'scripts', 'outline.md')
+  const readOutline = async (path: string): Promise<{ text: string; mtime: number }> => {
+    const st = await fs.stat(path).catch(() => null)
+    if (!st) return { text: '', mtime: 0 }
+    return { text: (await fs.readFile(path, 'utf8')).slice(0, 400_000), mtime: st.mtimeMs }
+  }
+  ipcMain.handle('scripts:outline', async (e, b: unknown, p: unknown) => readOutline(await outlinePath(...ids(e, b, p))))
+  ipcMain.handle('scripts:save-outline', async (e, b: unknown, p: unknown, text: unknown) => {
+    if (typeof text !== 'string' || text.length > 400_000) throw new Error('bad outline')
+    const path = await outlinePath(...ids(e, b, p))
+    await fs.mkdir(dirname(path), { recursive: true })
+    await writeAtomic(path, text)
+    return readOutline(path)
+  })
+
   ipcMain.handle('scripts:save-dump', async (e, b: unknown, p: unknown, t: unknown, audio: unknown, hifi: unknown) => {
     const hi = hifi && typeof hifi === 'object' && (hifi as { pcm?: unknown }).pcm instanceof Float32Array && typeof (hifi as { rate?: unknown }).rate === 'number' ? (hifi as { rate: number; pcm: Float32Array }) : null
     const d = await saveDump(...ids(e, b, p), cleanTranscription(t), audio instanceof Float32Array ? audio : null, hi)

@@ -25,6 +25,7 @@ import {
 } from '@shared/providers'
 import { CloseIcon, SendIcon } from '../components/Icons'
 import Markdown from './Markdown'
+import OutlinePanel from './OutlinePanel'
 import { EmbedCard, type EmbedActions } from './Embeds'
 import MediaReview from './MediaReview'
 import CardList from './cards/CardList'
@@ -212,6 +213,12 @@ export default function ChatView({
   const [draft, setDraft, draftSaved] = useChatDraft(brand.id, openId, project?.id ?? 'general')
   // the video's steps sit behind a header button, out of the way of the chat
   const [stepsOpen, setStepsOpen] = useState(false)
+  // the video's outline beside the chat, it stays open or shut the way you left it
+  const [outlineOpen, setOutlineOpenState] = useState(() => localStorage.getItem('trenddeck.outlineOpen') === 'true')
+  const setOutlineOpen = (on: boolean): void => {
+    localStorage.setItem('trenddeck.outlineOpen', String(on))
+    setOutlineOpenState(on)
+  }
   const stepsPanel = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!stepsOpen) return
@@ -1180,6 +1187,11 @@ export default function ChatView({
             {context && <span className="cx-head-context" title={`Linked to ${context}`}>{context}</span>}
           </h2>
           <span className="spacer" />
+          {project && (
+            <button type="button" className="ws-head-btn" aria-expanded={outlineOpen} onClick={() => setOutlineOpen(!outlineOpen)}>
+              Outline
+            </button>
+          )}
           {linkedProjects.length > 0 && (
             <button type="button" className="ws-head-btn cx-steps-btn" aria-expanded={stepsOpen} onClick={() => setStepsOpen(!stepsOpen)}>
               Steps
@@ -1569,6 +1581,7 @@ export default function ChatView({
           onClose={() => setManage(false)}
         />
       )}
+      {outlineOpen && project && <OutlinePanel brandId={brand.id} projectId={project.id} projectName={project.name} onClose={() => setOutlineOpen(false)} />}
     </section>
   )
 }

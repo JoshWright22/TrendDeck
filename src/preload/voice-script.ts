@@ -7,6 +7,8 @@ import type { TakesApi } from '@shared/take'
 // trenddeckBrandMemory
 
 export const scriptsApi: ScriptsApi = {
+  outline: (b, p) => ipcRenderer.invoke('scripts:outline', b, p),
+  saveOutline: (b, p, text) => ipcRenderer.invoke('scripts:save-outline', b, p, text),
   get: (b, p, f) => ipcRenderer.invoke('scripts:get', b, p, f),
   change: (b, p, f, c) => ipcRenderer.invoke('scripts:change', b, p, f, c),
   setStatus: (b, p, f, s) => ipcRenderer.invoke('scripts:status', b, p, f, s),
