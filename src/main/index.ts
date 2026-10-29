@@ -88,6 +88,9 @@ function openInApp(host: WebContents | null | undefined, url: string): void {
 // their own agents and editors on the same projects and write the same chat files
 let mainWin: BrowserWindow | null = null
 if (app.isPackaged && !app.requestSingleInstanceLock()) app.exit(0)
+// --update-now only tells a running TrendDeck to update. with none running it does nothing, it
+// never opens the app by itself
+else if (process.argv.includes('--update-now')) app.exit(0)
 app.on('second-instance', (_e, argv) => {
   if (!app.isReady()) return
   // a new release was just pushed: take it without bringing the window up
