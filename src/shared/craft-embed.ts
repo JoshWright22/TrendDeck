@@ -572,3 +572,31 @@ export function countsAsEdit(tool: string, args: Record<string, unknown>): boole
   }
   return true
 }
+
+// m:ss.s on the timeline, how people read a playhead
+export const clock = (ticks: number): string => {
+  const s = Math.max(0, toSeconds(ticks))
+  const m = Math.floor(s / 60)
+  const rest = (Math.round((s - m * 60) * 10) / 10).toFixed(1).padStart(4, '0')
+  return `${m}:${rest}`
+}
+
+// where the user is in FilmCraft right now, from sequence.inspect on the open sequence: one short
+// line so "cut this bit" or "this clip" needs no times. null when there's nothing to say
+export function whereInFilmcraft(seq: unknown): string | null {
+  const s = seq as Record<string, unknown> | null
+  if (!s || typeof s !== 'object' || typeof s.id !== 'number' || typeof s.playhead !== 'number') return null
+  const parts = [`The user's playhead is at ${clock(s.playhead)} on ${quote(asStr(s.name) || `sequence ${s.id}`)} (sequence ${s.id})`]
+  if (typeof s.in === 'number' || typeof s.out === 'number') {
+    parts.push(`in/out ${typeof s.in === 'number' ? clock(s.in) : 'start'} to ${typeof s.out === 'number' ? clock(s.out) : 'end'}`)
+  }
+  const picked = new Set(Array.isArray(s.selection) ? s.selection.filter((x): x is number => typeof x === 'number') : [])
+  if (picked.size) {
+    const all = fcSequenceFrom(s)?.clips ?? []
+    const named = ownClips({ id: s.id, name: '', fps: { num: 30, den: 1 }, clips: all.filter((c) => picked.has(c.id)), markers: [], captions: [] })
+    const shown = named.slice(0, 4).map((c) => `clip ${c.id} ${c.track} ${clock(c.start)}-${clock(c.end)}`)
+    const more = named.length - shown.length
+    parts.push(`selected ${shown.join(', ')}${more > 0 ? ` and ${more} more` : ''}`)
+  }
+  return `${parts.join('; ')}.`
+}

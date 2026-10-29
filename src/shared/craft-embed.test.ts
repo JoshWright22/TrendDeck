@@ -5,6 +5,7 @@ import {
   diffFilmcraft,
   diffGeneric,
   fcSequenceFrom,
+  whereInFilmcraft,
   formatCraftReview,
   frameAt,
   markerName,
@@ -236,5 +237,29 @@ describe('embed size', () => {
       }
       expect(Number.isFinite(stageHeight(size, NaN, NaN))).toBe(true)
     }
+  })
+})
+
+describe('whereInFilmcraft', () => {
+  const T = 254_016_000_000
+  const seq = {
+    id: 127,
+    name: 'Sinking Star - 10 min cut',
+    playhead: 252 * T,
+    in: null,
+    out: null,
+    selection: [145, 146],
+    video: [{ items: [{ clip: 145, name: 'a', start: 240 * T, end: 271.5 * T, link: 9 }] }],
+    audio: [{ items: [{ clip: 146, name: 'a', start: 240 * T, end: 271.5 * T, link: 9 }] }]
+  }
+
+  it('says the playhead and the selected clips in one line, a picture clip once with its sound', () => {
+    expect(whereInFilmcraft(seq)).toBe(`The user's playhead is at 4:12.0 on "Sinking Star - 10 min cut" (sequence 127); selected clip 145 V1 4:00.0-4:31.5.`)
+  })
+
+  it('adds in and out, and nothing without a playhead', () => {
+    expect(whereInFilmcraft({ ...seq, selection: [], in: 10 * T, out: null })).toBe(`The user's playhead is at 4:12.0 on "Sinking Star - 10 min cut" (sequence 127); in/out 0:10.0 to end.`)
+    expect(whereInFilmcraft({ id: 1 })).toBeNull()
+    expect(whereInFilmcraft(null)).toBeNull()
   })
 })

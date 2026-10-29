@@ -112,7 +112,30 @@ function guest(e: Embed): WebContents {
   return e.guest
 }
 
-const js = (e: Embed, code: string): Promise<unknown> => guest(e).executeJavaScript(code)
+// the longest anything in the page may take (bringing in a big file). a call into a page that
+// closed, crashed or hung never comes back on its own, and it would hold the project's lock with
+// everything after it waiting, so it fails instead
+const PAGE_MS = 5 * 60_000
+
+function js(e: Embed, code: string): Promise<unknown> {
+  const g = guest(e)
+  return new Promise((ok, no) => {
+    const end = (fn: () => void): void => {
+      clearTimeout(timer)
+      g.removeListener('destroyed', gone)
+      g.removeListener('render-process-gone', gone)
+      fn()
+    }
+    const gone = (): void => end(() => no(new Error(`${spec(e.appId).name} in the chat closed before it answered`)))
+    const timer = setTimeout(() => end(() => no(new Error(`${spec(e.appId).name} in the chat didn't answer`))), PAGE_MS)
+    g.once('destroyed', gone)
+    g.once('render-process-gone', gone)
+    g.executeJavaScript(code).then(
+      (r: unknown) => end(() => ok(r)),
+      (err: unknown) => end(() => no(err))
+    )
+  })
+}
 
 const call = (e: Embed, fn: string, ...args: unknown[]): Promise<unknown> =>
   js(e, `Promise.resolve(window.${e.appId}.${fn}(${args.map((a) => JSON.stringify(a)).join(', ')})).then((r) => r === undefined ? null : JSON.parse(JSON.stringify(r)))`)

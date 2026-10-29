@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs'
 import { basename, join } from 'node:path'
 import type { CraftEmbedCard } from '@shared/cards'
-import { describeChanges, diffSnapshots, fcSequenceFrom, type FcSnapshot, type ProjectSnapshot } from '@shared/craft-embed'
+import { describeChanges, diffSnapshots, fcSequenceFrom, whereInFilmcraft, type FcSnapshot, type ProjectSnapshot } from '@shared/craft-embed'
 import { cachedTools } from '../craft/agent'
 import { spec } from '../craft/catalog'
 import { runningApp } from '../craft/launch'
@@ -185,12 +185,29 @@ export async function turnNotes(brandId: string, threadId: string): Promise<stri
     if (text) parts.push(`- ${text}`)
   }
   persist(brandId)
-  if (!parts.length) return ''
+  const where = await whereNow(brandId, threadId)
+  if (!parts.length) return where
   return [
     '## What the user changed in the editors since your last reply',
     ...parts,
-    "These are the user's own edits in the Craft apps in this chat. Keep them and build on them. Don't undo, redo or move them unless the user asks; if you think one should change, say so and ask."
+    "These are the user's own edits in the Craft apps in this chat. Keep them and build on them. Don't undo, redo or move them unless the user asks; if you think one should change, say so and ask.",
+    ...(where ? ['', where] : [])
   ].join('\n')
+}
+
+// where the user is in the FilmCraft open in this chat (the editor here or its window): the
+// playhead, in/out and selected clips, one line. only from an open editor, a file's saved
+// playhead is old news
+async function whereNow(brandId: string, threadId: string): Promise<string> {
+  const open = (x: CraftEmbedCard): boolean => {
+    const live = liveOn(x.appId, brandId, x.projectId)
+    return live === 'web' || live === 'window'
+  }
+  const c = (await embedded(brandId, threadId)).find((x) => x.appId === 'filmcraft' && open(x))
+  if (!c) return ''
+  const seq = await withTimeout(json(brandId, c.projectId, 'filmcraft', 'command_run', { id: 'sequence.inspect', params: {} }).catch(() => null), 5_000)
+  const line = whereInFilmcraft(seq)
+  return line ? `## Where the user is in FilmCraft\n${line} "Here", "this bit" or "this clip" from them means this.` : ''
 }
 
 export function setupCollab(): void {

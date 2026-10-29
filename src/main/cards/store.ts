@@ -32,6 +32,13 @@ async function load(brandId: string): Promise<ChatCard[]> {
   } catch {
     // no cards yet
   }
+  // read once per run, before any reply of this run: one still editing is from a reply that ended
+  // with TrendDeck closing, its edits are there to keep or undo
+  for (const c of list) {
+    if (c.type !== 'craft' || c.turn?.state !== 'working') continue
+    c.turn.state = c.turn.edits > 0 ? 'review' : 'failed'
+    if (!c.turn.edits) c.turn.note = 'None of the edits went through.'
+  }
   cache.set(brandId, list)
   return list
 }

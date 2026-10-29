@@ -72,17 +72,18 @@ export function setupTurnEdits(): void {
       const [, appId, projectId] = g.key.split('|')
       void g.value
         .then(async (grp) => {
-          // the open window's project on disk gets the reply's edits, like the headless engine's
-          const live = liveOn(appId, grp.brandId, projectId)
-          if (g.edits > 0 && appId === 'filmcraft' && (live === 'window' || live === 'web')) {
-            await appCall(grp.brandId, projectId, appId, 'command_run', { id: 'file.save', params: {} }).catch(() => {})
-          }
+          // the card is done first, a save that takes a while doesn't keep it saying it's editing
           await changeCard(grp.brandId, grp.cardId, (e) => {
             if (e.type !== 'craft' || !e.turn || e.turn.turnId !== turn.id) return
             e.turn.edits = Math.max(e.turn.edits, g.edits)
             e.turn.state = e.turn.edits > 0 ? 'review' : 'failed'
             if (!e.turn.edits) e.turn.note = 'None of the edits went through.'
           })
+          // the open window's project on disk gets the reply's edits, like the headless engine's
+          const live = liveOn(appId, grp.brandId, projectId)
+          if (g.edits > 0 && appId === 'filmcraft' && (live === 'window' || live === 'web')) {
+            await appCall(grp.brandId, projectId, appId, 'command_run', { id: 'file.save', params: {} }).catch(() => {})
+          }
         })
         .catch(() => {})
     }
