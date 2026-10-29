@@ -285,6 +285,9 @@ class ClaudeSession implements ProviderSession {
       // claude code's own system prompt, the one that makes it act like a coding agent, with
       // TrendDeck's instructions after it, fresh every turn (T3 Code does the same)
       systemPrompt: { type: 'preset', preset: 'claude_code', append: input.system || undefined },
+      // its thinking comes back as text you can read in the work log, like T3 Code asks for. without
+      // this newer models only say how long they thought
+      thinking: { type: 'adaptive', display: 'summarized' },
       permissionMode: mapped.permissionMode,
       allowedTools: mapped.allowedTools,
       settings: await guardSettings(),

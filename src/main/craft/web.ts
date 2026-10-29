@@ -13,6 +13,7 @@ import { makeProxy, nativeCommand, type JobWhere } from './jobs'
 import { cleanEnv, runningApp } from './launch'
 import { McpClient, type McpCallResult, type McpContent } from './mcp'
 import { projectOperation, snapshotFile } from './recovery'
+import { previewSpeedNow } from '../preview-speed'
 import { isInside, safeName } from './rules'
 import { appUrl, craftWebResponse, projectUrl } from './web-protocol'
 import { setView, viewOf } from './web-view'
@@ -710,6 +711,27 @@ async function restoreView(e: Embed): Promise<void> {
 
 // ---- lifecycle ----
 
+// FilmCraft starts every play at 1x. after you press Space or click in it, TrendDeck reads whether
+// it's playing (ui.inspect only reads; ui.playback with no action toggles play, which once kept
+// pausing and playing the video) and, playing at 1x, switches it to your preview speed. nothing
+// runs on a timer, a speed you pick with J K L stays. only watching: clips and renders keep theirs
+const checking = new WeakSet<Embed>()
+function checkSpeed(e: Embed): void {
+  if (checking.has(e) || e.state !== 'ready' || e.restarting || webSpec(e.appId)?.kind !== 'api') return
+  const speed = previewSpeedNow()
+  if (speed === 1) return
+  checking.add(e)
+  setTimeout(() => {
+    void (async () => {
+      const r = (await call(e, 'request', 'ui.inspect', { fields: ['playback'] })) as { playback?: { playing?: unknown; speed?: unknown } } | null
+      const p = r?.playback
+      if (p?.playing === true && p.speed === 1 && e.state === 'ready') await call(e, 'request', 'ui.playback', { action: 'play', speed })
+    })()
+      .catch(() => {})
+      .finally(() => checking.delete(e))
+  }, 150)
+}
+
 async function load(e: Embed): Promise<void> {
   try {
     await waitReady(e)
@@ -851,9 +873,13 @@ export function attachWeb(cardId: string, guestId: number, host: WebContents): v
   }
   wc.on('before-input-event', (_ev, input) => {
     if (input.type === 'keyUp') touch()
+    if (input.type === 'keyUp' && (input.key === ' ' || input.code === 'Space')) checkSpeed(e)
   })
   wc.on('before-mouse-event', (_ev, mouse) => {
-    if (mouse.type === 'mouseUp') touch()
+    if (mouse.type === 'mouseUp') {
+      touch()
+      checkSpeed(e)
+    }
   })
   void load(e)
 }

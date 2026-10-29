@@ -4,8 +4,8 @@ import { join } from 'node:path'
 import { ToolError, type GatewayTool } from './gateway/types'
 import { num, obj } from './gateway/validate'
 
-// how fast you watch: TrendDeck's players play at this speed (FilmCraft can't be told safely, see the
-// note in craft/web.ts history: asking its playback state toggles play). only
+// how fast you watch: TrendDeck's players play at this speed, FilmCraft in the chat switches to it
+// after you press play (checkSpeed in craft/web.ts). only
 // watching, never a clip's speed or a render. 2x by default, the agent can change it
 
 export const DEFAULT_PREVIEW_SPEED = 2
@@ -57,7 +57,7 @@ export const PREVIEW_SPEED_TOOL: GatewayTool = {
   title: 'Set how fast videos play',
   risk: 'edit',
   description:
-    "Sets the speed the user watches at: TrendDeck's video players play at it (2x by default, the user likes to watch fast). FilmCraft has no setting for it: in FilmCraft the user presses L twice for 2x. It only changes watching: never a clip's speed, the timeline or a render or export, which keep real time. Leave speed out to read it.",
+    "Sets the speed the user watches at: TrendDeck's video players play at it, and the FilmCraft editor in the chat switches to it shortly after the user presses play (2x by default, the user likes to watch fast). It only changes watching: never a clip's speed, the timeline or a render or export, which keep real time. Leave speed out to read it.",
   inputSchema: obj({ speed: num(`the playback speed, ${PREVIEW_SPEEDS.min} to ${PREVIEW_SPEEDS.max}, e.g. 2 for double speed`, PREVIEW_SPEEDS.min, PREVIEW_SPEEDS.max) }),
   run: async (_turn, args) => {
     if (args.speed === undefined) return { speed: await previewSpeed() }
