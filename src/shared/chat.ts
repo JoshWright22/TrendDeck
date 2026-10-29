@@ -168,6 +168,8 @@ export interface Thread {
   sessions?: Record<string, string>
   // hash of the brand voice pack each agent's session last got, it's sent again when it changes
   voiceSent?: Record<string, string>
+  // the TrendDeck version whose instructions each agent last got, a new one sends them again
+  rulesSent?: Record<string, string>
   archived?: boolean
   // how much the agent may do without asking, missing means the brand's default
   permissionMode?: PermissionMode

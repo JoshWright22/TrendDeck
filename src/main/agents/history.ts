@@ -165,6 +165,7 @@ function cleanThread(raw: unknown): Thread | null {
     efforts: cleanMap(t.efforts, isStr),
     sessions: cleanMap(t.sessions, isStr),
     voiceSent: cleanMap(t.voiceSent, isStr),
+    rulesSent: cleanMap(t.rulesSent, isStr),
     archived: t.archived === true,
     permissionMode: isPermissionMode(t.permissionMode) ? t.permissionMode : undefined,
     queued: cleanQueue(t.queued),

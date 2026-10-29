@@ -61,9 +61,14 @@ export function privateRules(dir: string, entries: string[], room = 'agent-room'
   return entries.filter((n) => n !== room).flatMap((n) => tools.flatMap((t) => [`${t}(/${posix}/${n})`, `${t}(/${posix}/${n}/**)`]))
 }
 
-async function privateRulesNow(): Promise<string[]> {
+// the rules go in a settings file, not on the command line: one per folder and tool runs past
+// windows' command length. the file is in TrendDeck's own folder, which the agent can't touch
+async function guardSettings(): Promise<string> {
   const dir = app.getPath('userData')
-  return privateRules(dir, await fs.readdir(dir).catch(() => []))
+  const file = join(dir, 'agent-guard.json')
+  const deny = privateRules(dir, [...new Set([...(await fs.readdir(dir).catch(() => [])), 'agent-guard.json'])])
+  await fs.writeFile(file, JSON.stringify({ permissions: { deny } }), 'utf8')
+  return file
 }
 
 const MODELS_TTL_MS = 30 * 60_000
@@ -265,7 +270,7 @@ class ClaudeSession implements ProviderSession {
       canUseTool: this.canUseTool,
       permissionMode: mapped.permissionMode,
       allowedTools: mapped.allowedTools,
-      disallowedTools: await privateRulesNow(),
+      settings: await guardSettings(),
       // runs in every mode, full access too, where canUseTool is never asked
       hooks: {
         PreToolUse: [

@@ -412,6 +412,9 @@ async function runReply(brandId: string, live: Live): Promise<void> {
           return flatPrompt(context, past, message)
         }
         const parts: string[] = []
+        // the chat goes on in the agent's own session, which only got the instructions when it
+        // started. after an update they come again, so what it can do now is what it knows
+        if (thread.rulesSent?.[agentId] !== app.getVersion()) parts.push("## TrendDeck's instructions, updated (these replace the ones from the start of this chat)", context, '')
         if (thread.voiceSent?.[agentId] !== sentVoice) parts.push(voice.text, '')
         const handoff = buildHandoff(missedSince(thread, agentId, 2), agentId, agentName, histRoom)
         if (handoff) {
@@ -447,6 +450,7 @@ async function runReply(brandId: string, live: Live): Promise<void> {
         live.session = session
         const text = promptFor(resume !== undefined)
         thread.voiceSent = { ...thread.voiceSent, [agentId]: sentVoice }
+        thread.rulesSent = { ...thread.rulesSent, [agentId]: app.getVersion() }
         await session.sendTurn({ text, system: context, history: past, message })
       }
 
@@ -778,6 +782,7 @@ export function setupAgents(): void {
   const rerun = async (brandId: string, thread: Thread, agentId: string): Promise<SendResult> => {
     thread.sessions = {}
     thread.voiceSent = {}
+    thread.rulesSent = {}
     thread.seen = {}
     thread.agentId = agentId
     const answering = await replyAgent(agentId)
