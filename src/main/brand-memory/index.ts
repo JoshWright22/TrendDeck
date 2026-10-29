@@ -229,15 +229,10 @@ const base = (turn: Turn) => {
   return { id: newCardId(), brandId: turn.brandId, threadId: turn.threadId, messageId: turn.messageId ?? null, at: now, updatedAt: now }
 }
 
-async function keepRule(brandId: string, cardId: string, text: string): Promise<RuleCard> {
-  const card = await getCard(brandId, cardId)
-  if (!card || card.type !== 'rule') throw new Error('That rule card is gone.')
-  if (card.state !== 'proposed') throw new Error('This rule was already decided.')
-  const clean = text.replace(/\s+/g, ' ').trim()
-  if (!clean || clean.length > RULE_TEXT_MAX) throw new Error(`Keep a rule between 1 and ${RULE_TEXT_MAX} characters.`)
-  const edited = clean !== card.rule.text
+// a rule into the style rules the agent sees every turn and into brand/rules.md with where it came from
+async function storeRule(brandId: string, rule: RuleCard['rule'], clean: string, cardId: string, edited: boolean): Promise<void> {
   // the existing style memory first, so it reaches the agent every turn
-  const why = `Kept from a wrap-up. ${card.rule.why}`.trim()
+  const why = `Kept from a wrap-up. ${rule.why}`.trim()
   const saved = await changeContext<string | null>(brandId, (f) => {
     const r = addRule(f.rules, clean, 'agent', { why })
     return r.ok ? { file: { ...f, rules: r.rules }, out: null } : { file: f, out: r.error }
@@ -245,9 +240,18 @@ async function keepRule(brandId: string, cardId: string, text: string): Promise<
   if (saved && !/already saved/.test(saved)) throw new Error(saved)
   contextChanged(brandId)
   const at = Date.now()
-  await writeKeptRule(brandFolder(brandId), brandName(brandId), clean, card.rule.kind, { at, cardId, evidence: card.rule.evidence, examples: card.rule.examples, edited })
-  if (edited) await logFriction(brandId, { kind: 'edited-rule', before: card.rule.text, after: clean, ref: cardId })
+  await writeKeptRule(brandFolder(brandId), brandName(brandId), clean, rule.kind, { at, cardId, evidence: rule.evidence, examples: rule.examples, edited })
+  if (edited) await logFriction(brandId, { kind: 'edited-rule', before: rule.text, after: clean, ref: cardId })
   await commitBrand(brandId, `kept rule: ${clean}`)
+}
+
+async function keepRule(brandId: string, cardId: string, text: string): Promise<RuleCard> {
+  const card = await getCard(brandId, cardId)
+  if (!card || card.type !== 'rule') throw new Error('That rule card is gone.')
+  if (card.state !== 'proposed') throw new Error('This rule was already decided.')
+  const clean = text.replace(/\s+/g, ' ').trim()
+  if (!clean || clean.length > RULE_TEXT_MAX) throw new Error(`Keep a rule between 1 and ${RULE_TEXT_MAX} characters.`)
+  await storeRule(brandId, card.rule, clean, cardId, clean !== card.rule.text)
   const out = await changeCard(brandId, cardId, (c) => {
     if (c.type !== 'rule') return
     c.state = 'kept'
@@ -403,7 +407,7 @@ export const BRAND_MEMORY_TOOLS: GatewayTool[] = [
     title: 'Propose a brand rule',
     risk: 'read',
     description:
-      'At a wrap-up, propose one rule learned from the friction log as a card with Keep, Edit and Drop. At most 3 per session, so pick the patterns that repeat. evidence is the ids of the friction events it comes from. Kept rules go into the style rules you see every turn and into the brand files with where they came from.',
+      'At a wrap-up, save one rule learned from the friction log. It is kept right away, no card and nothing for the creator to approve: it goes into the style rules you see every turn and into brand/rules.md with where it came from. Mention it in one line; they can change or remove it in Settings. At most 3 per session, so pick the patterns that repeat. evidence is the ids of the friction events it comes from.',
     inputSchema: obj(
       {
         text: str('the rule, one short plain sentence, e.g. "Cut \'Moreover\'"', RULE_TEXT_MAX, 3),
@@ -417,14 +421,13 @@ export const BRAND_MEMORY_TOOLS: GatewayTool[] = [
     run: async (turn, args) => {
       brandOf(turn)
       const s = await loadState(turn.brandId)
-      if (rulesLeft(s.proposed) <= 0) throw new ToolError('You already proposed 3 rules this session. Stop here; the creator decides on those first.')
+      if (rulesLeft(s.proposed) <= 0) throw new ToolError('You already saved 3 rules this session. Stop here.')
       const known = new Set((await frictionSince(turn.brandId, null)).map((e) => e.id))
       const rule = cleanProposal(args, known)
       if (typeof rule === 'string') throw new ToolError(rule)
       await changeState(turn.brandId, (x) => void (x.proposed += 1))
-      const card: RuleCard = { ...base(turn), type: 'rule', rule, state: 'proposed', kept: '' }
-      await addCard(card)
-      return `shown as rule card ${card.id}, ${rulesLeft(s.proposed + 1)} left this session. the creator keeps, edits or drops it`
+      await storeRule(turn.brandId, rule, rule.text, '', false)
+      return `saved: "${rule.text}". ${rulesLeft(s.proposed + 1)} left this session`
     }
   },
   {

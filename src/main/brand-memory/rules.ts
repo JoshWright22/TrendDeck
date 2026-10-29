@@ -143,6 +143,6 @@ export function wrapUpPrompt(events: FrictionEvent[], left: number): string {
     '',
     frictionText(events),
     '',
-    `Look for patterns, not one-offs. Propose at most ${left} rule${left === 1 ? '' : 's'} with rule_propose, each pointing at the change ids it comes from, short and in plain words (for example "Cut 'Moreover'" or "Open hooks with a story, not a stat"). If nothing repeats, say so and propose none. I'll keep, edit or drop each card.`
+    `Look for patterns, not one-offs. Save at most ${left} rule${left === 1 ? '' : 's'} with rule_propose, each pointing at the change ids it comes from, short and in plain words (for example "Cut 'Moreover'" or "Open hooks with a story, not a stat"). They're kept right away; tell me in one line what you saved. If nothing repeats, say so and save none.`
   ].join('\n')
 }
