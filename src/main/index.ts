@@ -8,6 +8,7 @@ import { setupObs } from './obs'
 import { ID_PATTERN, isHttpUrl, partitionFor, type AppData } from '@shared/types'
 import { styleSite } from './site-style'
 import { setupUpdater, updateNow } from './updater'
+import { moveProjectsOutOfOneDrive } from './craft/move-root'
 import { webInUse } from './craft/web'
 import { bootInfo } from './boot-state'
 import { loadData, saveData } from './store'
@@ -271,8 +272,10 @@ setupVoiceScript()
 setupContentMap()
 setupVisuals()
 
-void app.whenReady().then(() => {
+void app.whenReady().then(async () => {
   app.userAgentFallback = plainUserAgent()
+  // before anything opens a project: out of OneDrive, once
+  await moveProjectsOutOfOneDrive().catch((err) => console.error('craft: moving the projects failed', err))
   // net.fetch needs the app ready, so the blocker hooks up here. its engine loads after first paint
   setupAdblock()
   setupPosting()
