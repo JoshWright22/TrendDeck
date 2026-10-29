@@ -489,8 +489,11 @@ export default function ChatView({
     follow(true)
     listEnd.current?.scrollIntoView({ block: 'end' })
   }
+  // an editor filling the chat holds it still while you work in it, but a message you send and the
+  // reply to it come in under the editor, so the chat follows them down
+  const replying = last?.role === 'user' || last?.status === 'streaming'
   useEffect(() => {
-    if (document.documentElement.dataset.embedFill) {
+    if (document.documentElement.dataset.embedFill && !replying) {
       follow(false)
       return
     }
@@ -661,6 +664,7 @@ export default function ChatView({
     }
     setError('')
     setNotice('')
+    follow(true)
     if (busy && thread) {
       if (files.length) {
         setError('Files go out with a new message. Wait for this reply, or remove them first.')
@@ -694,6 +698,7 @@ export default function ChatView({
     const body = text.trim()
     if (!body) return
     if (!agentId) throw new Error('Set up an agent first.')
+    follow(true)
     if (busy && thread) {
       const res = await chat().steer(brandId, thread.id, body, agentId)
       if (res.mode === 'queued') {

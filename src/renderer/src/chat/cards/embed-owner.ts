@@ -27,9 +27,18 @@ let writing: ReadonlySet<string> = new Set()
 const waiting = (e: Entry): boolean => !!e.messageId && writing.has(e.messageId)
 
 export function setWritingReplies(ids: ReadonlySet<string>): void {
-  const before = [...entries.values()].filter(waiting).map((e) => e.id).join()
+  const before = [...entries.values()].filter(waiting)
   writing = ids
-  if ([...entries.values()].filter(waiting).map((e) => e.id).join() !== before) recompute()
+  const done = before.filter((e) => !waiting(e))
+  // the reply is done: its editor takes over, the chat shows it
+  for (const e of done) handedOver.add(e.id)
+  if (done.length || [...entries.values()].some((e) => waiting(e) && !before.includes(e))) recompute()
+}
+
+// cards whose reply just finished, the chat scrolls to them once
+const handedOver = new Set<string>()
+export function takeHandover(id: string): boolean {
+  return handedOver.delete(id)
 }
 
 // a card in a reply that's still being written

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { embedFor, newestOnDoc, pinEmbed, registerEmbed, setEmbedVisible, setWritingReplies, waitsForReply } from './embed-owner'
+import { embedFor, newestOnDoc, pinEmbed, registerEmbed, setEmbedVisible, setWritingReplies, takeHandover, waitsForReply } from './embed-owner'
 
 const cleanup: (() => void)[] = []
 afterEach(() => {
@@ -51,6 +51,10 @@ describe('a reply\'s editor card', () => {
     setWritingReplies(new Set())
     expect(waitsForReply('b')).toBe(false)
     expect(newestOnDoc('a')).toBe('b')
+    // the chat shows it once
+    expect(takeHandover('b')).toBe(true)
+    expect(takeHandover('b')).toBe(false)
+    expect(takeHandover('a')).toBe(false)
     offA()
     offB()
   })

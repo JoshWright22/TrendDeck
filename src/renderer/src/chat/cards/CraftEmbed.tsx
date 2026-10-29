@@ -7,7 +7,7 @@ import { DEFAULT_ZOOM, ZOOMS } from '@shared/craft-web-view'
 import { craftApi, putCraft, useCraftApp } from '../../workspace/craft/store'
 import { markUserScroll } from '../scrollIntent'
 import VideoReview from '../VideoReview'
-import { liveMax, newestOnDoc, pinEmbed, registerEmbed, setEmbedVisible, takeReveal, useEmbeds, useLiveEmbeds, waitsForReply } from './embed-owner'
+import { liveMax, newestOnDoc, pinEmbed, registerEmbed, setEmbedVisible, takeHandover, takeReveal, useEmbeds, useLiveEmbeds, waitsForReply } from './embed-owner'
 import { cleanError, type CardActions } from './useCards'
 import { sendReview } from './VideoCard'
 import './craft-embed.css'
@@ -82,6 +82,11 @@ export default function CraftEmbed({ card, a }: { card: CraftEmbedCard; a: CardA
   const revealAt = useRef(0)
   useEffect(() => {
     if (takeReveal(card.id)) revealAt.current = Date.now()
+    // its reply just finished: shown, unless you've scrolled up to read something else
+    if (takeHandover(card.id)) {
+      const sc = scroller(rootRef.current)
+      if (sc && sc.scrollHeight - sc.scrollTop - sc.clientHeight < sc.clientHeight * 2) revealAt.current = Date.now()
+    }
     if (Date.now() - revealAt.current < 4000) {
       markUserScroll(scroller(rootRef.current))
       rootRef.current?.scrollIntoView({ block: 'start' })
