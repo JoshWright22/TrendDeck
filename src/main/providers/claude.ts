@@ -23,6 +23,7 @@ import { accountEnv } from '../agents/config'
 import { resolveLaunch, which, type Launch } from '../agents/detect'
 import { claudeParser, describeTool } from '../agents/parse'
 import { agentEnv, killTree, MAX_RUN_MS, workDir } from '../agents/run'
+import { PRIVATE_REASON, touchesPrivate } from './private-guard'
 import { answerSignal, approvalRequest, Inbox, sinkFor, userInputRequest, Waiting } from './common'
 import {
   ProviderUnavailable,
@@ -45,10 +46,25 @@ const loadSdk = (): Promise<Sdk> => (sdk ??= import('@anthropic-ai/claude-agent-
 
 const SPEC = CLIS.find((c) => c.id === 'claude')!
 
-// web lookups and a todo list. no shell and no files, the app's own tools come over mcp
-const TOOLS = ['WebSearch', 'WebFetch', 'TodoWrite']
-const READ_ONLY = ['WebSearch', 'WebFetch', 'TodoWrite']
+// everything claude code itself has: a shell, files, the web, a todo list, its own helpers. the
+// permission mode decides what asks first. the app's own tools come over mcp
+const TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'MultiEdit', 'Glob', 'Grep', 'NotebookEdit', 'WebSearch', 'WebFetch', 'TodoWrite', 'Task']
+const READ_ONLY = ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite']
 const APP_TOOLS = 'mcp__trenddeck'
+
+// TrendDeck's own folder holds the logins and keys the agent never sees: its file tools are kept
+// out of everything in it but the agent's own room, in every mode, full access too. claude code's
+// rules want //c/Users/... on windows
+export function privateRules(dir: string, entries: string[], room = 'agent-room'): string[] {
+  const posix = dir.replace(/\\/g, '/').replace(/^([A-Za-z]):/, (_m, d: string) => `/${d.toLowerCase()}`).replace(/\/+$/, '')
+  const tools = ['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Glob', 'Grep']
+  return entries.filter((n) => n !== room).flatMap((n) => tools.flatMap((t) => [`${t}(/${posix}/${n})`, `${t}(/${posix}/${n}/**)`]))
+}
+
+async function privateRulesNow(): Promise<string[]> {
+  const dir = app.getPath('userData')
+  return privateRules(dir, await fs.readdir(dir).catch(() => []))
+}
 
 const MODELS_TTL_MS = 30 * 60_000
 const MODELS_TIMEOUT_MS = 20_000
@@ -249,6 +265,22 @@ class ClaudeSession implements ProviderSession {
       canUseTool: this.canUseTool,
       permissionMode: mapped.permissionMode,
       allowedTools: mapped.allowedTools,
+      disallowedTools: await privateRulesNow(),
+      // runs in every mode, full access too, where canUseTool is never asked
+      hooks: {
+        PreToolUse: [
+          {
+            matcher: 'Bash|PowerShell',
+            hooks: [
+              async (h) => {
+                const command = h.hook_event_name === 'PreToolUse' ? String((h.tool_input as { command?: unknown })?.command ?? '') : ''
+                if (!touchesPrivate(command, app.getPath('userData'))) return { continue: true }
+                return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: PRIVATE_REASON } }
+              }
+            ]
+          }
+        ]
+      },
       allowDangerouslySkipPermissions: mapped.allowDangerouslySkipPermissions,
       model: this.start.model || undefined,
       effort: (SPEC.efforts?.includes(this.start.effort ?? '') ? this.start.effort : undefined) as Options['effort'],
