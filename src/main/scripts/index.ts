@@ -135,7 +135,7 @@ const dumpsDir = (dir: string): string => join(dir, 'scripts', 'dumps')
 // the longest dictation recording kept, 20 minutes at 16 kHz
 const MAX_DUMP_SAMPLES = 20 * 60 * 16_000
 
-export async function saveDump(brandId: string, projectId: string, t: Pick<Transcription, 'text' | 'words' | 'duration'>, audio?: Float32Array | null): Promise<Dump> {
+export async function saveDump(brandId: string, projectId: string, t: Pick<Transcription, 'text' | 'words' | 'duration'>, audio?: Float32Array | null, hifi?: { rate: number; pcm: Float32Array } | null): Promise<Dump> {
   const dir = await root(brandId, projectId)
   const at = Date.now()
   const id = `${new Date(at).toISOString().slice(0, 19).replace(/[-:T]/g, '')}-${randomUUID().slice(0, 4)}`
@@ -145,10 +145,18 @@ export async function saveDump(brandId: string, projectId: string, t: Pick<Trans
     .map((w) => ({ text: w.text.slice(0, 60), start: Math.round(w.start * 100) / 100, end: Math.round(w.end * 100) / 100 }))
   const dump: Dump = { id, at, text: t.text.slice(0, 200_000), words, duration: Number.isFinite(t.duration) ? t.duration : 0 }
   // the recording too, so the agent can listen back and you can put it in an edit
-  if (audio?.length) {
+  // at full quality without the call filters when the mic gave a copy like that (the voiceover),
+  // else the 16 kHz one transcription used. the word times line up with either
+  if (hifi?.pcm.length && hifi.rate >= 16_000 && hifi.rate <= 192_000) {
+    await fs.mkdir(dumpsDir(dir), { recursive: true })
+    await fs.writeFile(join(dumpsDir(dir), `${id}.wav`), wavBytes(hifi.pcm.subarray(0, Math.round(MAX_DUMP_SAMPLES / VAD_SAMPLE_RATE) * hifi.rate), hifi.rate))
+    dump.audio = `scripts/dumps/${id}.wav`
+    dump.rate = hifi.rate
+  } else if (audio?.length) {
     await fs.mkdir(dumpsDir(dir), { recursive: true })
     await fs.writeFile(join(dumpsDir(dir), `${id}.wav`), wavBytes(audio.subarray(0, MAX_DUMP_SAMPLES), VAD_SAMPLE_RATE))
     dump.audio = `scripts/dumps/${id}.wav`
+    dump.rate = VAD_SAMPLE_RATE
   }
   await writeAtomic(join(dumpsDir(dir), `${id}.json`), JSON.stringify(dump))
   void addSpeech(brandId, words)
@@ -360,7 +368,7 @@ export const SCRIPT_TOOLS: GatewayTool[] = [
       const p = projectOf(turn, args.projectId)
       const d = (await loadDumps(await root(turn.brandId, p.id))).find((x) => x.id === args.id)
       if (!d) throw new ToolError(`no dump ${String(args.id)} in this project`)
-      return { id: d.id, at: new Date(d.at).toISOString(), text: dumpText(d), audio: d.audio ? `${d.audio} in the project folder, 16 kHz mono, the word times line up with it` : null }
+      return { id: d.id, at: new Date(d.at).toISOString(), text: dumpText(d), audio: d.audio ? `${d.audio} in the project folder, ${d.rate && d.rate > VAD_SAMPLE_RATE ? `${d.rate / 1000} kHz mono without call filters, voiceover quality` : '16 kHz mono (phone quality, from before full quality recording)'}, the word times line up with it` : null }
     }
   },
   {
@@ -543,8 +551,9 @@ export function setupScripts(): void {
   ipcMain.handle('scripts:change', (e, b: unknown, p: unknown, f: unknown, c: unknown) => changeScript(...ids(e, b, p), fileArg(f), cleanChange(c)))
   ipcMain.handle('scripts:status', (e, b: unknown, p: unknown, f: unknown, s: unknown) => setScriptStatus(...ids(e, b, p), fileArg(f), s === 'ready' ? 'ready' : 'draft'))
   // every dictation that goes to the agent, kept with its word times
-  ipcMain.handle('scripts:save-dump', async (e, b: unknown, p: unknown, t: unknown, audio: unknown) => {
-    const d = await saveDump(...ids(e, b, p), cleanTranscription(t), audio instanceof Float32Array ? audio : null)
+  ipcMain.handle('scripts:save-dump', async (e, b: unknown, p: unknown, t: unknown, audio: unknown, hifi: unknown) => {
+    const hi = hifi && typeof hifi === 'object' && (hifi as { pcm?: unknown }).pcm instanceof Float32Array && typeof (hifi as { rate?: unknown }).rate === 'number' ? (hifi as { rate: number; pcm: Float32Array }) : null
+    const d = await saveDump(...ids(e, b, p), cleanTranscription(t), audio instanceof Float32Array ? audio : null, hi)
     return { id: d.id, words: d.words.length, audio: d.audio ?? null }
   })
   // speech that isn't for a project still teaches the cadence profile

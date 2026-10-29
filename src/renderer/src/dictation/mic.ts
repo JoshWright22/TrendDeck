@@ -6,6 +6,89 @@ import { VAD_SAMPLE_RATE } from '@shared/vad'
 
 export interface Mic {
   close(): void
+  // the same mic at full quality with the call filters off, for the recording you keep. null when
+  // the computer wouldn't open it a second time
+  hifi: HiFi | null
+}
+
+export interface HiFi {
+  rate: number
+  // the stretch between these seconds since the mic opened, as the 16 kHz frames count them
+  slice(start: number, end: number): Float32Array
+}
+
+// echo cancellation, noise suppression and auto gain are for calls: they make a voice sound
+// metallic. the copy you keep goes without them, at the mic's own rate
+const HIFI_CONSTRAINTS = { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false, sampleRate: 48_000 }
+// how much full quality audio is held, the oldest goes first. 15 minutes at 48 kHz in 16 bit is 86 MB
+const HIFI_KEEP_S = 15 * 60
+
+async function openHiFi(deviceId: string | undefined): Promise<(HiFi & { close(): void }) | null> {
+  let stream: MediaStream | null = null
+  let ctx: AudioContext | null = null
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { ...HIFI_CONSTRAINTS, ...(deviceId ? { deviceId: { exact: deviceId } } : {}) }, video: false })
+    const rate = stream.getAudioTracks()[0]?.getSettings().sampleRate || 48_000
+    ctx = new AudioContext({ sampleRate: rate })
+    const source = ctx.createMediaStreamSource(stream)
+    const chunks: Int16Array[] = []
+    let dropped = 0
+    let held = 0
+    const node = ctx.createScriptProcessor(4096, 1, 1)
+    const mute = ctx.createGain()
+    mute.gain.value = 0
+    node.onaudioprocess = (e) => {
+      const f = e.inputBuffer.getChannelData(0)
+      const c = new Int16Array(f.length)
+      for (let i = 0; i < f.length; i++) c[i] = Math.max(-32768, Math.min(32767, Math.round(f[i] * 32767)))
+      chunks.push(c)
+      held += c.length
+      while (held > HIFI_KEEP_S * rate && chunks.length > 1) {
+        const old = chunks.shift()!
+        held -= old.length
+        dropped += old.length
+      }
+    }
+    source.connect(node)
+    node.connect(mute)
+    mute.connect(ctx.destination)
+    const s = stream
+    const c = ctx
+    return {
+      rate,
+      slice: (start, end) => {
+        const from = Math.max(0, Math.round(start * rate) - dropped)
+        const to = Math.max(from, Math.round(end * rate) - dropped)
+        const out = new Float32Array(to - from)
+        let at = 0
+        let pos = 0
+        for (const ch of chunks) {
+          const a = Math.max(from, pos)
+          const b = Math.min(to, pos + ch.length)
+          for (let i = a; i < b; i++) out[at++] = ch[i - pos] / 32767
+          pos += ch.length
+          if (pos >= to) break
+        }
+        return out.subarray(0, at)
+      },
+      close: () => {
+        node.onaudioprocess = null
+        try {
+          source.disconnect()
+          node.disconnect()
+          mute.disconnect()
+        } catch {
+          // already gone
+        }
+        s.getTracks().forEach((t) => t.stop())
+        void c.close().catch(() => {})
+      }
+    }
+  } catch {
+    stream?.getTracks().forEach((t) => t.stop())
+    void ctx?.close().catch(() => {})
+    return null
+  }
 }
 
 // "Microphone (HyperX Cloud III S Wireless) (03f0:06be)" without the usb ids on the end
@@ -55,11 +138,14 @@ export async function openMic(onFrame: (frame: Float32Array) => void, name = '')
   try {
     ctx = new AudioContext({ sampleRate: VAD_SAMPLE_RATE })
     const source = ctx.createMediaStreamSource(stream)
+    const hifi = await openHiFi(stream.getAudioTracks()[0]?.getSettings().deviceId)
     const stop = await capture(ctx, source, onFrame)
     const context = ctx
     return {
+      hifi,
       close: () => {
         stop()
+        hifi?.close()
         try {
           source.disconnect()
         } catch {

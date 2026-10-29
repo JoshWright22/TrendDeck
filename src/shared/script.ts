@@ -51,9 +51,11 @@ export interface Dump {
   text: string
   words: SpokenWord[]
   duration: number
-  // the recording, a 16 kHz wav in the project folder (scripts/dumps/<id>.wav). missing on dumps
-  // from before audio was kept
+  // the recording, a wav in the project folder (scripts/dumps/<id>.wav). missing on dumps from
+  // before audio was kept
   audio?: string
+  // its sample rate: 48 kHz without call filters for the voiceover, 16 kHz on older dumps
+  rate?: number
 }
 
 // 16-bit mono wav of float samples, for the dictation recordings
@@ -373,7 +375,7 @@ export interface ScriptsApi {
   setStatus(brandId: string, projectId: string, file: string, status: 'draft' | 'ready'): Promise<ScriptView | null>
   // a dictation that went to the agent, saved with its word times in the project
   // audio: the dictation as 16 kHz mono samples, saved as a wav next to it
-  saveDump(brandId: string, projectId: string, t: Pick<Transcription, 'text' | 'words' | 'duration'>, audio?: Float32Array): Promise<{ id: string; words: number; audio: string | null }>
+  saveDump(brandId: string, projectId: string, t: Pick<Transcription, 'text' | 'words' | 'duration'>, audio?: Float32Array, hifi?: { rate: number; pcm: Float32Array }): Promise<{ id: string; words: number; audio: string | null }>
   // speech outside a project, only for the cadence profile
   addSpeech(brandId: string, t: Pick<Transcription, 'text' | 'words' | 'duration'>): Promise<void>
   show(brandId: string, projectId: string, threadId: string | null): Promise<string>

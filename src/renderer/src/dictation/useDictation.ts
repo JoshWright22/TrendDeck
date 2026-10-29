@@ -13,8 +13,9 @@ import { listMics, openMic, type Mic } from './mic'
 export type DictationState = 'idle' | 'starting' | 'listening' | 'finishing'
 
 export interface DictationHandlers {
-  // audio: the utterance as 16 kHz mono samples, kept with the dictation
-  onText: (text: string, t: Transcription, audio: Float32Array) => void
+  // audio: the utterance as 16 kHz mono samples. hifi: the same stretch at full quality, kept as
+  // the recording when there is one
+  onText: (text: string, t: Transcription, audio: Float32Array, hifi: { rate: number; pcm: Float32Array } | null) => void
   // '' when nothing is pending
   onPartial: (text: string) => void
   // after a pause with auto-send on and nothing left to transcribe
@@ -133,6 +134,9 @@ export function useDictation(h: DictationHandlers): DictationControl {
   }
 
   const transcribe = (u: Utterance): void => {
+    // cut now: the mic may be closed by the time the words are back
+    const hi = mic.current?.hifi
+    const hifi = hi ? { rate: hi.rate, pcm: hi.slice(u.start, u.end) } : null
     pending.current++
     handlers.current.onPartial('...')
     const controller = abort.current
@@ -144,7 +148,7 @@ export function useDictation(h: DictationHandlers): DictationControl {
         })
         if (controller?.signal.aborted) return
         const text = t.text.trim()
-        if (text) handlers.current.onText(text, t, u.audio)
+        if (text) handlers.current.onText(text, t, u.audio, hifi)
       } catch (err) {
         if (!controller?.signal.aborted) setError(cleanError(err, 'Transcription failed.'))
       } finally {

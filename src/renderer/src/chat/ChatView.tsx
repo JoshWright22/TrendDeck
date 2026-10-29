@@ -261,7 +261,7 @@ export default function ChatView({
   useTakeTranscriber(brandId, cards)
   // dictation: finished words go into the draft, the part still being transcribed shows lighter
   const [partial, setPartial] = useState('')
-  const dictated = useRef<{ t: Transcription; offset: number; audio: Float32Array }[]>([])
+  const dictated = useRef<{ t: Transcription; offset: number; audio: Float32Array; hifi: { rate: number; pcm: Float32Array } | null }[]>([])
   const [talkMode, setTalkMode] = useState<TalkMode | null>(null)
   const [recording, setRecording] = useState(false)
   const [takeBusy, setTakeBusy] = useState(false)
@@ -639,7 +639,19 @@ export default function ChatView({
           audio.set(p.audio, at)
           at += p.audio.length
         }
-        const dump = await window.trenddeckScripts.saveDump(brandId, project.id, joined, audio)
+        // the full quality copy is the recording you keep, when every part has one at the same rate
+        const rate = parts[0]?.hifi?.rate
+        let hifi: { rate: number; pcm: Float32Array } | undefined
+        if (rate && parts.every((p) => p.hifi?.rate === rate)) {
+          const pcm = new Float32Array(parts.reduce((n, p) => n + p.hifi!.pcm.length, 0))
+          let h = 0
+          for (const p of parts) {
+            pcm.set(p.hifi!.pcm, h)
+            h += p.hifi!.pcm.length
+          }
+          hifi = { rate, pcm }
+        }
+        const dump = await window.trenddeckScripts.saveDump(brandId, project.id, joined, audio, hifi)
         return `\n\n(Dictated. Saved as dump ${dump.id} with word times${dump.audio ? ` and the audio, ${dump.audio}` : ''}.)`
       }
       await window.trenddeckScripts.addSpeech(brandId, joined)
@@ -717,7 +729,7 @@ export default function ChatView({
 
   const dictation = useDictation({
     onPartial: setPartial,
-    onText: (text, t, audio) => {
+    onText: (text, t, audio, hifi) => {
       // an approval waiting and a short yes or no: that answers it, by your own voice only
       const said = approval ? shortAnswer(text) : null
       if (said) {
@@ -727,12 +739,12 @@ export default function ChatView({
       }
       // hands-free while a reply runs: what you say goes straight in as a steer
       if (dictation.config?.handsFree && busy && thread) {
-        dictated.current.push({ t, offset: 0, audio })
+        dictated.current.push({ t, offset: 0, audio, hifi })
         void keepDictation().then((note) => sendToAgent(`${text}${note}`).catch((err) => setError(cleanError(err))))
         return
       }
       const offset = dictated.current.reduce((n, p) => n + p.t.duration, 0)
-      dictated.current.push({ t, offset, audio })
+      dictated.current.push({ t, offset, audio, hifi })
       setDraft((current) => (current.trim() ? `${current.replace(/\s+$/, '')} ${text}` : text))
     },
     onPause: () => void send()
