@@ -5,6 +5,12 @@ import type { StorageApi } from '@shared/storage'
 // chat cards and storage settings, exposed as window.trenddeckCards and window.trenddeckStorage
 
 export const cardsApi: CardsApi = {
+  previewSpeed: () => ipcRenderer.invoke('preview-speed:get'),
+  onPreviewSpeed: (fn) => {
+    const listener = (_e: unknown, n: number): void => fn(n)
+    ipcRenderer.on('preview-speed:changed', listener)
+    return () => ipcRenderer.removeListener('preview-speed:changed', listener)
+  },
   list: (brandId, threadId) => ipcRenderer.invoke('cards:list', brandId, threadId),
   answer: (brandId, cardId, answer) => ipcRenderer.invoke('cards:answer', brandId, cardId, answer),
   saveFrame: (brandId, cardId, frame) => ipcRenderer.invoke('cards:save-frame', brandId, cardId, frame),

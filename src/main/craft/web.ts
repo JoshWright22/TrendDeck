@@ -13,6 +13,7 @@ import { makeProxy, nativeCommand, type JobWhere } from './jobs'
 import { cleanEnv, runningApp } from './launch'
 import { McpClient, type McpCallResult, type McpContent } from './mcp'
 import { projectOperation, snapshotFile } from './recovery'
+import { previewSpeedNow } from '../preview-speed'
 import { isInside, safeName } from './rules'
 import { appUrl, craftWebResponse, projectUrl } from './web-protocol'
 import { setView, viewOf } from './web-view'
@@ -710,6 +711,32 @@ async function restoreView(e: Embed): Promise<void> {
 
 // ---- lifecycle ----
 
+// FilmCraft plays at 1x every time play starts. each start goes to your preview speed (2x unless
+// changed), a speed you pick while it plays (J, K, L) stays until it stops. only watching:
+// clips and renders keep their own speed
+const SPEED_POLL_MS = 400
+function watchSpeed(e: Embed): void {
+  let was = false
+  let busy = false
+  e.timers.push(
+    setInterval(() => {
+      if (busy || e.state !== 'ready' || e.restarting) return
+      busy = true
+      void (async () => {
+        const p = (await call(e, 'request', 'ui.playback', {})) as { playing?: unknown } | null
+        const now = p?.playing === true
+        const speed = previewSpeedNow()
+        if (now && !was && speed !== 1) await call(e, 'request', 'ui.playback', { action: 'play', speed })
+        was = now
+      })()
+        .catch(() => {})
+        .finally(() => {
+          busy = false
+        })
+    }, SPEED_POLL_MS)
+  )
+}
+
 async function load(e: Embed): Promise<void> {
   try {
     await waitReady(e)
@@ -718,6 +745,7 @@ async function load(e: Embed): Promise<void> {
       await openDocument(e)
       e.timers.push(setInterval(() => void saveSoon(e, 'autosave').catch((err) => fail(e, err, false)), AUTOSAVE_MS))
       e.timers.push(setInterval(() => void watchExports(e).catch(() => {}), 2_000))
+      watchSpeed(e)
     } else if (e.file) {
       await dropFile(e, e.file)
       // the agent changed the file on disk: show it again, unless you have changes here

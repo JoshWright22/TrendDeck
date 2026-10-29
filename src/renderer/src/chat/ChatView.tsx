@@ -1097,6 +1097,14 @@ export default function ChatView({
     </div>
   )
 
+  // a dictated message plays back its recording, saved in the chat's project with the dump
+  const dictationAudio = (text: string): ReactNode => {
+    const file = /the audio, (scripts\/dumps\/[\w-]+\.wav)/.exec(text)?.[1]
+    if (!file || !project) return null
+    const src = window.trenddeckCards.projectFileUrl(brand.id, { projectId: project.id, file, kind: 'audio' })
+    return <audio className="cx-dictation-audio" controls preload="none" src={src} aria-label="Your dictation" />
+  }
+
   const userMessage = (m: ThreadMessage): ReactNode =>
     editing?.id === m.id ? (
       <div key={m.id} className="cx-msg user editing">
@@ -1133,6 +1141,7 @@ export default function ChatView({
         <div className={`cx-msg user${m.steer ? ' steer' : ''}`}>
           {m.steer && <span className="cx-steer-tag">Steered</span>}
           {m.text}
+          {dictationAudio(m.text)}
           {m.attachments?.length ? (
             <div className="cx-files in-msg">
               {m.attachments.map((f) => (

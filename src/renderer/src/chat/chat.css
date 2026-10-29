@@ -2620,3 +2620,12 @@
   border-radius: 6px;
   padding: 8px;
 }
+
+/* a dictated message's recording, under its words */
+.cx-dictation-audio {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: 32px;
+  margin-top: 8px;
+}

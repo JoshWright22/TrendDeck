@@ -1,4 +1,5 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { PREVIEW_SPEED_TOOL } from '../preview-speed'
 import { ID_PATTERN } from '@shared/types'
 import { SITE_TOOLS } from '../mcp/tools'
 import { onTurnClosed } from '../mcp/turns'
@@ -23,7 +24,7 @@ import { BRAND_TOOLS } from './tools/brand'
 export { callGatewayTool, mcpToolList, toolInfo } from './call'
 
 // every tool an agent can call, in the order tools/list shows them
-registerTools([...SITE_TOOLS, ...CONTENT_TOOLS, ...PUBLISH_TOOLS, ...PIPELINE_TOOLS, ...WORKSPACE_TOOLS])
+registerTools([PREVIEW_SPEED_TOOL, ...SITE_TOOLS, ...CONTENT_TOOLS, ...PUBLISH_TOOLS, ...PIPELINE_TOOLS, ...WORKSPACE_TOOLS])
 registerTools(qcTools())
 // project history and cloud copies, then the brand's docs, past videos and style memory
 registerTools(STORAGE_TOOLS)

@@ -296,6 +296,9 @@ export interface ReviewFeedback {
 }
 
 export interface CardsApi {
+  // how fast videos play, the same for TrendDeck's players and the Craft editor (main/preview-speed.ts)
+  previewSpeed(): Promise<number>
+  onPreviewSpeed(fn: (speed: number) => void): () => void
   list(brandId: string, threadId: string): Promise<ChatCard[]>
   // the user's pick on a suggestion card, the chat sends it on to the agent
   answer(brandId: string, cardId: string, answer: { choice: string; text: string }): Promise<ChatCard | null>

@@ -9,6 +9,7 @@ import { ID_PATTERN, isHttpUrl, partitionFor, type AppData } from '@shared/types
 import { styleSite } from './site-style'
 import { setupUpdater, updateNow } from './updater'
 import { setupContextMenu } from './context-menu'
+import { setupPreviewSpeed } from './preview-speed'
 import { moveProjectsOutOfOneDrive } from './craft/move-root'
 import { webInUse } from './craft/web'
 import { bootInfo } from './boot-state'
@@ -253,6 +254,7 @@ ipcMain.handle('brand:clear-session', async (_event, brandId: unknown) => {
 })
 
 setupContextMenu()
+setupPreviewSpeed()
 setupTrends()
 setupAnalytics()
 setupMcp()
