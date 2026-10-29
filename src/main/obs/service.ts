@@ -450,6 +450,23 @@ export function setInputMute(brandId: string, input: string, muted: boolean): Pr
   }))
 }
 
+// any OBS WebSocket request for the agent, the same ones the OBS settings window uses. the stream
+// key and anything that starts or stops recording or streaming are kept for their own tools
+const OBS_BLOCKED = /StreamServiceSettings|^(Start|Stop|Toggle|Pause|Resume)(Stream|Record|RecordPause|VirtualCam|ReplayBuffer|Output)|^Shutdown$|PersistentData|^CallVendorRequest$|^SetRecordDirectory$/
+export function obsRequestAllowed(requestType: string): string | null {
+  if (!/^[A-Z][A-Za-z]+$/.test(requestType)) return 'not an OBS request name'
+  if (OBS_BLOCKED.test(requestType)) return `${requestType} isn't available here: the stream key stays with OBS, and recording and streaming have their own tools`
+  return null
+}
+export const obsReadOnly = (requestType: string): boolean => /^(Get|List)/.test(requestType)
+
+export function obsRequest(brandId: string, requestType: string, requestData: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const why = obsRequestAllowed(requestType)
+  if (why) return Promise.reject(new Error(why))
+  if (obsReadOnly(requestType)) return read(brandId, (client) => client.request(requestType, requestData))
+  return exclusive(() => withClient(brandId, (client) => client.request(requestType, requestData)))
+}
+
 export async function isStreaming(brandId: string): Promise<boolean> {
   return read(brandId, async (client) => (await client.request('GetStreamStatus')).outputActive === true)
 }

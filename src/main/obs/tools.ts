@@ -6,7 +6,7 @@ import { bool, int, obj, str } from '../gateway/validate'
 import { getData } from '../store'
 import { obsPreferences } from './preferences'
 import {
-  configureObs, isStreaming, obsScenes, obsStatus, recentTakes, screenshot, setInputMute, setupRecording, startRecording, startStream,
+  configureObs, isStreaming, obsReadOnly, obsRequest, obsScenes, obsStatus, recentTakes, screenshot, setInputMute, setupRecording, startRecording, startStream,
   stopRecording, stopStream, switchScene
 } from './service'
 
@@ -41,6 +41,18 @@ const liveWhy = async (turn: Turn, what: string): Promise<string | null> => {
   } catch {
     return `TrendDeck couldn't check whether OBS is live, viewers may ${what}`
   }
+}
+
+const dataOf = (raw: unknown): Record<string, unknown> => {
+  if (typeof raw !== 'string' || !raw.trim()) return {}
+  let v: unknown
+  try {
+    v = JSON.parse(raw)
+  } catch {
+    throw new ToolError('data must be a JSON object')
+  }
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new ToolError('data must be a JSON object')
+  return v as Record<string, unknown>
 }
 
 const kb = (n: number): string => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`)
@@ -93,6 +105,30 @@ export const OBS_TOOLS: GatewayTool[] = [
       const project = projectOf(turn, args.projectId)
       const takes = await recentTakes(turn.brandId, project.id)
       return takes.map((t) => ({ name: t.name, file: t.file, size: kb(t.size), at: new Date(t.modifiedAt).toISOString() }))
+    })
+  },
+  {
+    name: 'obs_get', title: 'Read from OBS', risk: 'read',
+    description:
+      "Any OBS WebSocket v5 read request (names starting with Get or List), answered as JSON: GetStats (fps, dropped/lagged frames, CPU, disk), GetVideoSettings (resolution, fps), GetRecordStatus, GetProfileParameter (Output/SimpleOutput/AdvOut/Video settings), GetSceneItemList (sources in a scene and whether they're shown), GetInputSettings, GetSourceFilterList, GetInputList, GetOutputList and the rest. Prefer this over screenshots for anything but how the picture looks. The stream key isn't readable.",
+    inputSchema: obj({ request: str('the request name, e.g. GetStats', 80, 3), data: str('its requestData as a JSON object, {} or left out when it takes none', 4000) }, ['request']),
+    run: (turn, args) => plain(async () => {
+      const request = String(args.request)
+      if (!obsReadOnly(request)) throw new ToolError(`${request} changes OBS, use obs_set`)
+      return obsRequest(turn.brandId, request, dataOf(args.data))
+    })
+  },
+  {
+    name: 'obs_set', title: 'Change OBS', risk: 'edit',
+    description:
+      "Any OBS WebSocket v5 request that changes OBS: SetSceneItemEnabled (show or hide a source), SetVideoSettings (resolution, fps; only while not recording or streaming), SetProfileParameter (output settings), SetInputSettings, SetSourceFilterEnabled, CreateInput, SetCurrentProfile and the rest. Starting or stopping recording or streaming, and the stream key, are kept for their own tools. Asks first while OBS is live.",
+    inputSchema: obj({ request: str('the request name, e.g. SetSceneItemEnabled', 80, 3), data: str('its requestData as a JSON object', 8000) }, ['request']),
+    mustAsk: (turn) => liveWhy(turn, 'see the change'),
+    summarize: (_turn, args) => `OBS: ${String(args.request)} ${typeof args.data === 'string' ? args.data.slice(0, 200) : ''}`.trim(),
+    run: (turn, args) => plain(async () => {
+      const request = String(args.request)
+      if (obsReadOnly(request)) throw new ToolError(`${request} only reads, use obs_get`)
+      return (await obsRequest(turn.brandId, request, dataOf(args.data))) ?? { ok: true }
     })
   },
   {
