@@ -67,6 +67,21 @@ export async function moveProjectsOutOfOneDrive(): Promise<void> {
   const fixed = JSON.parse(swapRoot(JSON.stringify(data), from, to)) as typeof data
   await saveData(fixed)
   await rewrite(join(app.getPath('userData'), 'cards'), from, to)
+  await fs.writeFile(movedFile(), JSON.stringify({ from, to, at: Date.now() }), 'utf8').catch(() => {})
   console.log(`craft: projects moved out of OneDrive to ${to}, ${files} project files updated`)
+}
+
+const movedFile = (): string => join(app.getPath('userData'), 'projects-moved.json')
+
+// for a week after the move the agent hears of it: older messages in a chat still name the old
+// folder, and a file there isn't there any more
+export async function movedNote(): Promise<string> {
+  try {
+    const m = JSON.parse(await fs.readFile(movedFile(), 'utf8')) as { from?: unknown; to?: unknown; at?: unknown }
+    if (typeof m.from !== 'string' || typeof m.to !== 'string' || typeof m.at !== 'number' || Date.now() - m.at > 7 * 86_400_000) return ''
+    return `The project folders moved from ${m.from} to ${m.to}. Paths in earlier messages that start with the old folder are out of date: use the new one.`
+  } catch {
+    return ''
+  }
 }
 

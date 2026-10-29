@@ -18,6 +18,7 @@ import { checkProjectFile, newVideosSince, projectFileUrl, relativeIn } from './
 import { addCard, cardsDir, changeCard, dropCards, getCard, listCards, newCardId } from './store'
 import { cardTools, projectOf } from './tools'
 import { registerTurnNotes } from '../agents/context'
+import { movedNote } from '../craft/move-root'
 import { setupCollab, turnNotes } from './collab'
 import { embedTools, setupEmbeds } from './embed'
 import { setupTurnEdits } from './turn-edits'
@@ -126,6 +127,7 @@ export function setupCards(): void {
   setupTurnEdits()
   setupCollab()
   registerTurnNotes(turnNotes)
+  registerTurnNotes(() => movedNote())
 
   ipcMain.handle('cards:list', (e, brandId: unknown, threadId: unknown) => {
     if (!fromApp(e) || !isId(brandId) || typeof threadId !== 'string') return []
