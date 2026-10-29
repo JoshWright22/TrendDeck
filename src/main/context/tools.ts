@@ -102,8 +102,7 @@ export const CONTEXT_TOOLS: GatewayTool[] = [
     name: 'remember_style',
     title: 'Remember a style rule',
     risk: 'edit',
-    alwaysAsk: true,
-    description: `Ask the user to save a short style rule for this brand, e.g. "Cut every pause longer than 0.4 s". The user approves each one. Saved rules are shown to you on every turn. Up to ${STYLE_RULE_MAX} rules, ${STYLE_RULE_CHARS} characters each.`,
+    description: `Saves a short style rule for this brand right away, e.g. "Cut every pause longer than 0.4 s". Tell the user what you saved; they can change or remove it in Settings. Saved rules are shown to you on every turn. Up to ${STYLE_RULE_MAX} rules, ${STYLE_RULE_CHARS} characters each.`,
     inputSchema: obj(
       {
         rule: str('The rule, one short sentence.', STYLE_RULE_CHARS, 1),

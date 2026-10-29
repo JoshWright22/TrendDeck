@@ -10,7 +10,7 @@ export interface StyleRule {
   id: string
   text: string
   createdAt: number
-  // agent: proposed with remember_style and approved by the user. user: typed in settings
+  // agent: saved with remember_style. user: typed in settings
   source: 'agent' | 'user'
   why?: string
 }
