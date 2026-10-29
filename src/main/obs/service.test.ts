@@ -216,7 +216,7 @@ describe('OBS agent tools', () => {
         expect(tool.mustAsk).toBeTypeOf('function')
       }
     }
-    expect(OBS_TOOLS.filter((t) => t.risk === 'read').map((t) => t.name).sort()).toEqual(['obs_scenes', 'obs_screenshot', 'obs_show', 'obs_status', 'obs_takes'])
+    expect(OBS_TOOLS.filter((t) => t.risk === 'read').map((t) => t.name).sort()).toEqual(['obs_get', 'obs_scenes', 'obs_screenshot', 'obs_show', 'obs_status', 'obs_takes'])
   })
 
   it('imports the password from local OBS only after asking, and never hands it back', async () => {
