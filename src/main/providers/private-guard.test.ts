@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { touchesPrivate } from './private-guard'
-import { privateRules } from './claude'
+import { privateRules, withoutRules } from './claude'
 
 const DIR = 'C:\\Users\\awsom\\AppData\\Roaming\\TrendDeck'
 
@@ -35,5 +35,15 @@ describe('privateRules', () => {
     expect(rules).toContain('Read(//c/Users/awsom/AppData/Roaming/TrendDeck/trenddeck.json)')
     expect(rules).toContain('Read(//c/Users/awsom/AppData/Roaming/TrendDeck/Partitions/**)')
     expect(rules.some((r) => r.includes('agent-room'))).toBe(false)
+  })
+})
+
+describe('withoutRules', () => {
+  it('leaves the instructions out of the message, they go in the system prompt', () => {
+    const rules = 'You are the agent.\nRule two.'
+    expect(withoutRules(`${rules}\n\n## New message from the user\nhi`, rules)).toBe('## New message from the user\nhi')
+    const again = `## TrendDeck's instructions, updated (these replace the ones from the start of this chat)\n${rules}\n\n## New message from the user\nhi`
+    expect(withoutRules(again, rules)).toBe('\n## New message from the user\nhi')
+    expect(withoutRules('hi', rules)).toBe('hi')
   })
 })

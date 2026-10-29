@@ -46,9 +46,8 @@ const loadSdk = (): Promise<Sdk> => (sdk ??= import('@anthropic-ai/claude-agent-
 
 const SPEC = CLIS.find((c) => c.id === 'claude')!
 
-// everything claude code itself has: a shell, files, the web, a todo list, its own helpers. the
-// permission mode decides what asks first. the app's own tools come over mcp
-const TOOLS = ['Bash', 'Read', 'Write', 'Edit', 'MultiEdit', 'Glob', 'Grep', 'NotebookEdit', 'WebSearch', 'WebFetch', 'TodoWrite', 'Task']
+// claude code's own toolset (baseOptions), the permission mode decides what asks first. these go
+// through without asking in every mode. the app's own tools come over mcp
 const READ_ONLY = ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite']
 const APP_TOOLS = 'mcp__trenddeck'
 
@@ -87,9 +86,9 @@ function mapMode(mode: PermissionMode): Mapped {
     case 'auto-accept-edits':
       // the app's tool server checks site access itself, request_post waits for the user anyway
       // shell commands go through too, like the edits. TrendDeck's own folder stays guarded (hooks)
-      return { permissionMode: 'acceptEdits', allowedTools: [...READ_ONLY, APP_TOOLS, 'Bash'] }
+      return { permissionMode: 'acceptEdits', allowedTools: [...READ_ONLY, APP_TOOLS, 'Bash', 'PowerShell'] }
     case 'auto':
-      return { permissionMode: 'auto', allowedTools: [...READ_ONLY, APP_TOOLS, 'Bash'] }
+      return { permissionMode: 'auto', allowedTools: [...READ_ONLY, APP_TOOLS, 'Bash', 'PowerShell'] }
     case 'full-access':
       return { permissionMode: 'bypassPermissions', allowedTools: [...READ_ONLY, APP_TOOLS], allowDangerouslySkipPermissions: true }
   }
@@ -125,16 +124,26 @@ function spawner(claude: { path: string; launch: Launch }): (o: SpawnOptions) =>
   }
 }
 
+// the instructions come in the system prompt here, so the copy the chat puts in the message
+// (at the start of a chat, or again after an update) is left out of it
+export function withoutRules(text: string, rules: string | undefined): string {
+  if (!rules) return text
+  const again = `## TrendDeck's instructions, updated (these replace the ones from the start of this chat)\n${rules}\n`
+  const out = text.split(again).join('')
+  return out.startsWith(rules) ? out.slice(rules.length).replace(/^\n+/, '') : out
+}
+
 async function baseOptions(claude: { path: string; launch: Launch }, env: Record<string, string>): Promise<Options> {
   return {
     cwd: await workDir(),
     pathToClaudeCodeExecutable: claude.path,
     spawnClaudeCodeProcess: spawner(claude),
     env: { ...agentEnv(env), CLAUDE_AGENT_SDK_CLIENT_APP: `trenddeck/${app.getVersion()}` },
-    // the user's own settings, plugins and mcp servers stay out, like --strict-mcp-config did
-    settingSources: [],
+    // like T3 Code: the user's own claude code settings and CLAUDE.md files, and claude code's
+    // whole toolset. their own mcp servers stay out, TrendDeck's come in with the turn
+    settingSources: ['user', 'project', 'local'],
     strictMcpConfig: true,
-    tools: TOOLS
+    tools: { type: 'preset', preset: 'claude_code' }
   }
 }
 
@@ -260,7 +269,7 @@ class ClaudeSession implements ProviderSession {
     const inbox = new Inbox<SDKUserMessage>()
     this.inbox = inbox
     this.interrupted = false
-    inbox.push(this.message(input.text))
+    inbox.push(this.message(withoutRules(input.text, input.system)))
 
     const mcp = this.start.mcp
     const mapped = mapMode(this.mode)
@@ -269,6 +278,9 @@ class ClaudeSession implements ProviderSession {
       abortController: abort,
       includePartialMessages: true,
       canUseTool: this.canUseTool,
+      // claude code's own system prompt, the one that makes it act like a coding agent, with
+      // TrendDeck's instructions after it, fresh every turn (T3 Code does the same)
+      systemPrompt: { type: 'preset', preset: 'claude_code', append: input.system || undefined },
       permissionMode: mapped.permissionMode,
       allowedTools: mapped.allowedTools,
       settings: await guardSettings(),
