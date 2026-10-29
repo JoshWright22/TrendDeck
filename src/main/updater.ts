@@ -143,6 +143,24 @@ function cleanUp(): void {
 }
 
 // restarting is all it takes, boot.ts picks the downloaded code up
+// asked from outside (TrendDeck.exe --update-now while it runs): check now, and once the update is
+// downloaded start again on it as soon as no reply is being written and no editor holds unsaved work
+export async function updateNow(busy: () => boolean): Promise<void> {
+  if (!checkNow) return
+  const res = await checkNow().catch((err) => {
+    console.error('update check failed', err)
+    return 'error' as const
+  })
+  if (res !== 'downloading') return
+  const until = Date.now() + 2 * 60 * 60_000
+  const tick = (): void => {
+    if (Date.now() > until) return
+    if (installNow && !busy()) return installNow()
+    setTimeout(tick, 15_000)
+  }
+  tick()
+}
+
 function relaunch(): void {
   app.relaunch()
   app.quit()

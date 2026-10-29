@@ -95,6 +95,12 @@ export function webUnsaved(cardId: string): boolean {
   return !!e && e.touched && e.state === 'ready' && webSpec(e.appId)?.kind === 'files' && !!e.guest && !e.guest.isDestroyed()
 }
 
+// an editor you're working in right now (a change in the last two minutes) or one holding work
+// TrendDeck can't save for you: a restart for an update waits for it
+export function webInUse(now = Date.now()): boolean {
+  return [...embeds.values()].some((e) => (e.editedAt && now - e.editedAt < 120_000) || webUnsaved(e.cardId))
+}
+
 // the running editor on a project and when you last changed something in it
 export function webEdited(appId: string, brandId: string, projectId: string): { cardId: string; editedAt: number } | null {
   const e = liveFor(appId, brandId, projectId)

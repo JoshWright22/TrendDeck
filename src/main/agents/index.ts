@@ -644,6 +644,9 @@ async function steer(brandId: string, thread: Thread, text: string, agentId: str
   return { mode: 'queued', threadId: thread.id, queueId: q.id }
 }
 
+// a reply is being written somewhere, an update waits for it
+export const agentsWorking = (): boolean => runs.size > 0
+
 export function stopBrand(brandId: string): void {
   for (const [key, live] of runs) if (key.startsWith(`${brandId}:`)) live.ctl.abort()
 }

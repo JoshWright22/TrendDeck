@@ -7,7 +7,8 @@ import { setupDictation } from './dictation'
 import { setupObs } from './obs'
 import { ID_PATTERN, isHttpUrl, partitionFor, type AppData } from '@shared/types'
 import { styleSite } from './site-style'
-import { setupUpdater } from './updater'
+import { setupUpdater, updateNow } from './updater'
+import { webInUse } from './craft/web'
 import { bootInfo } from './boot-state'
 import { loadData, saveData } from './store'
 import { dropTrends, setupTrends } from './trends'
@@ -20,7 +21,7 @@ import { setupMcp } from './mcp'
 import { dropGatewayBrand, setupGateway } from './gateway'
 import { forgetBrand } from './mcp/state'
 import { forgetBrandLogins, setupVault } from './vault'
-import { dropChats, setupAgents, stopBrand } from './agents'
+import { agentsWorking, dropChats, setupAgents, stopBrand } from './agents'
 import { dropVoice, setupVoice } from './voice'
 import { dropInboxBrand, setupInbox } from './inbox'
 import { setupReuse } from './reuse'
@@ -82,8 +83,10 @@ function openInApp(host: WebContents | null | undefined, url: string): void {
 // their own agents and editors on the same projects and write the same chat files
 let mainWin: BrowserWindow | null = null
 if (app.isPackaged && !app.requestSingleInstanceLock()) app.exit(0)
-app.on('second-instance', () => {
+app.on('second-instance', (_e, argv) => {
   if (!app.isReady()) return
+  // a new release was just pushed: take it without bringing the window up
+  if (argv.includes('--update-now')) return void updateNow(() => agentsWorking() || webInUse())
   if (!mainWin || mainWin.isDestroyed()) return createWindow()
   if (mainWin.isMinimized()) mainWin.restore()
   mainWin.show()
